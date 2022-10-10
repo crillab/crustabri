@@ -3,6 +3,10 @@ use anyhow::{anyhow, Context, Result};
 /// The semantics associated with a problem.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Semantics {
+    /// The grounded semantics
+    GR,
+    /// The complete semantics
+    CO,
     /// The stable semantics
     ST,
 }
@@ -12,6 +16,8 @@ impl TryFrom<&str> for Semantics {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value.to_ascii_lowercase().as_str() {
+            "gr" => Ok(Semantics::GR),
+            "co" => Ok(Semantics::CO),
             "st" => Ok(Semantics::ST),
             _ => Err(anyhow!(r#"undefined semantics "{}""#, value)),
         }

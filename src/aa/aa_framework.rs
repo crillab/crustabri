@@ -8,6 +8,7 @@ where
 {
     arguments: ArgumentSet<T>,
     attacks: Vec<(usize, usize)>,
+    attacks_from: Vec<Vec<usize>>,
     attacks_to: Vec<Vec<usize>>,
 }
 
@@ -73,10 +74,12 @@ where
     /// assert_eq!(0, framework.iter_attacks().count());
     /// ```
     pub fn new(arguments: ArgumentSet<T>) -> Self {
+        let attacks_from = (0..arguments.len()).map(|_| vec![]).collect();
         let attacks_to = (0..arguments.len()).map(|_| vec![]).collect();
         AAFramework {
             arguments,
             attacks: vec![],
+            attacks_from,
             attacks_to,
         }
     }
@@ -106,16 +109,16 @@ where
     /// ```
     pub fn new_attack(&mut self, from: &T, to: &T) -> Result<()> {
         let context = || format!("cannot add an attack from {:?} to {:?}", from, to,);
+        let attacker_id = self
+            .arguments
+            .get_argument_index(from)
+            .with_context(context)?;
         let attacked_id = self
             .arguments
             .get_argument_index(to)
             .with_context(context)?;
-        self.attacks.push((
-            self.arguments
-                .get_argument_index(from)
-                .with_context(context)?,
-            attacked_id,
-        ));
+        self.attacks.push((attacker_id, attacked_id));
+        self.attacks_from[attacker_id].push(self.attacks.len() - 1);
         self.attacks_to[attacked_id].push(self.attacks.len() - 1);
         Ok(())
     }
@@ -200,7 +203,7 @@ where
         }
     }
 
-    /// returns the number of arguments in this framework.
+    /// Returns the number of arguments in this framework.
     ///
     /// # Example
     ///
@@ -215,7 +218,7 @@ where
         self.argument_set().len()
     }
 
-    /// returns the number of attacks in this framework.
+    /// Returns the number of attacks in this framework.
     ///
     /// # Example
     ///
@@ -230,6 +233,44 @@ where
     /// ```
     pub fn n_attacks(&self) -> usize {
         self.attacks.len()
+    }
+
+    /// Computes and return the grounded extension of this argumentation framework.
+    pub fn grounded_extension(&self) -> Vec<&Argument<T>> {
+        let mut ext = vec![];
+        let mut n_processed_args = 0;
+        let mut defeated_args = vec![false; self.n_arguments()];
+        let mut attacked_by = self
+            .attacks_to
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                let n = v.len();
+                if n == 0 {
+                    ext.push(self.argument_set().get_argument_by_id(i))
+                }
+                n
+            })
+            .collect::<Vec<usize>>();
+        while n_processed_args < ext.len() {
+            let id = ext[n_processed_args].id();
+            self.attacks_from[id].iter().for_each(|defeating_att| {
+                let (_, defeated) = self.attacks[*defeating_att];
+                if !defeated_args[defeated] {
+                    defeated_args[defeated] = true;
+                    self.attacks_from[defeated].iter().for_each(|att| {
+                        let (_, attacked) = self.attacks[*att];
+                        if attacked_by[attacked] == 1 {
+                            ext.push(self.argument_set().get_argument_by_id(attacked))
+                        } else {
+                            attacked_by[attacked] -= 1;
+                        }
+                    })
+                }
+            });
+            n_processed_args += 1;
+        }
+        ext
     }
 }
 
@@ -326,5 +367,46 @@ mod tests {
         let args = ArgumentSet::new(&arg_labels);
         let mut attacks = AAFramework::new(args);
         attacks.new_attack_by_ids(0, 3).unwrap_err();
+    }
+
+    #[test]
+    fn test_grounded_extension_1() {
+        let arg_labels = vec!["a", "b", "c", "d", "e", "f"];
+        let args = ArgumentSet::new(&arg_labels);
+        let mut af = AAFramework::new(args);
+        af.new_attack(&"a", &"b").unwrap();
+        af.new_attack(&"b", &"c").unwrap();
+        af.new_attack(&"b", &"d").unwrap();
+        af.new_attack(&"c", &"e").unwrap();
+        af.new_attack(&"d", &"e").unwrap();
+        af.new_attack(&"e", &"f").unwrap();
+        let mut grounded = af
+            .grounded_extension()
+            .iter()
+            .map(|a| *a.label())
+            .collect::<Vec<&str>>();
+        grounded.sort_unstable();
+        assert_eq!(vec!["a", "c", "d", "f"], grounded)
+    }
+
+    #[test]
+    fn test_grounded_extension_2() {
+        let arg_labels = vec!["x", "a", "b", "c", "d", "e", "f"];
+        let args = ArgumentSet::new(&arg_labels);
+        let mut af = AAFramework::new(args);
+        af.new_attack(&"x", &"a").unwrap();
+        af.new_attack(&"a", &"b").unwrap();
+        af.new_attack(&"b", &"c").unwrap();
+        af.new_attack(&"b", &"d").unwrap();
+        af.new_attack(&"c", &"e").unwrap();
+        af.new_attack(&"d", &"e").unwrap();
+        af.new_attack(&"e", &"f").unwrap();
+        let mut grounded = af
+            .grounded_extension()
+            .iter()
+            .map(|a| *a.label())
+            .collect::<Vec<&str>>();
+        grounded.sort_unstable();
+        assert_eq!(vec!["b", "e", "x"], grounded)
     }
 }

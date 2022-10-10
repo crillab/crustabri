@@ -8,8 +8,8 @@ use crate::{
     AAFramework, LabelType,
 };
 
-/// A SAT-based solver for the Stable semantics.
-pub struct StableEncodingSolver<'a, T>
+/// A SAT-based solver for the stable semantics.
+pub struct StableSemanticsSolver<'a, T>
 where
     T: LabelType,
 {
@@ -17,7 +17,7 @@ where
     af: &'a AAFramework<T>,
 }
 
-impl<'a, T> StableEncodingSolver<'a, T>
+impl<'a, T> StableSemanticsSolver<'a, T>
 where
     T: LabelType,
 {
@@ -50,7 +50,7 @@ where
     }
 }
 
-impl<T> SingleExtensionComputer<T> for StableEncodingSolver<'_, T>
+impl<T> SingleExtensionComputer<T> for StableSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
@@ -71,7 +71,7 @@ where
     }
 }
 
-impl<T> CredulousAcceptanceComputer<T> for StableEncodingSolver<'_, T>
+impl<T> CredulousAcceptanceComputer<T> for StableSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
@@ -83,7 +83,7 @@ where
     }
 }
 
-impl<T> SkepticalAcceptanceComputer<T> for StableEncodingSolver<'_, T>
+impl<T> SkepticalAcceptanceComputer<T> for StableSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
@@ -119,7 +119,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = StableEncodingSolver::new(&af);
+        let mut solver = StableSemanticsSolver::new(&af);
         assert_eq!(
             vec!["a0"],
             solver
@@ -141,7 +141,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = StableEncodingSolver::new(&af);
+        let mut solver = StableSemanticsSolver::new(&af);
         assert!(solver.compute_one_extension().is_none());
     }
 
@@ -157,7 +157,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = StableEncodingSolver::new(&af);
+        let mut solver = StableSemanticsSolver::new(&af);
         assert!(solver.compute_one_extension().is_none());
     }
 
@@ -170,7 +170,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = StableEncodingSolver::new(&af);
+        let mut solver = StableSemanticsSolver::new(&af);
         assert!(solver
             .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
         assert!(!solver
@@ -191,7 +191,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = StableEncodingSolver::new(&af);
+        let mut solver = StableSemanticsSolver::new(&af);
         assert!(solver
             .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
         assert!(solver

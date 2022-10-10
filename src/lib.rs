@@ -16,10 +16,12 @@ pub use aa::Query;
 pub use aa::Semantics;
 
 mod solvers;
+pub use solvers::CompleteSemanticsSolver;
 pub use solvers::CredulousAcceptanceComputer;
+pub use solvers::GroundedSemanticsSolver;
 pub use solvers::SingleExtensionComputer;
 pub use solvers::SkepticalAcceptanceComputer;
-pub use solvers::StableEncodingSolver;
+pub use solvers::StableSemanticsSolver;
 
 mod sat;
 pub(crate) use sat::default_solver;

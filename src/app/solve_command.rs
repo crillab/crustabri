@@ -1,8 +1,9 @@
 use super::common;
 use anyhow::{anyhow, Context, Result};
 use crustabri::{
-    AAFramework, Argument, AspartixWriter, CredulousAcceptanceComputer, Query, Semantics,
-    SingleExtensionComputer, SkepticalAcceptanceComputer, StableEncodingSolver,
+    AAFramework, Argument, AspartixWriter, CompleteSemanticsSolver, CredulousAcceptanceComputer,
+    GroundedSemanticsSolver, Query, Semantics, SingleExtensionComputer,
+    SkepticalAcceptanceComputer, StableSemanticsSolver,
 };
 use crusti_app_helper::{warn, AppSettings, Arg, Command, SubCommand};
 
@@ -91,8 +92,9 @@ fn check_arg_definition(query: Query, arg: &Option<&Argument<String>>) -> Result
 }
 
 fn compute_one_extension(af: &AAFramework<String>, semantics: Semantics) -> Result<()> {
-    let mut solver = match semantics {
-        Semantics::ST => Box::new(StableEncodingSolver::new(af)),
+    let mut solver: Box<dyn SingleExtensionComputer<String>> = match semantics {
+        Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
+        Semantics::ST => Box::new(StableSemanticsSolver::new(af)),
     };
     let writer = AspartixWriter::default();
     let mut out = std::io::stdout();
@@ -107,8 +109,10 @@ fn check_credulous_acceptance(
     semantics: Semantics,
     arg: &Argument<String>,
 ) -> Result<()> {
-    let mut solver = match semantics {
-        Semantics::ST => Box::new(StableEncodingSolver::new(af)),
+    let mut solver: Box<dyn CredulousAcceptanceComputer<String>> = match semantics {
+        Semantics::GR => Box::new(GroundedSemanticsSolver::new(af)),
+        Semantics::CO => Box::new(CompleteSemanticsSolver::new(af)),
+        Semantics::ST => Box::new(StableSemanticsSolver::new(af)),
     };
     let writer = AspartixWriter::default();
     let mut out = std::io::stdout();
@@ -121,8 +125,9 @@ fn check_skeptical_acceptance(
     semantics: Semantics,
     arg: &Argument<String>,
 ) -> Result<()> {
-    let mut solver = match semantics {
-        Semantics::ST => Box::new(StableEncodingSolver::new(af)),
+    let mut solver: Box<dyn SkepticalAcceptanceComputer<String>> = match semantics {
+        Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
+        Semantics::ST => Box::new(StableSemanticsSolver::new(af)),
     };
     let writer = AspartixWriter::default();
     let mut out = std::io::stdout();
