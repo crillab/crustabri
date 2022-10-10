@@ -67,7 +67,9 @@ impl AspartixWriter {
 
     /// Writes the text associated with the fact the problem has no extension.
     pub fn write_no_extension(&self, writer: &mut dyn Write) -> Result<()> {
-        writeln!(writer, "NO").context("while writing problem has no extension")
+        let context = "while writing problem has no extension";
+        writeln!(writer, "NO").context(context)?;
+        writer.flush().context(context)
     }
 
     /// Writes a single extension.
@@ -88,6 +90,17 @@ impl AspartixWriter {
             }
         })?;
         writeln!(writer, "]").context(context)?;
+        writer.flush().context(context)
+    }
+
+    /// Writes an acceptance status.
+    pub fn write_acceptance_status(
+        &self,
+        writer: &mut dyn Write,
+        acceptance_status: bool,
+    ) -> Result<()> {
+        let context = "while writing an acceptance_status";
+        writeln!(writer, "{}", if acceptance_status { "YES" } else { "NO" }).context(context)?;
         writer.flush().context(context)
     }
 }
@@ -150,6 +163,28 @@ mod tests {
         let writer = AspartixWriter::default();
         let mut buffer = BufWriter::new(Vec::new());
         writer.write_no_extension(&mut buffer).unwrap();
+        assert_eq!(
+            "NO\n",
+            String::from_utf8(buffer.into_inner().unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_write_acceptance_status_yes() {
+        let writer = AspartixWriter::default();
+        let mut buffer = BufWriter::new(Vec::new());
+        writer.write_acceptance_status(&mut buffer, true).unwrap();
+        assert_eq!(
+            "YES\n",
+            String::from_utf8(buffer.into_inner().unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_write_acceptance_status_no() {
+        let writer = AspartixWriter::default();
+        let mut buffer = BufWriter::new(Vec::new());
+        writer.write_acceptance_status(&mut buffer, false).unwrap();
         assert_eq!(
             "NO\n",
             String::from_utf8(buffer.into_inner().unwrap()).unwrap()

@@ -125,7 +125,6 @@ where
     /// let arguments = ArgumentSet::new(&labels);
     /// assert_eq!(3, arguments.len());
     /// ```
-    #[inline(always)]
     pub fn len(&self) -> usize {
         self.arguments.len()
     }
@@ -140,7 +139,6 @@ where
     /// let arguments = ArgumentSet::new(&labels);
     /// assert!(!arguments.is_empty());
     /// ```
-    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.arguments.is_empty()
     }
@@ -170,6 +168,28 @@ where
             .get(label)
             .ok_or_else(|| anyhow!("no such argument: {}", label))
             .map(|i| *i)
+    }
+
+    /// Returns the argument associated to an argument label.
+    ///
+    /// # Arguments
+    ///
+    /// * `label` - the argument label
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::ArgumentSet;
+    /// let labels = vec!["a", "b", "c"];
+    /// let arguments = ArgumentSet::new(&labels);
+    /// assert!(arguments.get_argument(&"a").is_ok());
+    /// assert!(arguments.get_argument(&"d").is_err());
+    /// ```
+    pub fn get_argument(&self, label: &T) -> Result<&Argument<T>> {
+        self.label_to_id
+            .get(label)
+            .map(|i| &self.arguments[*i])
+            .ok_or_else(|| anyhow!("no such argument: {}", label))
     }
 
     /// Returns the argument with the corresponding id.
@@ -243,5 +263,13 @@ mod tests {
             iter_labels.push(arg.label.clone())
         }
         assert_eq!(arg_labels, iter_labels);
+    }
+
+    #[test]
+    fn test_get_argument() {
+        let labels = vec!["a", "b", "c"];
+        let arguments = ArgumentSet::new(&labels);
+        assert!(arguments.get_argument(&"a").is_ok());
+        assert!(arguments.get_argument(&"d").is_err());
     }
 }

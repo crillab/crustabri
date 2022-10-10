@@ -1,4 +1,6 @@
-use super::specs::SingleExtensionComputer;
+use super::specs::{
+    CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer,
+};
 use crate::Argument;
 use crate::{
     clause,
@@ -69,6 +71,32 @@ where
     }
 }
 
+impl<T> CredulousAcceptanceComputer<T> for StableEncodingSolver<'_, T>
+where
+    T: LabelType,
+{
+    fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
+        self.solver
+            .solve_under_assumptions(&[Literal::from(arg_id_to_solver_var(arg.id()) as isize)])
+            .unwrap_model()
+            .is_some()
+    }
+}
+
+impl<T> SkepticalAcceptanceComputer<T> for StableEncodingSolver<'_, T>
+where
+    T: LabelType,
+{
+    fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
+        self.solver
+            .solve_under_assumptions(&[
+                Literal::from(arg_id_to_solver_var(arg.id()) as isize).negate()
+            ])
+            .unwrap_model()
+            .is_none()
+    }
+}
+
 fn arg_id_to_solver_var(id: usize) -> usize {
     id + 1
 }
@@ -131,5 +159,46 @@ mod tests {
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = StableEncodingSolver::new(&af);
         assert!(solver.compute_one_extension().is_none());
+    }
+
+    #[test]
+    fn test_acceptance_1() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        att(a0,a1).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StableEncodingSolver::new(&af);
+        assert!(solver
+            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
+        assert!(!solver
+            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        assert!(solver
+            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
+        assert!(!solver
+            .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+    }
+
+    #[test]
+    fn test_acceptance_2() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        att(a0,a1).
+        att(a1,a0).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StableEncodingSolver::new(&af);
+        assert!(solver
+            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
+        assert!(solver
+            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        assert!(!solver
+            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
+        assert!(!solver
+            .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
     }
 }

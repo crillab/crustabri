@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 
 /// The semantics associated with a problem.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Semantics {
     /// The stable semantics
     ST,
@@ -19,10 +19,27 @@ impl TryFrom<&str> for Semantics {
 }
 
 /// The query to compute.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Query {
     /// Compute a single extension
     SE,
+    /// Check credulous acceptance
+    DC,
+    /// Check skeptical acceptance
+    DS,
+}
+
+impl Query {
+    /// Returns a short string representing the query.
+    ///
+    /// The string corresponds to the two letters query as defined in ICCMA competitions.
+    pub fn to_short_str(&self) -> &str {
+        match self {
+            Query::SE => "SE",
+            Query::DC => "DC",
+            Query::DS => "DS",
+        }
+    }
 }
 
 impl TryFrom<&str> for Query {
@@ -31,6 +48,8 @@ impl TryFrom<&str> for Query {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value.to_ascii_lowercase().as_str() {
             "se" => Ok(Query::SE),
+            "dc" => Ok(Query::DC),
+            "ds" => Ok(Query::DS),
             _ => Err(anyhow!(r#"undefined query "{}""#, value)),
         }
     }

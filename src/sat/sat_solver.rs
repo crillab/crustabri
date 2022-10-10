@@ -5,6 +5,7 @@ use std::num::{NonZeroIsize, NonZeroUsize};
 ///
 /// A variable is represented by a non-null positive integer.
 /// It can be obtained through the [From] trait from an integer type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Variable(NonZeroUsize);
 
 macro_rules! impl_var_from {
@@ -52,7 +53,14 @@ impl From<Variable> for usize {
 ///
 /// A literal is represented by a non-null integer.
 /// It can be obtained through the [From] trait from a signed integer type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Literal(NonZeroIsize);
+
+impl Literal {
+    pub fn negate(self) -> Self {
+        Self::from(-self.0.get())
+    }
+}
 
 macro_rules! impl_lit_from {
     ($t: ty) => {
@@ -164,6 +172,8 @@ pub trait SatSolver {
     fn add_clause(&mut self, cl: Vec<Literal>);
 
     fn solve(&mut self) -> SolvingResult;
+
+    fn solve_under_assumptions(&mut self, assumptions: &[Literal]) -> SolvingResult;
 }
 
 pub(crate) fn default_solver() -> Box<dyn SatSolver> {
@@ -185,14 +195,14 @@ mod tests {
     #[should_panic]
     fn test_var_from_null() {
         Variable::from(0);
-    }
+    } // kcov-ignore
 
     #[test]
     #[allow(unused_must_use)]
     #[should_panic]
     fn test_var_from_neg() {
         Variable::from(-1);
-    }
+    } // kcov-ignore
 
     #[test]
     fn test_lit_from_pos() {
@@ -205,7 +215,7 @@ mod tests {
     #[should_panic]
     fn test_lit_from_null() {
         Literal::from(0);
-    }
+    } // kcov-ignore
 
     #[test]
     fn test_lit_from_neg() {
@@ -230,5 +240,11 @@ mod tests {
     #[should_panic]
     fn test_solving_result_unwrap_model_unknown() {
         SolvingResult::Unknown.unwrap_model();
+    } // kcov-ignore
+
+    #[test]
+    fn test_negate_lit() {
+        assert_eq!(Literal::from(-1), Literal::from(1).negate());
+        assert_eq!(Literal::from(1), Literal::from(-1).negate());
     }
 }

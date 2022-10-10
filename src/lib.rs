@@ -16,7 +16,9 @@ pub use aa::Query;
 pub use aa::Semantics;
 
 mod solvers;
+pub use solvers::CredulousAcceptanceComputer;
 pub use solvers::SingleExtensionComputer;
+pub use solvers::SkepticalAcceptanceComputer;
 pub use solvers::StableEncodingSolver;
 
 mod sat;

@@ -26,7 +26,7 @@ pub(crate) fn read_aspartix_file_path(file_path: &str) -> Result<AAFramework<Str
     parser.add_warning_handler(Box::new(|line, msg| warn!("at line {}: {}", line, msg)));
     let af = parser.read(&mut file_reader)?;
     info!(
-        "The argumentation framework has {} arguments and {} attacks",
+        "The argumentation framework has {} argument(s) and {} attack(s)",
         af.n_arguments(),
         af.n_attacks(),
     );
