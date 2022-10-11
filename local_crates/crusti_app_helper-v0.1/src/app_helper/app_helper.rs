@@ -21,7 +21,6 @@ use std::{ffi::OsString, sync::Once, time::SystemTime};
 
 static LOGGER_INIT: Once = Once::new();
 
-
 /// The main struct used to build an app.
 ///
 /// This helper class should be used this way:
@@ -94,7 +93,6 @@ impl<'a> AppHelper<'a> {
         I: IntoIterator<Item = T>,
         T: Into<OsString> + Clone,
     {
-        init_logger();
         if let Err(e) = self.execute_app(args) {
             error!("an error occurred: {}", e);
             e.chain()
@@ -122,23 +120,26 @@ impl<'a> AppHelper<'a> {
 }
 
 pub fn init_logger() {
+    init_logger_with_level(log::LevelFilter::Info)
+}
+
+pub fn init_logger_with_level(level: log::LevelFilter) {
     LOGGER_INIT.call_once(|| {
         let colors = fern::colors::ColoredLevelConfig::new().info(fern::colors::Color::Cyan);
         fern::Dispatch::new()
             .format(move |out, message, record| {
                 out.finish(format_args!(
-                    "[{:5}] {} {}",
+                    "![{:5}] {} {}",
                     colors.color(record.level()),
                     chrono::Local::now().format("[%Y-%m-%d %H:%M:%S]"),
                     message
                 ))
             })
-            .level(log::LevelFilter::Info)
+            .level(level)
             .chain(std::io::stdout())
             .apply()
             .unwrap_or(());
     });
-
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@ use crustabri::{
     GroundedSemanticsSolver, Query, Semantics, SingleExtensionComputer,
     SkepticalAcceptanceComputer, StableSemanticsSolver,
 };
-use crusti_app_helper::{warn, AppSettings, Arg, Command, SubCommand};
+use crusti_app_helper::{logging_level_cli_arg, warn, AppSettings, Arg, Command, SubCommand};
 
 const CMD_NAME: &str = "solve";
 
@@ -46,6 +46,7 @@ impl<'a> Command<'a> for SolveCommand {
                     .help("the argument (for DC/DS queries)")
                     .required(false),
             )
+            .arg(logging_level_cli_arg())
     }
 
     fn execute(&self, arg_matches: &crusti_app_helper::ArgMatches<'_>) -> Result<()> {

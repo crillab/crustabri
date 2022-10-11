@@ -15,11 +15,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use super::{command::Command, writable_string::WritableString};
+use crate::{init_logger, app_helper::app_helper::init_logger_with_level};
 use anyhow::{anyhow, Result};
-use clap::{App, AppSettings};
+use clap::{App, AppSettings, Arg};
 use log::info;
-use sysinfo::{System, SystemExt, ProcessorExt};
-use std::ffi::OsString;
+use std::{ffi::OsString, str::FromStr};
+use sysinfo::{ProcessorExt, System, SystemExt};
 
 /// A structure used to handle the set of commands and to process the CLI arguments against them.
 pub(crate) struct CliManager<'a> {
@@ -28,6 +29,18 @@ pub(crate) struct CliManager<'a> {
     author: &'a str,
     about: &'a str,
     commands: Vec<Box<dyn Command<'a>>>,
+}
+
+const APP_HELPER_LOGGING_LEVEL_ARG: &str = "APP_HELPER_LOGGING_LEVEL_ARG";
+
+pub fn logging_level_cli_arg<'a>() -> Arg<'a, 'a> {
+    Arg::with_name(APP_HELPER_LOGGING_LEVEL_ARG)
+        .long("logging-level")
+        .multiple(false)
+        .default_value("info")
+        .possible_values(&["trace", "debug", "info", "warn", "error", "off"])
+        .help("set the minimal logging level")
+        .required(true)
 }
 
 impl<'a> CliManager<'a> {
@@ -67,10 +80,18 @@ impl<'a> CliManager<'a> {
             .get_matches_from_safe(&mut args.clone().into_iter());
         match matches_result {
             Ok(matches) => {
-                info!("{} {}", self.app_name, self.version);
-                sys_info();
                 for c in self.commands.iter() {
                     if let Some(matches) = matches.subcommand_matches(c.name()) {
+                        let log_level = if let Some(str_log_level) =
+                            matches.value_of(APP_HELPER_LOGGING_LEVEL_ARG)
+                        {
+                            log::LevelFilter::from_str(str_log_level).unwrap()
+                        } else {
+                            log::LevelFilter::Info
+                        };
+                        init_logger_with_level(log_level);
+                        info!("{} {}", self.app_name, self.version);
+                        sys_info();
                         return c.execute(matches);
                     }
                 }
@@ -80,10 +101,12 @@ impl<'a> CliManager<'a> {
                 kind: clap::ErrorKind::HelpDisplayed,
                 ..
             }) => {
+                init_logger();
                 self.print_help(&mut app, args.as_slice());
                 Ok(())
             }
             Err(e) => {
+                init_logger();
                 info!("{} {}", self.app_name, self.version);
                 Err(anyhow!("{}", e))
             }
@@ -138,11 +161,20 @@ fn sys_info() {
     let sys = System::new_all();
     let unknown = || "[unknown]".to_string();
     info!("running on {}", sys.host_name().unwrap_or_else(unknown));
-    info!("OS is {} {} with kernel {}", sys.name().unwrap_or_else(unknown), sys.os_version().unwrap_or_else(unknown), sys.kernel_version().unwrap_or_else(unknown));
+    info!(
+        "OS is {} {} with kernel {}",
+        sys.name().unwrap_or_else(unknown),
+        sys.os_version().unwrap_or_else(unknown),
+        sys.kernel_version().unwrap_or_else(unknown)
+    );
     let mut processor_kinds: Vec<&str> = sys.processors().iter().map(|p| p.brand()).collect();
     processor_kinds.sort();
     processor_kinds.dedup();
-    info!("physical core count: {} {:?}", sys.physical_core_count().unwrap(), processor_kinds);
+    info!(
+        "physical core count: {} {:?}",
+        sys.physical_core_count().unwrap(),
+        processor_kinds
+    );
     info!("total memory: {} KB", sys.total_memory());
     info!("----------------------------------------");
 }

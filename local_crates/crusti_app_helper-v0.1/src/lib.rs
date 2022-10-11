@@ -29,4 +29,5 @@ pub use log::{debug, error, info, trace, warn};
 
 pub use app_helper::app_helper::{init_logger, AppHelper};
 pub use app_helper::license_command::LicenseCommand;
+pub use cli_manager::cli_manager::logging_level_cli_arg;
 pub use cli_manager::command::Command;

@@ -15,6 +15,5 @@ fn main() {
     for c in commands {
         app.add_command(c);
     }
-    crusti_app_helper::init_logger();
     app.launch_app();
 }
