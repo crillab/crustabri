@@ -22,9 +22,20 @@ where
     T: LabelType,
 {
     /// Builds a new SAT based solver for the stable semantics.
+    ///
+    /// The underlying SAT solver is one returned by [default_solver](crate::default_solver).
     pub fn new(af: &'a AAFramework<T>) -> Self {
-        let solver = crate::default_solver();
-        let mut res = Self { solver, af };
+        Self::new_with_sat_solver(af, crate::default_solver())
+    }
+
+    /// Builds a new SAT based solver for the stable semantics.
+    ///
+    /// The SAT solver to use in given.
+    pub fn new_with_sat_solver(af: &'a AAFramework<T>, sat_solver: Box<dyn SatSolver>) -> Self {
+        let mut res = Self {
+            solver: sat_solver,
+            af,
+        };
         res.encode();
         res
     }

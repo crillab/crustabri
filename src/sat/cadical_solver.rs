@@ -1,6 +1,7 @@
 use super::{sat_solver::SolvingResult, Assignment, Literal, SatSolver};
 use cadical::Solver as CadicalCSolver;
 
+/// A wrapper around the Cadical SAT solver.
 #[derive(Default)]
 pub struct CadicalSolver {
     solver: CadicalCSolver,

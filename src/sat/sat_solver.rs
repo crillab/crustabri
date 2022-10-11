@@ -1,5 +1,8 @@
 use super::cadical_solver::CadicalSolver;
-use std::num::{NonZeroIsize, NonZeroUsize};
+use std::{
+    fmt::Display,
+    num::{NonZeroIsize, NonZeroUsize},
+};
 
 /// A variable in a SAT solver.
 ///
@@ -60,6 +63,10 @@ impl Literal {
     pub fn negate(self) -> Self {
         Self::from(-self.0.get())
     }
+
+    pub fn var(&self) -> Variable {
+        Variable(self.0.unsigned_abs())
+    }
 }
 
 macro_rules! impl_lit_from {
@@ -81,6 +88,12 @@ impl_lit_from!(i8);
 impl From<Literal> for isize {
     fn from(l: Literal) -> Self {
         l.0.into()
+    }
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -112,7 +125,7 @@ impl Assignment {
     /// The result in an [Option].
     /// In case the variable is not assigned, [Option::None] is returned.
     /// Else, [Option::Some] is returned and contains the assigned value.
-    pub(crate) fn value_of<T>(&self, v: T) -> Option<bool>
+    pub fn value_of<T>(&self, v: T) -> Option<bool>
     where
         T: Into<Variable>,
     {
@@ -145,6 +158,7 @@ impl Iterator for AssignmentIterator<'_> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum SolvingResult {
     Satisfiable(Assignment),
     Unsatisfiable,
@@ -168,15 +182,20 @@ impl SolvingResult {
     }
 }
 
+/// A trait for SAT solvers.
 pub trait SatSolver {
+    /// Adds a clause to this solver.
     fn add_clause(&mut self, cl: Vec<Literal>);
 
+    /// Solves the problem formed by the clauses added so far.
     fn solve(&mut self) -> SolvingResult;
 
+    /// Solves the problem formed by the clauses added so far and the provided assumptions.
     fn solve_under_assumptions(&mut self, assumptions: &[Literal]) -> SolvingResult;
 }
 
-pub(crate) fn default_solver() -> Box<dyn SatSolver> {
+/// The default SAT solver (Cadical).
+pub fn default_solver() -> Box<dyn SatSolver> {
     Box::new(CadicalSolver::default())
 }
 

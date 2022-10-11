@@ -24,4 +24,7 @@ pub use solvers::SkepticalAcceptanceComputer;
 pub use solvers::StableSemanticsSolver;
 
 mod sat;
-pub(crate) use sat::default_solver;
+pub use sat::default_solver;
+pub use sat::CadicalSolver;
+pub use sat::ExternalSatSolver;
+pub use sat::SatSolver;
