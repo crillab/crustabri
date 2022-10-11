@@ -40,7 +40,6 @@ pub fn logging_level_cli_arg<'a>() -> Arg<'a, 'a> {
         .default_value("info")
         .possible_values(&["trace", "debug", "info", "warn", "error", "off"])
         .help("set the minimal logging level")
-        .required(true)
 }
 
 impl<'a> CliManager<'a> {
