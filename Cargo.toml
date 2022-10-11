@@ -10,7 +10,7 @@ name = "crustabri"
 path = "src/lib.rs"
 
 [[bin]]
-name = "qbf_rs"
+name = "crustabri"
 path = "src/main.rs"
 
 [dependencies]
