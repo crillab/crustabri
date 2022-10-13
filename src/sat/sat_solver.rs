@@ -192,6 +192,11 @@ pub trait SatSolver {
 
     /// Solves the problem formed by the clauses added so far and the provided assumptions.
     fn solve_under_assumptions(&mut self, assumptions: &[Literal]) -> SolvingResult;
+
+    /// Returns the number of variables defined so far.
+    ///
+    /// This number is equal to the highest variable identifier used in added clauses.
+    fn n_vars(&self) -> usize;
 }
 
 /// The default SAT solver (Cadical).

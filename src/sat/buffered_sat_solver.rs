@@ -141,6 +141,10 @@ impl SatSolver for BufferedSatSolver {
             None => SolvingResult::Unknown,
         }
     }
+
+    fn n_vars(&self) -> usize {
+        self.n_vars
+    }
 }
 
 #[cfg(test)]

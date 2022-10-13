@@ -2,8 +2,8 @@ use super::common;
 use anyhow::{anyhow, Context, Result};
 use crustabri::{
     AAFramework, Argument, AspartixWriter, CompleteSemanticsSolver, CredulousAcceptanceComputer,
-    ExternalSatSolver, GroundedSemanticsSolver, Query, SatSolver, Semantics,
-    SingleExtensionComputer, SkepticalAcceptanceComputer, StableSemanticsSolver,
+    ExternalSatSolver, GroundedSemanticsSolver, PreferredSemanticsSolver, Query, SatSolver,
+    Semantics, SingleExtensionComputer, SkepticalAcceptanceComputer, StableSemanticsSolver,
 };
 use crusti_app_helper::{
     info, logging_level_cli_arg, warn, AppSettings, Arg, ArgMatches, Command, SubCommand,
@@ -122,6 +122,10 @@ fn compute_one_extension(
 ) -> Result<()> {
     let mut solver: Box<dyn SingleExtensionComputer<String>> = match semantics {
         Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
+        Semantics::PR => Box::new(PreferredSemanticsSolver::new_with_sat_solver(
+            af,
+            create_sat_solver(arg_matches),
+        )),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver(
             af,
             create_sat_solver(arg_matches),
@@ -143,7 +147,7 @@ fn check_credulous_acceptance(
 ) -> Result<()> {
     let mut solver: Box<dyn CredulousAcceptanceComputer<String>> = match semantics {
         Semantics::GR => Box::new(GroundedSemanticsSolver::new(af)),
-        Semantics::CO => Box::new(CompleteSemanticsSolver::new_with_sat_solver(
+        Semantics::CO | Semantics::PR => Box::new(CompleteSemanticsSolver::new_with_sat_solver(
             af,
             create_sat_solver(arg_matches),
         )),
@@ -166,6 +170,10 @@ fn check_skeptical_acceptance(
 ) -> Result<()> {
     let mut solver: Box<dyn SkepticalAcceptanceComputer<String>> = match semantics {
         Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
+        Semantics::PR => Box::new(PreferredSemanticsSolver::new_with_sat_solver(
+            af,
+            create_sat_solver(arg_matches),
+        )),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver(
             af,
             create_sat_solver(arg_matches),

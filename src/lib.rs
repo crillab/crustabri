@@ -19,6 +19,7 @@ mod solvers;
 pub use solvers::CompleteSemanticsSolver;
 pub use solvers::CredulousAcceptanceComputer;
 pub use solvers::GroundedSemanticsSolver;
+pub use solvers::PreferredSemanticsSolver;
 pub use solvers::SingleExtensionComputer;
 pub use solvers::SkepticalAcceptanceComputer;
 pub use solvers::StableSemanticsSolver;

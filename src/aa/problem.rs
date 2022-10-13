@@ -7,6 +7,8 @@ pub enum Semantics {
     GR,
     /// The complete semantics
     CO,
+    /// The preferred semantics
+    PR,
     /// The stable semantics
     ST,
 }
@@ -18,6 +20,7 @@ impl TryFrom<&str> for Semantics {
         match value.to_ascii_lowercase().as_str() {
             "gr" => Ok(Semantics::GR),
             "co" => Ok(Semantics::CO),
+            "pr" => Ok(Semantics::PR),
             "st" => Ok(Semantics::ST),
             _ => Err(anyhow!(r#"undefined semantics "{}""#, value)),
         }

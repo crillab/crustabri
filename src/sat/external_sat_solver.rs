@@ -43,6 +43,10 @@ impl SatSolver for ExternalSatSolver {
         self.buffered_sat_solver
             .solve_under_assumptions(assumptions)
     }
+
+    fn n_vars(&self) -> usize {
+        self.buffered_sat_solver.n_vars()
+    }
 }
 
 fn exec_solver(mut reader: DimacsInstanceRead, program: &str, options: &[String]) -> Box<dyn Read> {

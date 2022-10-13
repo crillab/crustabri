@@ -34,6 +34,10 @@ impl SatSolver for CadicalSolver {
             None => SolvingResult::Unknown,
         }
     }
+
+    fn n_vars(&self) -> usize {
+        self.solver.max_variable() as usize
+    }
 }
 
 #[cfg(test)]
