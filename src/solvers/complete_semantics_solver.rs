@@ -1,39 +1,48 @@
 use super::specs::CredulousAcceptanceComputer;
-use crate::Argument;
 use crate::{
     clause,
-    sat::{Literal, SatSolver},
+    sat::{Literal, SatSolver, SatSolverFactoryFn},
     AAFramework, LabelType,
 };
+use crate::{connected_component_of, Argument};
 
 /// A SAT-based solver for the complete semantics.
 ///
 /// This solver does not provides function to compute an extension or to check the skeptical acceptance
 /// of an argument as they can be computed in a more efficient way by a [GroundedSemanticsSolver](super::GroundedSemanticsSolver).
-pub struct CompleteSemanticsSolver {
-    solver: Box<dyn SatSolver>,
+pub struct CompleteSemanticsSolver<'a, T>
+where
+    T: LabelType,
+{
+    af: &'a AAFramework<T>,
+    solver_factory: Box<SatSolverFactoryFn>,
 }
 
-impl CompleteSemanticsSolver {
+impl<'a, T> CompleteSemanticsSolver<'a, T>
+where
+    T: LabelType,
+{
     /// Builds a new SAT based solver for the complete semantics.
     ///
     /// The underlying SAT solver is one returned by [default_solver](crate::default_solver).
-    pub fn new<T>(af: &AAFramework<T>) -> Self
+    pub fn new(af: &'a AAFramework<T>) -> Self
     where
         T: LabelType,
     {
-        Self::new_with_sat_solver(af, crate::default_solver())
+        Self::new_with_sat_solver_factory(af, Box::new(|| crate::default_solver()))
     }
 
     /// Builds a new SAT based solver for the complete semantics.
     ///
-    /// The SAT solver to use in given.
-    pub fn new_with_sat_solver<T>(af: &AAFramework<T>, mut sat_solver: Box<dyn SatSolver>) -> Self
+    /// The SAT solver to use in given through the solver factory.
+    pub fn new_with_sat_solver_factory(
+        af: &'a AAFramework<T>,
+        solver_factory: Box<SatSolverFactoryFn>,
+    ) -> Self
     where
         T: LabelType,
     {
-        encode_complete_semantics_constraints(af, sat_solver.as_mut());
-        Self { solver: sat_solver }
+        Self { af, solver_factory }
     }
 }
 
@@ -89,13 +98,19 @@ pub(crate) fn encode_complete_semantics_constraints<T>(
     });
 }
 
-impl<T> CredulousAcceptanceComputer<T> for CompleteSemanticsSolver
+impl<T> CredulousAcceptanceComputer<T> for CompleteSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
     fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
-        self.solver
-            .solve_under_assumptions(&[Literal::from(arg_id_to_solver_var(arg.id()) as isize)])
+        let mut solver = (self.solver_factory)();
+        let reduced_af = connected_component_of(self.af, arg);
+        encode_complete_semantics_constraints(&reduced_af, solver.as_mut());
+        let arg_in_reduced_af = reduced_af.argument_set().get_argument(arg.label()).unwrap();
+        solver
+            .solve_under_assumptions(&[Literal::from(
+                arg_id_to_solver_var(arg_in_reduced_af.id()) as isize
+            )])
             .unwrap_model()
             .is_some()
     }

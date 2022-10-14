@@ -2,8 +2,9 @@ use super::common;
 use anyhow::{anyhow, Context, Result};
 use crustabri::{
     AAFramework, Argument, AspartixWriter, CompleteSemanticsSolver, CredulousAcceptanceComputer,
-    ExternalSatSolver, GroundedSemanticsSolver, PreferredSemanticsSolver, Query, SatSolver,
-    Semantics, SingleExtensionComputer, SkepticalAcceptanceComputer, StableSemanticsSolver,
+    ExternalSatSolver, GroundedSemanticsSolver, PreferredSemanticsSolver, Query,
+    SatSolverFactoryFn, Semantics, SingleExtensionComputer, SkepticalAcceptanceComputer,
+    StableSemanticsSolver,
 };
 use crusti_app_helper::{
     info, logging_level_cli_arg, warn, AppSettings, Arg, ArgMatches, Command, SubCommand,
@@ -122,13 +123,13 @@ fn compute_one_extension(
 ) -> Result<()> {
     let mut solver: Box<dyn SingleExtensionComputer<String>> = match semantics {
         Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
-        Semantics::PR => Box::new(PreferredSemanticsSolver::new_with_sat_solver(
+        Semantics::PR => Box::new(PreferredSemanticsSolver::new_with_sat_solver_factory(
             af,
-            create_sat_solver(arg_matches),
+            create_sat_solver_factory(arg_matches),
         )),
-        Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver(
+        Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
-            create_sat_solver(arg_matches),
+            create_sat_solver_factory(arg_matches),
         )),
     };
     let writer = AspartixWriter::default();
@@ -147,13 +148,15 @@ fn check_credulous_acceptance(
 ) -> Result<()> {
     let mut solver: Box<dyn CredulousAcceptanceComputer<String>> = match semantics {
         Semantics::GR => Box::new(GroundedSemanticsSolver::new(af)),
-        Semantics::CO | Semantics::PR => Box::new(CompleteSemanticsSolver::new_with_sat_solver(
+        Semantics::CO | Semantics::PR => {
+            Box::new(CompleteSemanticsSolver::new_with_sat_solver_factory(
+                af,
+                create_sat_solver_factory(arg_matches),
+            ))
+        }
+        Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
-            create_sat_solver(arg_matches),
-        )),
-        Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver(
-            af,
-            create_sat_solver(arg_matches),
+            create_sat_solver_factory(arg_matches),
         )),
     };
     let writer = AspartixWriter::default();
@@ -170,13 +173,13 @@ fn check_skeptical_acceptance(
 ) -> Result<()> {
     let mut solver: Box<dyn SkepticalAcceptanceComputer<String>> = match semantics {
         Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
-        Semantics::PR => Box::new(PreferredSemanticsSolver::new_with_sat_solver(
+        Semantics::PR => Box::new(PreferredSemanticsSolver::new_with_sat_solver_factory(
             af,
-            create_sat_solver(arg_matches),
+            create_sat_solver_factory(arg_matches),
         )),
-        Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver(
+        Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
-            create_sat_solver(arg_matches),
+            create_sat_solver_factory(arg_matches),
         )),
     };
     let writer = AspartixWriter::default();
@@ -185,16 +188,24 @@ fn check_skeptical_acceptance(
     writer.write_acceptance_status(&mut out, acceptance_status)
 }
 
-fn create_sat_solver(arg_matches: &ArgMatches<'_>) -> Box<dyn SatSolver> {
-    if let Some(s) = arg_matches.value_of(ARG_EXTERNAL_SAT_SOLVER) {
-        let solver_options = arg_matches
-            .values_of(ARG_EXTERNAL_SAT_SOLVER_OPTIONS)
-            .map(|v| v.map(|o| o.to_string()).collect::<Vec<String>>())
-            .unwrap_or_default();
+fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Box<SatSolverFactoryFn> {
+    let external_solver = arg_matches
+        .value_of(ARG_EXTERNAL_SAT_SOLVER)
+        .map(|s| s.to_string());
+    let external_solver_options = arg_matches
+        .values_of(ARG_EXTERNAL_SAT_SOLVER_OPTIONS)
+        .map(|v| v.map(|o| o.to_string()).collect::<Vec<String>>())
+        .unwrap_or_default();
+    if let Some(s) = external_solver {
         info!("using {} for problems requiring a SAT solver", s);
-        Box::new(ExternalSatSolver::new(s.to_string(), solver_options))
+        Box::new(move || {
+            Box::new(ExternalSatSolver::new(
+                s.to_string(),
+                external_solver_options.clone(),
+            ))
+        })
     } else {
         info!("using the default SAT solver for problems requiring a SAT solver");
-        crustabri::default_solver()
+        Box::new(|| crustabri::default_solver())
     }
 }

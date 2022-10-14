@@ -26,7 +26,7 @@ where
     T: LabelType,
 {
     fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
-        Some(self.af.grounded_extension())
+        Some(crate::grounded_extension(self.af))
     }
 }
 
@@ -35,7 +35,7 @@ where
     T: LabelType,
 {
     fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
-        self.af.grounded_extension().contains(&arg)
+        crate::grounded_extension(self.af).contains(&arg)
     }
 }
 
@@ -44,7 +44,7 @@ where
     T: LabelType,
 {
     fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
-        self.af.grounded_extension().contains(&arg)
+        crate::grounded_extension(self.af).contains(&arg)
     }
 }
 

@@ -29,3 +29,9 @@ pub use sat::default_solver;
 pub use sat::CadicalSolver;
 pub use sat::ExternalSatSolver;
 pub use sat::SatSolver;
+pub use sat::SatSolverFactoryFn;
+
+mod utils;
+pub use utils::connected_component_of;
+pub use utils::grounded_extension;
+pub use utils::iter_connected_components;

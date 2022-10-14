@@ -204,6 +204,9 @@ pub fn default_solver() -> Box<dyn SatSolver> {
     Box::new(CadicalSolver::default())
 }
 
+/// The type of solver factories.
+pub type SatSolverFactoryFn = dyn Fn() -> Box<dyn SatSolver>;
+
 #[cfg(test)]
 mod tests {
     use super::*;

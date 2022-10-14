@@ -1,7 +1,7 @@
 use super::complete_semantics_solver;
 use crate::{
     sat::{Literal, SatSolver},
-    AAFramework, LabelType,
+    AAFramework, LabelType, SatSolverFactoryFn,
 };
 use crate::{Argument, SingleExtensionComputer, SkepticalAcceptanceComputer};
 
@@ -13,8 +13,8 @@ pub struct PreferredSemanticsSolver<'a, T>
 where
     T: LabelType,
 {
-    solver: Box<dyn SatSolver>,
     af: &'a AAFramework<T>,
+    solver_factory: Box<SatSolverFactoryFn>,
 }
 
 impl<'a, T> PreferredSemanticsSolver<'a, T>
@@ -25,18 +25,17 @@ where
     ///
     /// The underlying SAT solver is one returned by [default_solver](crate::default_solver).
     pub fn new(af: &'a AAFramework<T>) -> Self {
-        Self::new_with_sat_solver(af, crate::default_solver())
+        Self::new_with_sat_solver_factory(af, Box::new(|| crate::default_solver()))
     }
 
     /// Builds a new SAT based solver for the preferred semantics.
     ///
-    /// The SAT solver to use in given.
-    pub fn new_with_sat_solver(af: &'a AAFramework<T>, mut sat_solver: Box<dyn SatSolver>) -> Self {
-        complete_semantics_solver::encode_complete_semantics_constraints(af, sat_solver.as_mut());
-        Self {
-            solver: sat_solver,
-            af,
-        }
+    /// The SAT solver to use in given through the solver factory.
+    pub fn new_with_sat_solver_factory(
+        af: &'a AAFramework<T>,
+        solver_factory: Box<SatSolverFactoryFn>,
+    ) -> Self {
+        Self { af, solver_factory }
     }
 }
 
@@ -54,7 +53,7 @@ where
     T: LabelType,
 {
     af: &'a AAFramework<T>,
-    solver: &'a mut dyn SatSolver,
+    solver: Box<dyn SatSolver>,
     current: Option<Vec<&'a Argument<T>>>,
     state: ComputerState,
     selector: Literal,
@@ -64,7 +63,7 @@ impl<'a, T> PreferredExtensionComputer<'a, T>
 where
     T: LabelType,
 {
-    fn new(af: &'a AAFramework<T>, solver: &'a mut dyn SatSolver) -> Self {
+    fn new(af: &'a AAFramework<T>, solver: Box<dyn SatSolver>) -> Self {
         let selector = Literal::from(1 + solver.n_vars() as isize);
         Self {
             af,
@@ -86,7 +85,7 @@ where
     }
 
     fn compute_grounded(&mut self) {
-        self.current = Some(self.af.grounded_extension());
+        self.current = Some(crate::grounded_extension(self.af));
         self.state = ComputerState::Complete;
     }
 
@@ -185,11 +184,22 @@ where
     T: LabelType,
 {
     fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
-        let mut computer = PreferredExtensionComputer::new(self.af, self.solver.as_mut());
-        while computer.state != ComputerState::Preferred {
-            computer.compute_next();
+        let mut merged = Vec::new();
+        for cc_af in crate::iter_connected_components(self.af) {
+            let mut solver = (self.solver_factory)();
+            complete_semantics_solver::encode_complete_semantics_constraints(
+                &cc_af,
+                solver.as_mut(),
+            );
+            let mut computer = PreferredExtensionComputer::new(&cc_af, solver);
+            while computer.state != ComputerState::Preferred {
+                computer.compute_next();
+            }
+            for cc_arg in computer.current.take().unwrap() {
+                merged.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
+            }
         }
-        computer.current.take()
+        Some(merged)
     }
 }
 
@@ -198,17 +208,21 @@ where
     T: LabelType,
 {
     fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
-        let mut computer = PreferredExtensionComputer::new(self.af, self.solver.as_mut());
+        let cc_af = crate::connected_component_of(self.af, arg);
+        let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
+        let mut solver = (self.solver_factory)();
+        complete_semantics_solver::encode_complete_semantics_constraints(&cc_af, solver.as_mut());
+        let mut computer = PreferredExtensionComputer::new(&cc_af, solver);
         loop {
             computer.compute_next();
             match computer.state {
                 ComputerState::Preferred => {
-                    if !computer.current.as_ref().unwrap().contains(&arg) {
+                    if !computer.current.as_ref().unwrap().contains(&cc_arg) {
                         return false;
                     }
                 }
                 ComputerState::Complete => {
-                    if computer.current.as_ref().unwrap().contains(&arg) {
+                    if computer.current.as_ref().unwrap().contains(&cc_arg) {
                         computer.discard_current_search();
                     }
                 }
