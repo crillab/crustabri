@@ -1,7 +1,6 @@
 //! Crustabri is a RUST ABstract argumentation Reasoner Implementation.
 
 #![warn(missing_docs)]
-#![warn(rustdoc::missing_doc_code_examples)]
 
 mod aa;
 pub use aa::iter_problem_strings;
