@@ -1,4 +1,4 @@
-use crate::{AAFramework, Argument, LabelType};
+use crate::{AAFramework, Argument, LabelType, ResponseWriter};
 use anyhow::{Context, Result};
 use std::io::Write;
 
@@ -64,19 +64,17 @@ impl AspartixWriter {
         writer.flush()?;
         Ok(())
     }
+}
 
-    /// Writes the text associated with the fact the problem has no extension.
-    pub fn write_no_extension(&self, writer: &mut dyn Write) -> Result<()> {
-        let context = "while writing problem has no extension";
-        writeln!(writer, "NO").context(context)?;
-        writer.flush().context(context)
+impl ResponseWriter<String> for AspartixWriter {
+    fn write_no_extension(&self, writer: &mut dyn Write) -> Result<()> {
+        super::specs::write_no_extension(writer)
     }
 
-    /// Writes a single extension.
-    pub fn write_single_extension<T: LabelType>(
+    fn write_single_extension(
         &self,
         writer: &mut dyn Write,
-        extension: &[&Argument<T>],
+        extension: &[&Argument<String>],
     ) -> Result<()> {
         let context = "while writing an extension";
         write!(writer, "[").context(context)?;
@@ -93,15 +91,12 @@ impl AspartixWriter {
         writer.flush().context(context)
     }
 
-    /// Writes an acceptance status.
-    pub fn write_acceptance_status(
+    fn write_acceptance_status(
         &self,
         writer: &mut dyn Write,
         acceptance_status: bool,
     ) -> Result<()> {
-        let context = "while writing an acceptance_status";
-        writeln!(writer, "{}", if acceptance_status { "YES" } else { "NO" }).context(context)?;
-        writer.flush().context(context)
+        super::specs::write_acceptance_status(writer, acceptance_status)
     }
 }
 

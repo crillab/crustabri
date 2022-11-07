@@ -1,5 +1,5 @@
-use super::warning_result::WarningResult;
-use crate::{AAFramework, ArgumentSet};
+use super::{warning_result::WarningResult, InstanceReader, WarningHandler};
+use crate::{AAFramework, Argument, ArgumentSet};
 use anyhow::{anyhow, Context, Result};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
@@ -64,8 +64,6 @@ where
     }
 }
 
-type WarningHandler = Box<dyn Fn(usize, String)>;
-
 /// A reader for the Aspartix format.
 ///
 /// This object is used to read an [`AAFramework`] encoded using the Aspartix input format, as defined on [the Aspartix website](https://www.dbai.tuwien.ac.at/research/argumentation/aspartix/dung.html).
@@ -74,7 +72,7 @@ type WarningHandler = Box<dyn Fn(usize, String)>;
 /// # Example
 ///
 /// ```
-/// # use crustabri::{AAFramework, AspartixReader};
+/// # use crustabri::{AAFramework, AspartixReader, InstanceReader};
 /// fn read_af_from_str(s: &str) -> AAFramework<String> {
 ///     let reader = AspartixReader::default();
 ///     reader.read(&mut s.as_bytes()).expect("invalid Aspartix AF")
@@ -86,28 +84,13 @@ pub struct AspartixReader {
     warning_handlers: Vec<WarningHandler>,
 }
 
-impl AspartixReader {
-    /// Reads an [`AAFramework`] encoded using the Aspartix input format.
-    /// The [LabelType](crate::LabelType) of the returned AFs is [String].
-    ///
-    /// In case warnings are raised, the callback functions registered by [add_warning_handler](Self::add_warning_handler) are triggered.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use crustabri::{AAFramework, AspartixReader};
-    /// fn read_af_from_str(s: &str) -> AAFramework<String> {
-    ///     let reader = AspartixReader::default();
-    ///     reader.read(&mut s.as_bytes()).expect("invalid Aspartix AF")
-    /// }
-    /// # read_af_from_str("arg(a).");
-    /// ```
-    pub fn read(&self, reader: &mut dyn Read) -> Result<AAFramework<String>> {
+impl InstanceReader<String> for AspartixReader {
+    fn read(&self, reader: &mut dyn Read) -> Result<AAFramework<String>> {
         let mut arg_labels = Vec::with_capacity(DEFAULT_ARG_LABELS_CAP);
         let mut af = None;
         let br = BufReader::new(reader);
         for (i, line) in br.lines().enumerate() {
-            let context = || format!("while reading line {}", i);
+            let context = || format!("while reading line with index {}", i);
             let warning_consumer = |warnings: Vec<String>| {
                 for w in warnings.iter() {
                     self.warning_handlers
@@ -146,8 +129,15 @@ impl AspartixReader {
         }
     }
 
-    /// Adds a callback function to call when warnings are raised while parsing an AF.
-    pub fn add_warning_handler(&mut self, h: WarningHandler) {
+    fn read_arg_from_str<'a>(
+        &self,
+        af: &'a AAFramework<String>,
+        arg: &str,
+    ) -> Result<&'a Argument<String>> {
+        af.argument_set().get_argument(&arg.to_string())
+    }
+
+    fn add_warning_handler(&mut self, h: WarningHandler) {
         self.warning_handlers.push(h);
     }
 }

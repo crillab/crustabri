@@ -51,7 +51,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::AspartixReader;
+    use crate::{io::InstanceReader, AspartixReader};
 
     #[test]
     fn test_grounded_solver() {

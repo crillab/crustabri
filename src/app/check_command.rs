@@ -1,5 +1,6 @@
 use super::common;
 use anyhow::Result;
+use crustabri::{AspartixReader, Iccma23Reader};
 use crusti_app_helper::{AppSettings, Command, SubCommand};
 
 const CMD_NAME: &str = "check";
@@ -19,14 +20,19 @@ impl<'a> Command<'a> for CheckCommand {
 
     fn clap_subcommand(&self) -> crusti_app_helper::App<'a, 'a> {
         SubCommand::with_name(CMD_NAME)
-            .about("Checks Aspartix files for errors")
+            .about("Checks input AF files for errors")
             .setting(AppSettings::DisableVersion)
             .arg(common::input_args())
+            .arg(common::reader_arg())
     }
 
     fn execute(&self, arg_matches: &crusti_app_helper::ArgMatches<'_>) -> Result<()> {
         let file = arg_matches.value_of(common::ARG_INPUT).unwrap();
-        common::read_aspartix_file_path(file)?;
+        match arg_matches.value_of(common::ARG_READER).unwrap() {
+            "apx" => common::read_file_path(file, &mut AspartixReader::default()).map(|_| ()),
+            "iccma23" => common::read_file_path(file, &mut Iccma23Reader::default()).map(|_| ()),
+            _ => unreachable!(),
+        }?;
         Ok(())
     }
 }

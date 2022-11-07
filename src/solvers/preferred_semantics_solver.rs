@@ -236,7 +236,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::AspartixReader;
+    use crate::{io::InstanceReader, AspartixReader};
 
     #[test]
     fn test_compute_one_preferred_ext_is_grounded() {

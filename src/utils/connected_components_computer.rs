@@ -139,7 +139,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AspartixReader, AspartixWriter};
+    use crate::{io::InstanceReader, AspartixReader, AspartixWriter};
     use std::io::Cursor;
 
     #[test]

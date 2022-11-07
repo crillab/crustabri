@@ -167,7 +167,7 @@ fn arg_id_from_solver_var(var: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::AspartixReader;
+    use crate::{io::InstanceReader, AspartixReader};
 
     #[test]
     fn test_compute_one() {

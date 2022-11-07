@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use crustabri::{AAFramework, AspartixReader};
+use crustabri::{AAFramework, InstanceReader, LabelType};
 use crusti_app_helper::{info, warn, Arg};
 use std::{
     fs::{self, File},
@@ -14,17 +14,36 @@ pub(crate) fn input_args() -> Arg<'static, 'static> {
         .short("f")
         .empty_values(false)
         .multiple(false)
-        .help("the input file in Aspartix format")
+        .help("the input file that contains the AF")
         .required(true)
 }
 
-pub(crate) fn read_aspartix_file_path(file_path: &str) -> Result<AAFramework<String>> {
+pub(crate) const ARG_READER: &str = "READER";
+
+pub(crate) fn reader_arg() -> Arg<'static, 'static> {
+    Arg::with_name(ARG_READER)
+        .short("r")
+        .long("reader")
+        .empty_values(false)
+        .multiple(false)
+        .possible_values(&["apx", "iccma23"])
+        .default_value("iccma23")
+        .help("the input file format")
+        .required(false)
+}
+
+pub(crate) fn read_file_path<T>(
+    file_path: &str,
+    reader: &mut dyn InstanceReader<T>,
+) -> Result<AAFramework<T>>
+where
+    T: LabelType,
+{
     let canonicalized = canonicalize_file_path(file_path)?;
     info!("reading input file {:?}", canonicalized);
     let mut file_reader = BufReader::new(File::open(canonicalized)?);
-    let mut parser = AspartixReader::default();
-    parser.add_warning_handler(Box::new(|line, msg| warn!("at line {}: {}", line, msg)));
-    let af = parser.read(&mut file_reader)?;
+    reader.add_warning_handler(Box::new(|line, msg| warn!("at line {}: {}", line, msg)));
+    let af = reader.read(&mut file_reader)?;
     info!(
         "the argumentation framework has {} argument(s) and {} attack(s)",
         af.n_arguments(),
