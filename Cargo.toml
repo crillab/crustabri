@@ -19,3 +19,5 @@ cadical = "0.1.13"
 crusti_app_helper = {path = "local_crates/crusti_app_helper-v0.1"}
 lazy_static = "1.4.0"
 regex = "1.6.0"
+strum = "0.24.1"
+strum_macros = "0.24.1"

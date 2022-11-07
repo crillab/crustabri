@@ -1,4 +1,4 @@
-use app::{AuthorsCommand, CheckCommand, SolveCommand};
+use app::{AuthorsCommand, CheckCommand, ProblemsCommand, SolveCommand};
 use crusti_app_helper::{AppHelper, Command};
 
 mod app;
@@ -17,6 +17,7 @@ fn main() {
     let commands: Vec<Box<dyn Command>> = vec![
         Box::new(AuthorsCommand::new(app_name, app_version, AUTHORS)),
         Box::new(CheckCommand::new()),
+        Box::new(ProblemsCommand::new()),
         Box::new(SolveCommand::new()),
     ];
     for c in commands {

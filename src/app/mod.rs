@@ -6,5 +6,8 @@ pub(crate) use check_command::CheckCommand;
 
 mod common;
 
+mod problems_command;
+pub(crate) use problems_command::ProblemsCommand;
+
 mod solve_command;
 pub(crate) use solve_command::SolveCommand;

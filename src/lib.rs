@@ -4,6 +4,7 @@
 #![warn(rustdoc::missing_doc_code_examples)]
 
 mod aa;
+pub use aa::iter_problem_strings;
 pub use aa::read_problem_string;
 pub use aa::AAFramework;
 pub use aa::Argument;

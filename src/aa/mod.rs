@@ -14,6 +14,7 @@ mod aspartix_writer;
 pub use aspartix_writer::AspartixWriter;
 
 mod problem;
+pub use problem::iter_problem_strings;
 pub use problem::read_problem_string;
 pub use problem::Query;
 pub use problem::Semantics;

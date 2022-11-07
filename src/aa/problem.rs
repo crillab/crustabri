@@ -1,7 +1,9 @@
 use anyhow::{anyhow, Context, Result};
+use strum::IntoEnumIterator;
+use strum_macros::{AsRefStr, EnumIter};
 
 /// The semantics associated with a problem.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AsRefStr, EnumIter)]
 pub enum Semantics {
     /// The grounded semantics
     GR,
@@ -28,7 +30,7 @@ impl TryFrom<&str> for Semantics {
 }
 
 /// The query to compute.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AsRefStr, EnumIter)]
 pub enum Query {
     /// Compute a single extension
     SE,
@@ -36,19 +38,6 @@ pub enum Query {
     DC,
     /// Check skeptical acceptance
     DS,
-}
-
-impl Query {
-    /// Returns a short string representing the query.
-    ///
-    /// The string corresponds to the two letters query as defined in ICCMA competitions.
-    pub fn to_short_str(&self) -> &str {
-        match self {
-            Query::SE => "SE",
-            Query::DC => "DC",
-            Query::DS => "DS",
-        }
-    }
 }
 
 impl TryFrom<&str> for Query {
@@ -84,6 +73,16 @@ pub fn read_problem_string(problem: &str) -> Result<(Query, Semantics)> {
     }
 }
 
+/// Returns an iterator through the known problems given as strings.
+///
+/// This functions returns strings representing the problems as defined in ICCMA competitions.
+/// Each string is composed by the query, an hyphen, and the semantics.
+/// The queries and problems are given by the sequences of strings representing them in the competitions.
+pub fn iter_problem_strings() -> impl Iterator<Item = String> + 'static {
+    Semantics::iter()
+        .flat_map(|sem| Query::iter().map(move |q| format!("{}-{}", q.as_ref(), sem.as_ref())))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,5 +112,20 @@ mod tests {
     #[test]
     fn test_read_problem_no_hyphen() {
         assert!(read_problem_string("SEST").is_err());
+    }
+
+    #[test]
+    fn test_iter_as_strings() {
+        let mut expected = [
+            "SE-CO", "DC-CO", "DS-CO", "SE-GR", "DC-GR", "DS-GR", "SE-PR", "DC-PR", "DS-PR",
+            "SE-ST", "DC-ST", "DS-ST",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
+        expected.sort_unstable();
+        let mut actual = iter_problem_strings().collect::<Vec<String>>();
+        actual.sort_unstable();
+        assert_eq!(expected, actual)
     }
 }

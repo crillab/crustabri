@@ -40,7 +40,7 @@ impl<'a> Command<'a> for SolveCommand {
                     .short("p")
                     .empty_values(false)
                     .multiple(false)
-                    .help("the problem to solver")
+                    .help("the problem to solve")
                     .required(true),
             )
             .arg(
@@ -98,7 +98,7 @@ fn check_arg_definition(query: Query, arg: &Option<&Argument<String>>) -> Result
             if arg.is_some() {
                 warn!(
                     "unexpected argument on the command line (useless for query {})",
-                    query.to_short_str()
+                    query.as_ref()
                 );
             }
             Ok(())
@@ -107,7 +107,7 @@ fn check_arg_definition(query: Query, arg: &Option<&Argument<String>>) -> Result
             if arg.is_none() {
                 Err(anyhow!(
                     "missing argument on the command line (required for query {})",
-                    query.to_short_str()
+                    query.as_ref()
                 ))
             } else {
                 Ok(())
