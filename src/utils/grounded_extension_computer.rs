@@ -8,35 +8,30 @@ where
     let mut ext = vec![];
     let mut n_processed_args = 0;
     let mut defeated_args = vec![false; af.n_arguments()];
-    let mut attacked_by = af
-        .attacks_to()
-        .iter()
-        .enumerate()
-        .map(|(i, v)| {
-            let n = v.len();
-            if n == 0 {
-                ext.push(af.argument_set().get_argument_by_id(i))
-            }
-            n
-        })
-        .collect::<Vec<usize>>();
-    let attacks = af.attacks();
+    let mut attacked_by = vec![usize::MAX; af.n_arguments()];
+    af.argument_set().iter().for_each(|arg| {
+        let cnt = af.iter_attacks_to(arg).count();
+        if cnt == 0 {
+            ext.push(arg);
+        }
+        attacked_by[arg.id()] = cnt;
+    });
     while n_processed_args < ext.len() {
-        let id = ext[n_processed_args].id();
-        af.attack_ids_from(id).iter().for_each(|defeating_att| {
-            let (_, defeated) = attacks[*defeating_att];
-            if !defeated_args[defeated] {
-                defeated_args[defeated] = true;
-                af.attack_ids_from(defeated).iter().for_each(|att| {
-                    let (_, attacked) = attacks[*att];
-                    if attacked_by[attacked] == 1 {
-                        ext.push(af.argument_set().get_argument_by_id(attacked))
-                    } else {
-                        attacked_by[attacked] -= 1;
-                    }
-                })
-            }
-        });
+        af.iter_attacks_from(ext[n_processed_args])
+            .for_each(|defeating_att| {
+                let defeated = defeating_att.attacked();
+                if !defeated_args[defeated.id()] {
+                    defeated_args[defeated.id()] = true;
+                    af.iter_attacks_from(defeated).for_each(|defeated_att| {
+                        let defended = defeated_att.attacked();
+                        if attacked_by[defended.id()] == 1 {
+                            ext.push(defended);
+                        } else {
+                            attacked_by[defended.id()] -= 1;
+                        }
+                    });
+                }
+            });
         n_processed_args += 1;
     }
     ext
@@ -51,7 +46,7 @@ mod tests {
     fn test_grounded_extension_1() {
         let arg_labels = vec!["a", "b", "c", "d", "e", "f"];
         let args = ArgumentSet::new_with_labels(&arg_labels);
-        let mut af = AAFramework::new(args);
+        let mut af = AAFramework::new_with_argument_set(args);
         af.new_attack(&"a", &"b").unwrap();
         af.new_attack(&"b", &"c").unwrap();
         af.new_attack(&"b", &"d").unwrap();
@@ -70,7 +65,7 @@ mod tests {
     fn test_grounded_extension_2() {
         let arg_labels = vec!["x", "a", "b", "c", "d", "e", "f"];
         let args = ArgumentSet::new_with_labels(&arg_labels);
-        let mut af = AAFramework::new(args);
+        let mut af = AAFramework::new_with_argument_set(args);
         af.new_attack(&"x", &"a").unwrap();
         af.new_attack(&"a", &"b").unwrap();
         af.new_attack(&"b", &"c").unwrap();

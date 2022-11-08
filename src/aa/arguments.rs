@@ -135,11 +135,11 @@ where
     /// # Panics
     ///
     /// If the argument does not exists, this function panics.
-    pub fn remove_argument(&mut self, label: &T) {
+    pub fn remove_argument(&mut self, label: &T) -> Argument<T> {
         match self.label_to_id.remove(label) {
             Some(id) => {
                 self.n_removed += 1;
-                self.arguments[id] = None
+                self.arguments[id].take().unwrap()
             }
             None => panic!("no such argument: {}", label),
         }
@@ -157,6 +157,13 @@ where
     /// ```
     pub fn len(&self) -> usize {
         self.arguments.len() - self.n_removed
+    }
+
+    /// Returns the maximal argument id given so far.
+    ///
+    /// This id may refer to a removed argument.
+    pub fn max_id(&self) -> usize {
+        self.arguments.len() - 1
     }
 
     /// Returns `true` iff the set has no argument.

@@ -2,14 +2,16 @@ use crate::{Argument, ArgumentSet, LabelType};
 use anyhow::{anyhow, Context, Result};
 
 /// An Abstract Argumentation framework as defined in Dung semantics.
+#[derive(Default)]
 pub struct AAFramework<T>
 where
     T: LabelType,
 {
     arguments: ArgumentSet<T>,
-    attacks: Vec<(usize, usize)>,
+    attacks: Vec<Option<(usize, usize)>>,
     attacks_from: Vec<Vec<usize>>,
     attacks_to: Vec<Vec<usize>>,
+    n_removed_attacks: usize,
 }
 
 /// An attack, represented as a couple of two arguments.
@@ -58,7 +60,7 @@ where
 {
     /// Builds an AA framework.
     ///
-    /// The set of arguments used in the framework must be provided.
+    /// The set of arguments used in the framework is provided.
     ///
     /// # Arguments
     ///
@@ -69,11 +71,11 @@ where
     /// ```
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let arguments = ArgumentSet::new_with_labels(&["a", "b", "c"]);
-    /// let framework = AAFramework::new(arguments);
+    /// let framework = AAFramework::new_with_argument_set(arguments);
     /// assert_eq!(3, framework.argument_set().len());
     /// assert_eq!(0, framework.iter_attacks().count());
     /// ```
-    pub fn new(arguments: ArgumentSet<T>) -> Self {
+    pub fn new_with_argument_set(arguments: ArgumentSet<T>) -> Self {
         let attacks_from = (0..arguments.len()).map(|_| vec![]).collect();
         let attacks_to = (0..arguments.len()).map(|_| vec![]).collect();
         AAFramework {
@@ -81,6 +83,17 @@ where
             attacks: vec![],
             attacks_from,
             attacks_to,
+            n_removed_attacks: 0,
+        }
+    }
+
+    /// Adds a new argument to this argumentation framework.
+    pub fn add_argument(&mut self, label: T) {
+        let old_len = self.arguments.len();
+        self.arguments.add_argument(label);
+        if self.arguments.len() > old_len {
+            self.attacks_from.push(Vec::new());
+            self.attacks_to.push(Vec::new());
         }
     }
 
@@ -102,7 +115,7 @@ where
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
-    /// let mut framework = AAFramework::new(arguments);
+    /// let mut framework = AAFramework::new_with_argument_set(arguments);
     /// assert_eq!(0, framework.iter_attacks().count());
     /// framework.new_attack(&labels[0], &labels[1]);
     /// assert_eq!(1, framework.iter_attacks().count());
@@ -117,7 +130,7 @@ where
             .arguments
             .get_argument_index(to)
             .with_context(context)?;
-        self.attacks.push((attacker_id, attacked_id));
+        self.attacks.push(Some((attacker_id, attacked_id)));
         self.attacks_from[attacker_id].push(self.attacks.len() - 1);
         self.attacks_to[attacked_id].push(self.attacks.len() - 1);
         Ok(())
@@ -141,7 +154,7 @@ where
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
-    /// let mut framework = AAFramework::new(arguments);
+    /// let mut framework = AAFramework::new_with_argument_set(arguments);
     /// assert_eq!(0, framework.iter_attacks().count());
     /// framework.new_attack_by_ids(0, 1); // "a" attacks "b"
     /// assert_eq!(1, framework.iter_attacks().count());
@@ -156,7 +169,7 @@ where
                 n_arguments - 1
             ));
         }
-        self.attacks.push((from, to));
+        self.attacks.push(Some((from, to)));
         self.attacks_from[from].push(self.attacks.len() - 1);
         self.attacks_to[to].push(self.attacks.len() - 1);
         Ok(())
@@ -170,7 +183,7 @@ where
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
-    /// let framework = AAFramework::new(arguments);
+    /// let framework = AAFramework::new_with_argument_set(arguments);
     /// assert_eq!(3, framework.argument_set().len());
     /// ```
     pub fn argument_set(&self) -> &ArgumentSet<T> {
@@ -185,24 +198,66 @@ where
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
-    /// let mut framework = AAFramework::new(arguments);
+    /// let mut framework = AAFramework::new_with_argument_set(arguments);
     /// assert_eq!(0, framework.iter_attacks().count());
     /// framework.new_attack_by_ids(0, 1); // "a" attacks "b"
     /// assert_eq!(1, framework.iter_attacks().count());
     /// ```
-    pub fn iter_attacks(&self) -> AttacksIter<T> {
-        AttacksIter {
-            af: self,
-            index_iter: Box::new(0..self.attacks.len()),
-        }
+    pub fn iter_attacks(&self) -> impl Iterator<Item = Attack<'_, T>> + '_ {
+        self.attacks
+            .iter()
+            .filter_map(|o| o.as_ref())
+            .map(|(a, b)| {
+                Attack(
+                    self.arguments.get_argument_by_id(*a),
+                    self.arguments.get_argument_by_id(*b),
+                )
+            })
+    }
+
+    /// Provides an iterator to the attacks that have the given argument as attacker.
+    pub fn iter_attacks_from(&self, arg: &Argument<T>) -> impl Iterator<Item = Attack<'_, T>> + '_ {
+        self.attacks_from[arg.id()]
+            .iter()
+            .map(|i| &self.attacks[*i])
+            .filter_map(|o| o.as_ref())
+            .map(|(a, b)| {
+                Attack(
+                    self.arguments.get_argument_by_id(*a),
+                    self.arguments.get_argument_by_id(*b),
+                )
+            })
+    }
+
+    /// Provides an iterator to the attacks that have the given argument as attacked.
+    pub fn iter_attacks_to(&self, arg: &Argument<T>) -> impl Iterator<Item = Attack<'_, T>> + '_ {
+        self.attacks_to[arg.id()]
+            .iter()
+            .map(|i| &self.attacks[*i])
+            .filter_map(|o| o.as_ref())
+            .map(|(a, b)| {
+                Attack(
+                    self.arguments.get_argument_by_id(*a),
+                    self.arguments.get_argument_by_id(*b),
+                )
+            })
     }
 
     /// Provides an iterator to the attacks in which the attacked argument is the one given by the id.
-    pub fn iter_attacks_to_id(&self, attacked_id: usize) -> AttacksIter<T> {
-        AttacksIter {
-            af: self,
-            index_iter: Box::new(self.attacks_to[attacked_id].iter().cloned()),
-        }
+    pub fn iter_attacks_to_id(
+        &self,
+        attacked_id: usize,
+    ) -> impl Iterator<Item = Attack<'_, T>> + '_ {
+        self.attacks_to[attacked_id]
+            .iter()
+            .map(|i| &self.attacks[*i])
+            .filter_map(|o| o.as_ref())
+            .map(|(a, b)| {
+                Attack(
+                    self.arguments.get_argument_by_id(*a),
+                    self.arguments.get_argument_by_id(*b),
+                )
+            })
     }
 
     /// Returns the number of arguments in this framework.
@@ -213,11 +268,18 @@ where
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
-    /// let mut framework = AAFramework::new(arguments);
+    /// let mut framework = AAFramework::new_with_argument_set(arguments);
     /// assert_eq!(3, framework.n_arguments());
     /// ```
     pub fn n_arguments(&self) -> usize {
         self.argument_set().len()
+    }
+
+    /// Returns the maximal argument id given so far.
+    ///
+    /// This id may refer to a removed argument.
+    pub fn max_argument_id(&self) -> usize {
+        self.argument_set().max_id()
     }
 
     /// Returns the number of attacks in this framework.
@@ -228,54 +290,13 @@ where
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
-    /// let mut framework = AAFramework::new(arguments);
+    /// let mut framework = AAFramework::new_with_argument_set(arguments);
     /// assert_eq!(0, framework.n_attacks());
     /// framework.new_attack_by_ids(0, 1); // "a" attacks "b"
     /// assert_eq!(1, framework.n_attacks());
     /// ```
     pub fn n_attacks(&self) -> usize {
-        self.attacks.len()
-    }
-
-    pub(crate) fn attacks(&self) -> &[(usize, usize)] {
-        &self.attacks
-    }
-
-    pub(crate) fn attacks_to(&self) -> &[Vec<usize>] {
-        &self.attacks_to
-    }
-
-    pub(crate) fn attack_ids_from(&self, arg: usize) -> &[usize] {
-        &self.attacks_from[arg]
-    }
-
-    pub(crate) fn attack_ids_to(&self, arg: usize) -> &[usize] {
-        &self.attacks_to[arg]
-    }
-}
-
-pub struct AttacksIter<'a, T>
-where
-    T: LabelType,
-{
-    af: &'a AAFramework<T>,
-    index_iter: Box<dyn Iterator<Item = usize> + 'a>,
-}
-
-impl<'a, T> Iterator for AttacksIter<'a, T>
-where
-    T: LabelType + 'a,
-{
-    type Item = Attack<'a, T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.index_iter.next().map(|i| {
-            let att = &self.af.attacks[i];
-            Attack(
-                self.af.arguments.get_argument_by_id(att.0),
-                self.af.arguments.get_argument_by_id(att.1),
-            )
-        })
+        self.attacks.len() - self.n_removed_attacks
     }
 }
 
@@ -287,7 +308,7 @@ mod tests {
     fn test_n_args() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
         let args = ArgumentSet::new_with_labels(&arg_labels);
-        let af = AAFramework::new(args);
+        let af = AAFramework::new_with_argument_set(args);
         assert_eq!(3, af.n_arguments());
     }
 
@@ -295,18 +316,18 @@ mod tests {
     fn test_new_attack_ok() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
         let args = ArgumentSet::new_with_labels(&arg_labels);
-        let mut attacks = AAFramework::new(args);
+        let mut attacks = AAFramework::new_with_argument_set(args);
         assert_eq!(0, attacks.n_attacks());
         attacks.new_attack(&arg_labels[0], &arg_labels[0]).unwrap();
         assert_eq!(1, attacks.n_attacks());
-        assert_eq!((0, 0), attacks.attacks[0]);
+        assert_eq!((0, 0), attacks.attacks[0].unwrap());
     }
 
     #[test]
     fn test_new_attack_unknown_label_1() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
         let args = ArgumentSet::new_with_labels(&arg_labels);
-        let mut attacks = AAFramework::new(args);
+        let mut attacks = AAFramework::new_with_argument_set(args);
         attacks
             .new_attack(&"d".to_string(), &arg_labels[0])
             .unwrap_err();
@@ -316,7 +337,7 @@ mod tests {
     fn test_new_attack_unknown_label_2() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
         let args = ArgumentSet::new_with_labels(&arg_labels);
-        let mut attacks = AAFramework::new(args);
+        let mut attacks = AAFramework::new_with_argument_set(args);
         attacks
             .new_attack(&arg_labels[0], &"d".to_string())
             .unwrap_err();
@@ -326,18 +347,18 @@ mod tests {
     fn test_new_attack_by_ids_ok() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
         let args = ArgumentSet::new_with_labels(&arg_labels);
-        let mut attacks = AAFramework::new(args);
+        let mut attacks = AAFramework::new_with_argument_set(args);
         assert_eq!(0, attacks.n_attacks());
         attacks.new_attack_by_ids(0, 0).unwrap();
         assert_eq!(1, attacks.n_attacks());
-        assert_eq!((0, 0), attacks.attacks[0]);
+        assert_eq!((0, 0), attacks.attacks[0].unwrap());
     }
 
     #[test]
     fn test_new_attack_by_ids_unknown_id_1() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
         let args = ArgumentSet::new_with_labels(&arg_labels);
-        let mut attacks = AAFramework::new(args);
+        let mut attacks = AAFramework::new_with_argument_set(args);
         attacks.new_attack_by_ids(3, 0).unwrap_err();
     }
 
@@ -345,7 +366,7 @@ mod tests {
     fn test_new_attack_by_ids_unknown_id_2() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
         let args = ArgumentSet::new_with_labels(&arg_labels);
-        let mut attacks = AAFramework::new(args);
+        let mut attacks = AAFramework::new_with_argument_set(args);
         attacks.new_attack_by_ids(0, 3).unwrap_err();
     }
 }

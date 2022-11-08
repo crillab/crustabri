@@ -1,7 +1,5 @@
 use std::io::{BufRead, BufReader, Read};
-
 use anyhow::{anyhow, Context, Result};
-
 use crate::{AAFramework, Argument, ArgumentSet, InstanceReader, WarningHandler};
 
 /// A reader for the ICCMA 2023 format.
@@ -76,7 +74,7 @@ impl InstanceReader<usize> for Iccma23Reader {
                 let argument_set = ArgumentSet::new_with_labels(
                     (1..=n_args.unwrap()).collect::<Vec<usize>>().as_slice(),
                 );
-                af = Some(AAFramework::new(argument_set));
+                af = Some(AAFramework::new_with_argument_set(argument_set));
                 continue;
             }
             if words.len() != 2 {
@@ -145,8 +143,12 @@ mod tests {
             .unwrap();
         assert_eq!(3, af.n_arguments());
         assert_eq!(2, af.n_attacks());
-        assert!(af.attacks().contains(&(0, 1)));
-        assert!(af.attacks().contains(&(2, 2)));
+        assert!(af
+            .iter_attacks()
+            .any(|att| att.attacker().id() == 0 && att.attacked().id() == 1));
+        assert!(af
+            .iter_attacks()
+            .any(|att| att.attacker().id() == 2 && att.attacked().id() == 2));
     }
 
     #[test]
@@ -157,8 +159,12 @@ mod tests {
             .unwrap();
         assert_eq!(3, af.n_arguments());
         assert_eq!(2, af.n_attacks());
-        assert!(af.attacks().contains(&(0, 1)));
-        assert!(af.attacks().contains(&(2, 2)));
+        assert!(af
+            .iter_attacks()
+            .any(|att| att.attacker().id() == 0 && att.attacked().id() == 1));
+        assert!(af
+            .iter_attacks()
+            .any(|att| att.attacker().id() == 2 && att.attacked().id() == 2));
     }
 
     #[test]
@@ -169,8 +175,12 @@ mod tests {
             .unwrap();
         assert_eq!(3, af.n_arguments());
         assert_eq!(2, af.n_attacks());
-        assert!(af.attacks().contains(&(0, 1)));
-        assert!(af.attacks().contains(&(2, 2)));
+        assert!(af
+            .iter_attacks()
+            .any(|att| att.attacker().id() == 0 && att.attacked().id() == 1));
+        assert!(af
+            .iter_attacks()
+            .any(|att| att.attacker().id() == 2 && att.attacked().id() == 2));
     }
 
     #[test]
@@ -197,8 +207,12 @@ mod tests {
             .unwrap();
         assert_eq!(3, af.n_arguments());
         assert_eq!(2, af.n_attacks());
-        assert!(af.attacks().contains(&(0, 1)));
-        assert!(af.attacks().contains(&(2, 2)));
+        assert!(af
+            .iter_attacks()
+            .any(|att| att.attacker().id() == 0 && att.attacked().id() == 1));
+        assert!(af
+            .iter_attacks()
+            .any(|att| att.attacker().id() == 2 && att.attacked().id() == 2));
     }
 
     #[test]

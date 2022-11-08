@@ -113,7 +113,9 @@ impl InstanceReader<String> for AspartixReader {
             if let Some(result) = try_read_att_line(l).with_context(context)? {
                 let (a, b) = result.consume_warnings(warning_consumer);
                 if af.is_none() {
-                    af = Some(AAFramework::new(ArgumentSet::new_with_labels(&arg_labels)));
+                    af = Some(AAFramework::new_with_argument_set(
+                        ArgumentSet::new_with_labels(&arg_labels),
+                    ));
                 }
                 af.as_mut()
                     .unwrap()
@@ -125,7 +127,9 @@ impl InstanceReader<String> for AspartixReader {
         }
         match af {
             Some(a) => Ok(a),
-            None => Ok(AAFramework::new(ArgumentSet::new_with_labels(&[]))),
+            None => Ok(AAFramework::new_with_argument_set(
+                ArgumentSet::new_with_labels(&[]),
+            )),
         }
     }
 

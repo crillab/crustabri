@@ -1,4 +1,5 @@
 use crate::{AAFramework, Argument, ArgumentSet, LabelType};
+use std::iter::Peekable;
 
 /// Returns the connected component the argument belongs to.
 pub fn connected_component_of<T>(af: &AAFramework<T>, arg: &Argument<T>) -> AAFramework<T>
@@ -7,9 +8,9 @@ where
 {
     let connected_component = find_connected_component_of(
         af,
-        arg.id(),
+        arg,
         &mut vec![false; af.argument_set().len()],
-        &mut 0,
+        &mut af.argument_set().iter().peekable(),
     );
     extract_connected_component(af, &connected_component)
 }
@@ -31,53 +32,62 @@ fn find_connected_components<T>(af: &AAFramework<T>) -> Vec<Vec<usize>>
 where
     T: LabelType,
 {
-    let mut in_connected_components = vec![false; af.n_arguments()];
-    let mut next = 0;
+    let mut in_connected_components = vec![false; 1 + af.max_argument_id()];
+    let mut next = af.argument_set().iter().peekable();
     let mut connected_components = Vec::new();
-    while next < in_connected_components.len() {
-        let current =
-            find_connected_component_of(af, next, &mut in_connected_components, &mut next);
+    while next.peek().is_some() {
+        let current = find_connected_component_of(
+            af,
+            next.next().unwrap(),
+            &mut in_connected_components,
+            &mut next,
+        );
         connected_components.push(current);
     }
     connected_components
 }
 
-fn find_connected_component_of<T>(
-    af: &AAFramework<T>,
-    arg: usize,
+fn find_connected_component_of<'a, I, T>(
+    af: &'a AAFramework<T>,
+    arg: &'a Argument<T>,
     in_connected_components: &mut [bool],
-    next: &mut usize,
+    next: &mut Peekable<I>,
 ) -> Vec<usize>
 where
     T: LabelType,
+    I: Iterator<Item = &'a Argument<T>>,
 {
-    in_connected_components[arg] = true;
-    let mut current = vec![arg];
+    in_connected_components[arg.id()] = true;
+    let mut current = vec![arg.id()];
     let mut newly_in_current = vec![arg];
-    let update_next = |n: &mut usize, icc: &mut [bool]| {
-        while *n < icc.len() && icc[*n] {
-            *n += 1;
+    let update_next = |n: &mut Peekable<I>, icc: &mut [bool]| {
+        while let Some(arg) = n.peek() {
+            if icc[arg.id()] {
+                n.next();
+            } else {
+                break;
+            }
         }
     };
     update_next(next, in_connected_components);
     while !newly_in_current.is_empty() {
         let arg = newly_in_current.pop().unwrap();
-        let mut add_to_current = |a: usize| {
-            if !in_connected_components[a] {
-                in_connected_components[a] = true;
-                current.push(a);
+        let mut add_to_current = |a: &'a Argument<T>| {
+            if !in_connected_components[a.id()] {
+                in_connected_components[a.id()] = true;
+                current.push(a.id());
                 newly_in_current.push(a);
-                if a == *next {
+                if next.peek() == Some(&a) {
                     update_next(next, in_connected_components)
                 }
             }
         };
-        af.attack_ids_from(arg)
-            .iter()
-            .for_each(|att| add_to_current(af.attacks()[*att].1));
-        af.attack_ids_to(arg)
-            .iter()
-            .for_each(|att| add_to_current(af.attacks()[*att].0));
+        af.iter_attacks_from(arg).for_each(|att| {
+            add_to_current(att.attacked());
+        });
+        af.iter_attacks_to(arg).for_each(|att| {
+            add_to_current(att.attacker());
+        });
     }
     current
 }
@@ -99,10 +109,10 @@ where
         .map(|i| af.argument_set().get_argument_by_id(*i).label().clone())
         .collect::<Vec<T>>();
     let arguments = ArgumentSet::new_with_labels(&labels);
-    let mut new_af = AAFramework::new(arguments);
-    af.attacks().iter().for_each(|(i, j)| {
-        if let Some(new_i) = arg_mapping[*i] {
-            let new_j = arg_mapping[*j].unwrap();
+    let mut new_af = AAFramework::new_with_argument_set(arguments);
+    af.iter_attacks().for_each(|att| {
+        if let Some(new_i) = arg_mapping[att.attacker().id()] {
+            let new_j = arg_mapping[att.attacked().id()].unwrap();
             new_af.new_attack_by_ids(new_i, new_j).unwrap();
         }
     });
