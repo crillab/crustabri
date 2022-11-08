@@ -98,7 +98,7 @@ where
         .iter()
         .map(|i| af.argument_set().get_argument_by_id(*i).label().clone())
         .collect::<Vec<T>>();
-    let arguments = ArgumentSet::new(&labels);
+    let arguments = ArgumentSet::new_with_labels(&labels);
     let mut new_af = AAFramework::new(arguments);
     af.attacks().iter().for_each(|(i, j)| {
         if let Some(new_i) = arg_mapping[*i] {

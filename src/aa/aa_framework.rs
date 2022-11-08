@@ -68,7 +68,7 @@ where
     ///
     /// ```
     /// # use crustabri::{ArgumentSet, AAFramework};
-    /// let arguments = ArgumentSet::new(&["a", "b", "c"]);
+    /// let arguments = ArgumentSet::new_with_labels(&["a", "b", "c"]);
     /// let framework = AAFramework::new(arguments);
     /// assert_eq!(3, framework.argument_set().len());
     /// assert_eq!(0, framework.iter_attacks().count());
@@ -101,7 +101,7 @@ where
     /// ```
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new(arguments);
     /// assert_eq!(0, framework.iter_attacks().count());
     /// framework.new_attack(&labels[0], &labels[1]);
@@ -140,7 +140,7 @@ where
     /// ```
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new(arguments);
     /// assert_eq!(0, framework.iter_attacks().count());
     /// framework.new_attack_by_ids(0, 1); // "a" attacks "b"
@@ -169,7 +169,7 @@ where
     /// ```
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let framework = AAFramework::new(arguments);
     /// assert_eq!(3, framework.argument_set().len());
     /// ```
@@ -184,7 +184,7 @@ where
     /// ```
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new(arguments);
     /// assert_eq!(0, framework.iter_attacks().count());
     /// framework.new_attack_by_ids(0, 1); // "a" attacks "b"
@@ -212,7 +212,7 @@ where
     /// ```
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new(arguments);
     /// assert_eq!(3, framework.n_arguments());
     /// ```
@@ -227,7 +227,7 @@ where
     /// ```
     /// # use crustabri::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new(arguments);
     /// assert_eq!(0, framework.n_attacks());
     /// framework.new_attack_by_ids(0, 1); // "a" attacks "b"
@@ -286,7 +286,7 @@ mod tests {
     #[test]
     fn test_n_args() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let args = ArgumentSet::new(&arg_labels);
+        let args = ArgumentSet::new_with_labels(&arg_labels);
         let af = AAFramework::new(args);
         assert_eq!(3, af.n_arguments());
     }
@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn test_new_attack_ok() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let args = ArgumentSet::new(&arg_labels);
+        let args = ArgumentSet::new_with_labels(&arg_labels);
         let mut attacks = AAFramework::new(args);
         assert_eq!(0, attacks.n_attacks());
         attacks.new_attack(&arg_labels[0], &arg_labels[0]).unwrap();
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn test_new_attack_unknown_label_1() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let args = ArgumentSet::new(&arg_labels);
+        let args = ArgumentSet::new_with_labels(&arg_labels);
         let mut attacks = AAFramework::new(args);
         attacks
             .new_attack(&"d".to_string(), &arg_labels[0])
@@ -315,7 +315,7 @@ mod tests {
     #[test]
     fn test_new_attack_unknown_label_2() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let args = ArgumentSet::new(&arg_labels);
+        let args = ArgumentSet::new_with_labels(&arg_labels);
         let mut attacks = AAFramework::new(args);
         attacks
             .new_attack(&arg_labels[0], &"d".to_string())
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn test_new_attack_by_ids_ok() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let args = ArgumentSet::new(&arg_labels);
+        let args = ArgumentSet::new_with_labels(&arg_labels);
         let mut attacks = AAFramework::new(args);
         assert_eq!(0, attacks.n_attacks());
         attacks.new_attack_by_ids(0, 0).unwrap();
@@ -336,7 +336,7 @@ mod tests {
     #[test]
     fn test_new_attack_by_ids_unknown_id_1() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let args = ArgumentSet::new(&arg_labels);
+        let args = ArgumentSet::new_with_labels(&arg_labels);
         let mut attacks = AAFramework::new(args);
         attacks.new_attack_by_ids(3, 0).unwrap_err();
     }
@@ -344,7 +344,7 @@ mod tests {
     #[test]
     fn test_new_attack_by_ids_unknown_id_2() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let args = ArgumentSet::new(&arg_labels);
+        let args = ArgumentSet::new_with_labels(&arg_labels);
         let mut attacks = AAFramework::new(args);
         attacks.new_attack_by_ids(0, 3).unwrap_err();
     }

@@ -20,7 +20,7 @@ use std::io::Write;
 ///     let writer = AspartixWriter::default();
 ///     writer.write_framework(&af, &mut std::io::stdout())
 /// }
-/// # write_af_to_stdout(&AAFramework::new(ArgumentSet::new(&[] as &[String])));
+/// # write_af_to_stdout(&AAFramework::new(ArgumentSet::new_with_labels(&[] as &[String])));
 /// ```
 #[derive(Default)]
 pub struct AspartixWriter {}
@@ -47,7 +47,7 @@ impl AspartixWriter {
     ///     let writer = AspartixWriter::default();
     ///     writer.write_framework(&af, &mut std::io::stdout())
     /// }
-    /// # write_af_to_stdout(&AAFramework::new(ArgumentSet::new(&[] as &[String])));
+    /// # write_af_to_stdout(&AAFramework::new(ArgumentSet::new_with_labels(&[] as &[String])));
     /// ```
     pub fn write_framework<T: LabelType>(
         &self,
@@ -109,7 +109,7 @@ mod tests {
     #[test]
     fn test_write_af() {
         let arg_names = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let args = ArgumentSet::new(&arg_names);
+        let args = ArgumentSet::new_with_labels(&arg_names);
         let mut framework = AAFramework::new(args);
         framework.new_attack(&arg_names[0], &arg_names[0]).unwrap();
         framework.new_attack(&arg_names[1], &arg_names[2]).unwrap();
@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn test_write_single_extension() {
         let arg_names = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let args = ArgumentSet::new(&arg_names);
+        let args = ArgumentSet::new_with_labels(&arg_names);
         let writer = AspartixWriter::default();
         let mut buffer = BufWriter::new(Vec::new());
         writer

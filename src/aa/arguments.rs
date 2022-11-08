@@ -69,21 +69,24 @@ where
 }
 
 /// Handles the set of arguments of an AA framework.
+#[derive(Default)]
 pub struct ArgumentSet<T>
 where
     T: LabelType,
 {
-    arguments: Vec<Argument<T>>,
+    arguments: Vec<Option<Argument<T>>>,
     label_to_id: HashMap<T, usize>,
+    n_removed: usize,
 }
 
 impl<T> ArgumentSet<T>
 where
     T: LabelType,
 {
-    /// Builds a new argument set given the label of the arguments.
+    /// Builds a new argument set given the labels of the arguments.
     ///
     /// Each argument will be assigned an id equal to its index in the provided slice of argument labels.
+    /// If a label appears multiple times, the first occurrence is the only one that is considered.
     ///
     /// # Arguments
     ///
@@ -94,24 +97,51 @@ where
     /// ```
     /// # use crustabri::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(3, arguments.len());
     /// ```
-    pub fn new(labels: &[T]) -> Self {
-        let mut label_to_id = HashMap::new();
-        ArgumentSet {
-            arguments: labels
-                .iter()
-                .enumerate()
-                .map(|(i, s)| {
-                    label_to_id.insert(s.clone(), i);
-                    Argument {
-                        id: i,
-                        label: s.clone(),
-                    }
-                })
-                .collect(),
-            label_to_id,
+    pub fn new_with_labels(labels: &[T]) -> Self {
+        let mut argument_set = ArgumentSet {
+            arguments: Vec::with_capacity(labels.len()),
+            label_to_id: HashMap::with_capacity(labels.len()),
+            n_removed: 0,
+        };
+        labels
+            .iter()
+            .for_each(|l| argument_set.add_argument(l.clone()));
+        argument_set.arguments.shrink_to_fit();
+        argument_set.label_to_id.shrink_to_fit();
+        argument_set
+    }
+
+    /// Adds a new argument to this set.
+    ///
+    /// The id of the new argument is the previous maximal id plus one.
+    /// In an argument with the same label is already defined, no argument is added.
+    pub fn add_argument(&mut self, label: T) {
+        self.label_to_id.entry(label.clone()).or_insert_with(|| {
+            self.arguments.push(Some(Argument {
+                id: self.arguments.len(),
+                label,
+            }));
+            self.arguments.len() - 1
+        });
+    }
+
+    /// Removes an argument from this set.
+    ///
+    /// The argument id will not be attributed to new arguments.
+    ///
+    /// # Panics
+    ///
+    /// If the argument does not exists, this function panics.
+    pub fn remove_argument(&mut self, label: &T) {
+        match self.label_to_id.remove(label) {
+            Some(id) => {
+                self.n_removed += 1;
+                self.arguments[id] = None
+            }
+            None => panic!("no such argument: {}", label),
         }
     }
 
@@ -122,11 +152,11 @@ where
     /// ```
     /// # use crustabri::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(3, arguments.len());
     /// ```
     pub fn len(&self) -> usize {
-        self.arguments.len()
+        self.arguments.len() - self.n_removed
     }
 
     /// Returns `true` iff the set has no argument.
@@ -136,11 +166,11 @@ where
     /// ```
     /// # use crustabri::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert!(!arguments.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
-        self.arguments.is_empty()
+        self.arguments.len() == self.n_removed
     }
 
     /// Returns the unique index associated to an argument label.
@@ -158,7 +188,7 @@ where
     /// ```
     /// # use crustabri::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(0, arguments.get_argument_index(&labels[0]).unwrap());
     /// assert_eq!(1, arguments.get_argument_index(&labels[1]).unwrap());
     /// assert_eq!(2, arguments.get_argument_index(&labels[2]).unwrap());
@@ -181,14 +211,14 @@ where
     /// ```
     /// # use crustabri::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert!(arguments.get_argument(&"a").is_ok());
     /// assert!(arguments.get_argument(&"d").is_err());
     /// ```
     pub fn get_argument(&self, label: &T) -> Result<&Argument<T>> {
         self.label_to_id
             .get(label)
-            .map(|i| &self.arguments[*i])
+            .and_then(|i| self.arguments[*i].as_ref())
             .ok_or_else(|| anyhow!("no such argument: {}", label))
     }
 
@@ -205,13 +235,13 @@ where
     /// ```
     /// # use crustabri::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(&labels[0], arguments.get_argument_by_id(0).label());
     /// assert_eq!(&labels[1], arguments.get_argument_by_id(1).label());
     /// assert_eq!(&labels[2], arguments.get_argument_by_id(2).label());
     /// ```
     pub fn get_argument_by_id(&self, id: usize) -> &Argument<T> {
-        &self.arguments[id]
+        self.arguments[id].as_ref().unwrap()
     }
 
     /// Returns an iterator to the arguments.
@@ -221,11 +251,11 @@ where
     /// ```
     /// # use crustabri::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new(&labels);
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(3, arguments.iter().count());
     /// ```
-    pub fn iter(&self) -> std::slice::Iter<'_, Argument<T>> {
-        self.arguments.iter()
+    pub fn iter(&self) -> impl Iterator<Item = &Argument<T>> + '_ {
+        self.arguments.iter().filter_map(|o| o.as_ref())
     }
 }
 
@@ -234,30 +264,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_new() {
+    fn test_new_with_labels() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let args = ArgumentSet::new(&arg_labels);
+        let args = ArgumentSet::new_with_labels(&arg_labels);
         assert_eq!(3, args.arguments.len());
         assert_eq!(3, args.label_to_id.len());
         assert_eq!(3, args.len());
         assert!(!args.is_empty());
-        for (i, a) in args.arguments.iter().enumerate() {
+        for (i, opt_a) in args.arguments.iter().enumerate() {
+            let a = opt_a.as_ref().unwrap();
             assert_eq!(i, a.id);
             assert_eq!(arg_labels[i], a.label);
         }
     }
 
     #[test]
-    fn test_new_empty() {
-        let args = ArgumentSet::new(&[] as &[String]);
+    fn test_new_with_empty_labels() {
+        let args = ArgumentSet::new_with_labels(&[] as &[String]);
         assert_eq!(0, args.len());
         assert!(args.is_empty());
     }
 
     #[test]
+    fn test_new_repeated_labels() {
+        let arg_labels = vec!["a".to_string(), "b".to_string(), "a".to_string()];
+        let args = ArgumentSet::new_with_labels(&arg_labels);
+        assert_eq!(2, args.arguments.len());
+    }
+
+    #[test]
     fn test_into_iterator() {
         let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let args = ArgumentSet::new(&arg_labels);
+        let args = ArgumentSet::new_with_labels(&arg_labels);
         let mut iter_labels: Vec<String> = Vec::with_capacity(arg_labels.len());
         for arg in args.iter() {
             iter_labels.push(arg.label.clone())
@@ -268,8 +306,37 @@ mod tests {
     #[test]
     fn test_get_argument() {
         let labels = vec!["a", "b", "c"];
-        let arguments = ArgumentSet::new(&labels);
+        let arguments = ArgumentSet::new_with_labels(&labels);
         assert!(arguments.get_argument(&"a").is_ok());
         assert!(arguments.get_argument(&"d").is_err());
+    }
+
+    #[test]
+    fn test_add_arguments() {
+        let arg_labels = vec!["a".to_string(), "b".to_string()];
+        let mut args = ArgumentSet::new_with_labels(&arg_labels);
+        args.add_argument("c".to_string());
+        args.add_argument("c".to_string());
+        assert_eq!(3, args.arguments.len());
+        assert_eq!(2, args.get_argument(&"c".to_string()).unwrap().id())
+    }
+
+    #[test]
+    fn test_remove_argument() {
+        let arg_labels = vec!["a".to_string(), "b".to_string()];
+        let mut args = ArgumentSet::new_with_labels(&arg_labels);
+        args.n_removed = 0;
+        assert_eq!(2, args.arguments.len());
+        args.remove_argument(&"b".to_string());
+        args.n_removed = 1;
+        assert_eq!(1, args.len());
+    }
+
+    #[test]
+    #[should_panic(expected = "no such argument: c")]
+    fn test_remove_nonexisting_argument() {
+        let arg_labels = vec!["a".to_string(), "b".to_string()];
+        let mut args = ArgumentSet::new_with_labels(&arg_labels);
+        args.remove_argument(&"c".to_string());
     }
 }

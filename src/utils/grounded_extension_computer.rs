@@ -50,7 +50,7 @@ mod tests {
     #[test]
     fn test_grounded_extension_1() {
         let arg_labels = vec!["a", "b", "c", "d", "e", "f"];
-        let args = ArgumentSet::new(&arg_labels);
+        let args = ArgumentSet::new_with_labels(&arg_labels);
         let mut af = AAFramework::new(args);
         af.new_attack(&"a", &"b").unwrap();
         af.new_attack(&"b", &"c").unwrap();
@@ -69,7 +69,7 @@ mod tests {
     #[test]
     fn test_grounded_extension_2() {
         let arg_labels = vec!["x", "a", "b", "c", "d", "e", "f"];
-        let args = ArgumentSet::new(&arg_labels);
+        let args = ArgumentSet::new_with_labels(&arg_labels);
         let mut af = AAFramework::new(args);
         af.new_attack(&"x", &"a").unwrap();
         af.new_attack(&"a", &"b").unwrap();

@@ -73,8 +73,9 @@ impl InstanceReader<usize> for Iccma23Reader {
                             .with_context(context)
                     }
                 };
-                let argument_set =
-                    ArgumentSet::new((1..=n_args.unwrap()).collect::<Vec<usize>>().as_slice());
+                let argument_set = ArgumentSet::new_with_labels(
+                    (1..=n_args.unwrap()).collect::<Vec<usize>>().as_slice(),
+                );
                 af = Some(AAFramework::new(argument_set));
                 continue;
             }
