@@ -122,7 +122,7 @@ where
     /// If the provided arguments are undefined, an error is returned.
     /// Else, the attack is added.
     ///
-    /// If the attack already exists, it is added another time (no checks are made for existence).
+    /// If the attack already exists, no new attack is added.
     ///
     /// # Arguments
     ///
@@ -150,9 +150,14 @@ where
             .arguments
             .get_argument_index(to)
             .with_context(context)?;
-        self.attacks.push(Some((attacker_id, attacked_id)));
-        self.attacks_from[attacker_id].push(self.attacks.len() - 1);
-        self.attacks_to[attacked_id].push(self.attacks.len() - 1);
+        if !self.attacks_from[attacker_id]
+            .iter()
+            .any(|id| self.attacks[*id] == Some((attacker_id, attacked_id)))
+        {
+            self.attacks.push(Some((attacker_id, attacked_id)));
+            self.attacks_from[attacker_id].push(self.attacks.len() - 1);
+            self.attacks_to[attacked_id].push(self.attacks.len() - 1);
+        }
         Ok(())
     }
 
@@ -444,6 +449,7 @@ mod tests {
         for i in 0..3 {
             for j in 0..3 {
                 af.new_attack(&arg_labels[i], &arg_labels[j]).unwrap();
+                af.new_attack(&arg_labels[i], &arg_labels[j]).unwrap();
             }
         }
         assert_eq!(9, af.n_attacks());
@@ -473,5 +479,17 @@ mod tests {
         assert!(af
             .iter_attacks()
             .all(|att| att.attacker().label() != "a" && att.attacked().label() != "a"));
+    }
+
+    #[test]
+    fn test_new_attack_already_exists() {
+        let arg_labels = vec!["a"];
+        let args = ArgumentSet::new_with_labels(&arg_labels);
+        let mut af = AAFramework::new_with_argument_set(args);
+        assert_eq!(0, af.n_attacks());
+        af.new_attack(&"a", &"a").unwrap();
+        assert_eq!(1, af.n_attacks());
+        af.new_attack(&"a", &"a").unwrap();
+        assert_eq!(1, af.n_attacks());
     }
 }
