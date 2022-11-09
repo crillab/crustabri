@@ -47,7 +47,7 @@ where
         let attacked_id = arg.id();
         let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;
         let mut full_cl = clause![attacked_solver_var];
-        af.iter_attacks_to_id(attacked_id).for_each(|att| {
+        af.iter_attacks_to(arg).for_each(|att| {
             let attacker_id = att.attacker().id();
             if attacked_id == attacker_id {
                 solver.add_clause(clause![-attacked_solver_var])

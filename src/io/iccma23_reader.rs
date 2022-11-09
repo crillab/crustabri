@@ -1,6 +1,6 @@
-use std::io::{BufRead, BufReader, Read};
-use anyhow::{anyhow, Context, Result};
 use crate::{AAFramework, Argument, ArgumentSet, InstanceReader, WarningHandler};
+use anyhow::{anyhow, Context, Result};
+use std::io::{BufRead, BufReader, Read};
 
 /// A reader for the ICCMA 2023 format.
 ///

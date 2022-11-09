@@ -327,4 +327,37 @@ mod tests {
         assert!(solver
             .is_skeptically_accepted(af.argument_set().get_argument(&"a5".to_string()).unwrap()));
     }
+
+    #[test]
+    fn test_skeptical_acceptance_after_arg_removal() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        arg(a5).
+        att(a0,a1).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a3).
+        att(a2,a4).
+        att(a3,a2).
+        att(a3,a4).
+        att(a4,a5).
+        "#;
+        let reader = AspartixReader::default();
+        let mut af = reader.read(&mut instance.as_bytes()).unwrap();
+        af.remove_argument(&"a2".to_string()).unwrap();
+        af.remove_argument(&"a3".to_string()).unwrap();
+        let mut solver = PreferredSemanticsSolver::new(&af);
+        assert!(solver
+            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
+        assert!(!solver
+            .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        assert!(solver
+            .is_skeptically_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
+        assert!(!solver
+            .is_skeptically_accepted(af.argument_set().get_argument(&"a5".to_string()).unwrap()));
+    }
 }

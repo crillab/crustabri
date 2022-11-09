@@ -60,7 +60,7 @@ where
             -attacked_disjunction_solver_var
         ]);
         let mut full_cl = clause![-attacked_disjunction_solver_var];
-        af.iter_attacks_to_id(attacked_id).for_each(|att| {
+        af.iter_attacks_to(arg).for_each(|att| {
             let attacker_id = att.attacker().id();
             let attacker_solver_var = arg_id_to_solver_var(attacker_id) as isize;
             solver.add_clause(clause![
@@ -84,7 +84,7 @@ pub(crate) fn encode_complete_semantics_constraints<T>(
         let attacked_id = arg.id();
         let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;
         let mut full_cl = clause![attacked_solver_var];
-        af.iter_attacks_to_id(attacked_id).for_each(|att| {
+        af.iter_attacks_to(arg).for_each(|att| {
             let attacker_id = att.attacker().id();
             let attacker_disjunction_solver_var =
                 arg_id_to_solver_disjunction_var(attacker_id) as isize;
@@ -197,5 +197,26 @@ mod tests {
         assert_eq!(1, arg_id_from_solver_var(arg_id_to_solver_var(1)).unwrap());
         assert_eq!(2, arg_id_to_solver_var(arg_id_from_solver_var(2).unwrap()));
         assert_eq!(4, arg_id_to_solver_var(arg_id_from_solver_var(4).unwrap()));
+    }
+
+    #[test]
+    fn test_credulous_acceptance_after_arg_removal() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        att(a0,a1).
+        att(a1,a2).
+        att(a2,a1).
+        "#;
+        let reader = AspartixReader::default();
+        let mut af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver_before = CompleteSemanticsSolver::new(&af);
+        assert!(!solver_before
+            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        af.remove_argument(&"a0".to_string()).unwrap();
+        let mut solver_after = CompleteSemanticsSolver::new(&af);
+        assert!(solver_after
+            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
     }
 }

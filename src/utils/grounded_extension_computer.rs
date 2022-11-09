@@ -5,10 +5,14 @@ pub fn grounded_extension<T>(af: &AAFramework<T>) -> Vec<&Argument<T>>
 where
     T: LabelType,
 {
+    let max_arg_id = match af.max_argument_id() {
+        Some(n) => n,
+        None => return Vec::new(),
+    };
     let mut ext = vec![];
     let mut n_processed_args = 0;
-    let mut defeated_args = vec![false; 1 + af.max_argument_id()];
-    let mut attacked_by = vec![usize::MAX; 1 + af.max_argument_id()];
+    let mut defeated_args = vec![false; 1 + max_arg_id];
+    let mut attacked_by = vec![usize::MAX; 1 + max_arg_id];
     af.argument_set().iter().for_each(|arg| {
         let cnt = af.iter_attacks_to(arg).count();
         if cnt == 0 {

@@ -155,11 +155,15 @@ where
         self.arguments.len() - self.n_removed
     }
 
-    /// Returns the maximal argument id given so far.
+    /// Returns the maximal argument id given so far, or `None` if no argument has been added yet.
     ///
     /// This id may refer to a removed argument.
-    pub fn max_id(&self) -> usize {
-        self.arguments.len() - 1
+    pub fn max_id(&self) -> Option<usize> {
+        if self.arguments.is_empty() {
+            None
+        } else {
+            Some(self.arguments.len() - 1)
+        }
     }
 
     /// Returns `true` iff the set has no argument.

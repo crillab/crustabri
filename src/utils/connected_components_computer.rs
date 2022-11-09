@@ -6,10 +6,18 @@ pub fn connected_component_of<T>(af: &AAFramework<T>, arg: &Argument<T>) -> AAFr
 where
     T: LabelType,
 {
+    let max_arg_id = match af.max_argument_id() {
+        Some(n) => n,
+        None => {
+            return AAFramework::<T>::new_with_argument_set(ArgumentSet::new_with_labels(
+                &[] as &[T]
+            ))
+        }
+    };
     let connected_component = find_connected_component_of(
         af,
         arg,
-        &mut vec![false; af.argument_set().len()],
+        &mut vec![false; 1 + max_arg_id],
         &mut af.argument_set().iter().peekable(),
     );
     extract_connected_component(af, &connected_component)
@@ -34,7 +42,7 @@ fn find_connected_components<T>(af: &AAFramework<T>) -> Vec<Vec<&Argument<T>>>
 where
     T: LabelType,
 {
-    let mut in_connected_components = vec![false; 1 + af.max_argument_id()];
+    let mut in_connected_components = vec![false; 1 + af.max_argument_id().unwrap()];
     let mut next = af.argument_set().iter().peekable();
     let mut connected_components = Vec::new();
     while next.peek().is_some() {
@@ -101,7 +109,7 @@ fn extract_connected_component<T>(
 where
     T: LabelType,
 {
-    let mut arg_mapping = vec![None; 1 + af.max_argument_id()];
+    let mut arg_mapping = vec![None; 1 + af.max_argument_id().unwrap()];
     connected_component
         .iter()
         .enumerate()
