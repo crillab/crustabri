@@ -7,8 +7,8 @@ where
 {
     let mut ext = vec![];
     let mut n_processed_args = 0;
-    let mut defeated_args = vec![false; af.n_arguments()];
-    let mut attacked_by = vec![usize::MAX; af.n_arguments()];
+    let mut defeated_args = vec![false; 1 + af.max_argument_id()];
+    let mut attacked_by = vec![usize::MAX; 1 + af.max_argument_id()];
     af.argument_set().iter().for_each(|arg| {
         let cnt = af.iter_attacks_to(arg).count();
         if cnt == 0 {
@@ -40,7 +40,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ArgumentSet;
+    use crate::{ArgumentSet, AspartixReader, InstanceReader};
 
     #[test]
     fn test_grounded_extension_1() {
@@ -79,5 +79,33 @@ mod tests {
             .collect::<Vec<&str>>();
         grounded.sort_unstable();
         assert_eq!(vec!["b", "e", "x"], grounded)
+    }
+
+    #[test]
+    fn test_grounded_extension_after_arg_removal() {
+        let instance = r#"
+        arg(a).
+        arg(b).
+        arg(c).
+        arg(d).
+        att(a,b).
+        att(b,c).
+        att(c,d).
+        "#;
+        let reader = AspartixReader::default();
+        let mut af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut grounded_before = grounded_extension(&af)
+            .iter()
+            .map(|a| a.label().clone())
+            .collect::<Vec<String>>();
+        grounded_before.sort_unstable();
+        assert_eq!(vec!["a", "c"], grounded_before);
+        af.remove_argument(&"c".to_string()).unwrap();
+        let mut grounded_after = grounded_extension(&af)
+            .iter()
+            .map(|a| a.label().clone())
+            .collect::<Vec<String>>();
+        grounded_after.sort_unstable();
+        assert_eq!(vec!["a", "d"], grounded_after);
     }
 }

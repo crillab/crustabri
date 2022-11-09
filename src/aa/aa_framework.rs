@@ -88,13 +88,33 @@ where
     }
 
     /// Adds a new argument to this argumentation framework.
-    pub fn add_argument(&mut self, label: T) {
+    pub fn new_argument(&mut self, label: T) {
         let old_len = self.arguments.len();
-        self.arguments.add_argument(label);
+        self.arguments.new_argument(label);
         if self.arguments.len() > old_len {
             self.attacks_from.push(Vec::new());
             self.attacks_to.push(Vec::new());
         }
+    }
+
+    /// Removes an argument from this argumentation framework.
+    ///
+    /// The argument id will not be attributed to new arguments.
+    pub fn remove_argument(&mut self, label: &T) -> Result<()> {
+        let removed = self.arguments.remove_argument(label)?;
+        let removed_id = removed.id();
+        let try_remove_attack = |i: &usize| {
+            if self.attacks[*i].take().is_some() {
+                self.n_removed_attacks += 1;
+            }
+        };
+        self.attacks_from[removed_id]
+            .iter()
+            .chain(self.attacks_to[removed_id].iter())
+            .for_each(try_remove_attack);
+        self.attacks_from[removed_id].clear();
+        self.attacks_to[removed_id].clear();
+        Ok(())
     }
 
     /// Adds a new attack given the labels of the source and destination arguments.
@@ -134,6 +154,40 @@ where
         self.attacks_from[attacker_id].push(self.attacks.len() - 1);
         self.attacks_to[attacked_id].push(self.attacks.len() - 1);
         Ok(())
+    }
+
+    /// Removes an attack.
+    ///
+    /// If the provided attack or one of its arguments does not belong to this framework, an error is returned.
+    pub fn remove_attack(&mut self, from: &T, to: &T) -> Result<()> {
+        let context = || format!("while removing an attack from {:?} to {:?}", from, to);
+        let attacker_id = self
+            .arguments
+            .get_argument_index(from)
+            .with_context(context)?;
+        let attacked_id = self
+            .arguments
+            .get_argument_index(to)
+            .with_context(context)?;
+        let attacks_from = &self.attacks_from[attacker_id];
+        match attacks_from
+            .iter()
+            .position(|i| self.attacks[*i] == Some((attacker_id, attacked_id)))
+        {
+            Some(pos_in_attacks_from) => {
+                let attack_id = attacks_from[pos_in_attacks_from];
+                self.attacks[attack_id] = None;
+                let pos_in_attacks_to = self.attacks_to[attacked_id]
+                    .iter()
+                    .position(|att_id| *att_id == attack_id)
+                    .unwrap();
+                self.attacks_to[attacked_id].swap_remove(pos_in_attacks_to);
+                self.attacks_from.swap_remove(pos_in_attacks_from);
+                self.n_removed_attacks += 1;
+                Ok(())
+            }
+            None => Err(anyhow!("no such attack")),
+        }
     }
 
     /// Adds a new attack given the IDs of the source and destination arguments.
@@ -368,5 +422,56 @@ mod tests {
         let args = ArgumentSet::new_with_labels(&arg_labels);
         let mut attacks = AAFramework::new_with_argument_set(args);
         attacks.new_attack_by_ids(0, 3).unwrap_err();
+    }
+
+    #[test]
+    fn test_new_argument() {
+        let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let args = ArgumentSet::new_with_labels(&arg_labels);
+        let mut af = AAFramework::new_with_argument_set(args);
+        af.new_argument("d".to_string());
+        assert_eq!(4, af.n_arguments());
+        af.new_argument("d".to_string());
+        assert_eq!(4, af.n_arguments());
+    }
+
+    #[test]
+    fn test_remove_attack() {
+        let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let args = ArgumentSet::new_with_labels(&arg_labels);
+        let mut af = AAFramework::new_with_argument_set(args);
+        assert_eq!(0, af.n_attacks());
+        for i in 0..3 {
+            for j in 0..3 {
+                af.new_attack(&arg_labels[i], &arg_labels[j]).unwrap();
+            }
+        }
+        assert_eq!(9, af.n_attacks());
+        assert!(af.remove_attack(&arg_labels[0], &arg_labels[0]).is_ok());
+        assert!(af.remove_attack(&arg_labels[0], &arg_labels[0]).is_err());
+        assert_eq!(8, af.n_attacks());
+        assert!(af
+            .iter_attacks()
+            .all(|att| att.attacker().label() != "a" || att.attacked().label() != "a"));
+    }
+
+    #[test]
+    fn test_remove_argument() {
+        let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let args = ArgumentSet::new_with_labels(&arg_labels);
+        let mut af = AAFramework::new_with_argument_set(args);
+        assert_eq!(0, af.n_attacks());
+        for i in 0..3 {
+            for j in 0..3 {
+                af.new_attack(&arg_labels[i], &arg_labels[j]).unwrap();
+            }
+        }
+        assert_eq!(9, af.n_attacks());
+        assert!(af.remove_argument(&arg_labels[0]).is_ok());
+        assert!(af.remove_argument(&arg_labels[0]).is_err());
+        assert_eq!(4, af.n_attacks());
+        assert!(af
+            .iter_attacks()
+            .all(|att| att.attacker().label() != "a" && att.attacked().label() != "a"));
     }
 }

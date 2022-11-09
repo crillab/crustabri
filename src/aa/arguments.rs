@@ -108,7 +108,7 @@ where
         };
         labels
             .iter()
-            .for_each(|l| argument_set.add_argument(l.clone()));
+            .for_each(|l| argument_set.new_argument(l.clone()));
         argument_set.arguments.shrink_to_fit();
         argument_set.label_to_id.shrink_to_fit();
         argument_set
@@ -118,7 +118,7 @@ where
     ///
     /// The id of the new argument is the previous maximal id plus one.
     /// In an argument with the same label is already defined, no argument is added.
-    pub fn add_argument(&mut self, label: T) {
+    pub fn new_argument(&mut self, label: T) {
         self.label_to_id.entry(label.clone()).or_insert_with(|| {
             self.arguments.push(Some(Argument {
                 id: self.arguments.len(),
@@ -131,17 +131,13 @@ where
     /// Removes an argument from this set.
     ///
     /// The argument id will not be attributed to new arguments.
-    ///
-    /// # Panics
-    ///
-    /// If the argument does not exists, this function panics.
-    pub fn remove_argument(&mut self, label: &T) -> Argument<T> {
+    pub fn remove_argument(&mut self, label: &T) -> Result<Argument<T>> {
         match self.label_to_id.remove(label) {
             Some(id) => {
                 self.n_removed += 1;
-                self.arguments[id].take().unwrap()
+                Ok(self.arguments[id].take().unwrap())
             }
-            None => panic!("no such argument: {}", label),
+            None => Err(anyhow!("no such argument: {}", label)),
         }
     }
 
@@ -322,8 +318,8 @@ mod tests {
     fn test_add_arguments() {
         let arg_labels = vec!["a".to_string(), "b".to_string()];
         let mut args = ArgumentSet::new_with_labels(&arg_labels);
-        args.add_argument("c".to_string());
-        args.add_argument("c".to_string());
+        args.new_argument("c".to_string());
+        args.new_argument("c".to_string());
         assert_eq!(3, args.arguments.len());
         assert_eq!(2, args.get_argument(&"c".to_string()).unwrap().id())
     }
@@ -334,7 +330,7 @@ mod tests {
         let mut args = ArgumentSet::new_with_labels(&arg_labels);
         args.n_removed = 0;
         assert_eq!(2, args.arguments.len());
-        args.remove_argument(&"b".to_string());
+        args.remove_argument(&"b".to_string()).unwrap();
         args.n_removed = 1;
         assert_eq!(1, args.len());
     }
@@ -344,6 +340,6 @@ mod tests {
     fn test_remove_nonexisting_argument() {
         let arg_labels = vec!["a".to_string(), "b".to_string()];
         let mut args = ArgumentSet::new_with_labels(&arg_labels);
-        args.remove_argument(&"c".to_string());
+        args.remove_argument(&"c".to_string()).unwrap();
     }
 }
