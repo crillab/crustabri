@@ -13,6 +13,10 @@ path = "src/lib.rs"
 name = "crustabri"
 path = "src/main.rs"
 
+[[bin]]
+name = "crustabri_iccma23"
+path = "src/main_iccma23.rs"
+
 [dependencies]
 anyhow = "1.0.65"
 cadical = "0.1.13"

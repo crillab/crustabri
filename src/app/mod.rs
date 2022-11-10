@@ -4,7 +4,7 @@ pub(crate) use authors_command::AuthorsCommand;
 mod check_command;
 pub(crate) use check_command::CheckCommand;
 
-mod common;
+pub(crate) mod common;
 
 mod problems_command;
 pub(crate) use problems_command::ProblemsCommand;

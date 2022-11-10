@@ -1,11 +1,35 @@
+use super::{AuthorsCommand, CheckCommand, ProblemsCommand, SolveCommand};
 use anyhow::{Context, Result};
 use crustabri::{AAFramework, InstanceReader, LabelType};
-use crusti_app_helper::{info, warn, Arg};
+use crusti_app_helper::{info, warn, AppHelper, Arg, Command};
 use std::{
     fs::{self, File},
     io::BufReader,
     path::PathBuf,
 };
+
+const AUTHORS: &str = "Jean-Marie Lagniez <lagniez@cril.fr>, Emmanuel Lonca <lonca@cril.fr> and Jean-Guy Mailly <jean-guy.mailly@u-paris.fr>";
+
+pub(crate) fn create_app_helper() -> AppHelper<'static> {
+    let app_name = option_env!("CARGO_PKG_NAME").unwrap_or("unknown app name");
+    let app_version = option_env!("CARGO_PKG_VERSION").unwrap_or("unknown version");
+    let mut app = AppHelper::new(
+        app_name,
+        app_version,
+        AUTHORS,
+        "Crustabri, an abstract argumentation solver.",
+    );
+    let commands: Vec<Box<dyn Command>> = vec![
+        Box::new(AuthorsCommand::new(app_name, app_version, AUTHORS)),
+        Box::new(CheckCommand::new()),
+        Box::new(ProblemsCommand::new()),
+        Box::new(SolveCommand::new()),
+    ];
+    for c in commands {
+        app.add_command(c);
+    }
+    app
+}
 
 pub(crate) const ARG_INPUT: &str = "INPUT";
 
@@ -16,6 +40,26 @@ pub(crate) fn input_args() -> Arg<'static, 'static> {
         .multiple(false)
         .help("the input file that contains the AF")
         .required(true)
+}
+
+pub(crate) const ARG_PROBLEM: &str = "PROBLEM";
+pub(crate) const ARG_ARG: &str = "ARG";
+
+pub(crate) fn problem_args() -> Vec<Arg<'static, 'static>> {
+    vec![
+        Arg::with_name(ARG_PROBLEM)
+            .short("p")
+            .empty_values(false)
+            .multiple(false)
+            .help("the problem to solve")
+            .required(true),
+        Arg::with_name(ARG_ARG)
+            .short("a")
+            .empty_values(false)
+            .multiple(false)
+            .help("the argument (for DC/DS queries)")
+            .required(false),
+    ]
 }
 
 pub(crate) const ARG_READER: &str = "READER";

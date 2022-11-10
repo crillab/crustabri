@@ -1,4 +1,4 @@
-use super::common;
+use super::common::{self, ARG_ARG, ARG_PROBLEM};
 use anyhow::{anyhow, Context, Result};
 use crustabri::{
     AAFramework, Argument, AspartixReader, AspartixWriter, CompleteSemanticsSolver,
@@ -13,8 +13,6 @@ use crusti_app_helper::{
 
 const CMD_NAME: &str = "solve";
 
-const ARG_PROBLEM: &str = "PROBLEM";
-const ARG_ARG: &str = "ARG";
 const ARG_EXTERNAL_SAT_SOLVER: &str = "EXTERNAL_SAT_SOLVER";
 const ARG_EXTERNAL_SAT_SOLVER_OPTIONS: &str = "EXTERNAL_SAT_SOLVER_OPTIONS";
 
@@ -39,22 +37,7 @@ impl<'a> Command<'a> for SolveCommand {
             .setting(AppSettings::DisableVersion)
             .arg(common::input_args())
             .arg(common::reader_arg())
-            .arg(
-                Arg::with_name(ARG_PROBLEM)
-                    .short("p")
-                    .empty_values(false)
-                    .multiple(false)
-                    .help("the problem to solve")
-                    .required(true),
-            )
-            .arg(
-                Arg::with_name(ARG_ARG)
-                    .short("a")
-                    .empty_values(false)
-                    .multiple(false)
-                    .help("the argument (for DC/DS queries)")
-                    .required(false),
-            )
+            .args(&common::problem_args())
             .args(&external_sat_solver_args())
             .arg(logging_level_cli_arg())
             .arg(
