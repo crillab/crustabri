@@ -1,7 +1,7 @@
 use super::complete_semantics_solver;
 use crate::{
     sat::{Literal, SatSolver},
-    AAFramework, LabelType, SatSolverFactoryFn,
+    AAFramework, ConnectedComponentsComputer, LabelType, SatSolverFactoryFn,
 };
 use crate::{Argument, SingleExtensionComputer, SkepticalAcceptanceComputer};
 
@@ -208,7 +208,8 @@ where
     T: LabelType,
 {
     fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
-        let cc_af = crate::connected_component_of(self.af, arg);
+        let mut cc_computer = ConnectedComponentsComputer::new(self.af);
+        let cc_af = cc_computer.connected_component_of(arg);
         let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
         let mut solver = (self.solver_factory)();
         complete_semantics_solver::encode_complete_semantics_constraints(&cc_af, solver.as_mut());

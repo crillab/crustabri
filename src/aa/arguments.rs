@@ -251,6 +251,13 @@ where
         self.arguments[id].as_ref().unwrap()
     }
 
+    /// Returns `true` if and only if an argument with the provided id exists.
+    ///
+    /// If the argument existed but has been remove, this function returns `false`.
+    pub fn has_argument_with_id(&self, id: usize) -> bool {
+        id < self.arguments.len() && self.arguments[id].is_some()
+    }
+
     /// Returns an iterator to the arguments.
     ///
     /// # Example

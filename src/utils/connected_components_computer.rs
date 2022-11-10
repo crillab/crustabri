@@ -1,158 +1,158 @@
 use crate::{AAFramework, Argument, ArgumentSet, LabelType};
-use std::iter::Peekable;
 
-/// Returns the connected component the argument belongs to.
-pub fn connected_component_of<T>(af: &AAFramework<T>, arg: &Argument<T>) -> AAFramework<T>
+/// An object used to decompose an AF into its connected components.
+///
+/// Connected components are returned as other AFs.
+/// Be careful that arguments in such sub-AFs shares the labels of the initial AF but identifiers differ.
+pub struct ConnectedComponentsComputer<'a, T>
 where
     T: LabelType,
 {
-    let max_arg_id = match af.max_argument_id() {
-        Some(n) => n,
-        None => {
-            return AAFramework::<T>::new_with_argument_set(ArgumentSet::new_with_labels(
-                &[] as &[T]
-            ))
+    init_af: &'a AAFramework<T>,
+    in_connected_components: Vec<bool>,
+    next_arg_id: usize,
+}
+
+impl<'a, T> ConnectedComponentsComputer<'a, T>
+where
+    T: LabelType,
+{
+    /// Builds a new connected component computer for an AF.
+    pub fn new(af: &'a AAFramework<T>) -> Self {
+        let mut c = ConnectedComponentsComputer {
+            init_af: af,
+            in_connected_components: vec![false; 1 + af.max_argument_id().unwrap_or_default()],
+            next_arg_id: 0,
+        };
+        c.update_next();
+        c
+    }
+
+    /// Computes the connected component in which the provided argument belongs.
+    ///
+    /// The argument must exist, and the related connected component must not have been computed yet.
+    ///
+    /// # Panics
+    ///
+    /// If the argument does not exist, or if the connected component containing the argument has already been computed,
+    /// this function panics.
+    pub fn connected_component_of(&mut self, arg: &'a Argument<T>) -> AAFramework<T> {
+        if self.in_connected_components[arg.id()] {
+            panic!("this connected component was already computed");
         }
-    };
-    let connected_component = find_connected_component_of(
-        af,
-        arg,
-        &mut vec![false; 1 + max_arg_id],
-        &mut af.argument_set().iter().peekable(),
-    );
-    extract_connected_component(af, &connected_component)
+        let connected_component = self.find_connected_component_of(arg);
+        self.extract_connected_component(&connected_component)
+    }
+
+    /// Computes a connected component that have not been computed yet.
+    ///
+    /// In case no such connected component exists, `None` is returned.
+    pub fn next_connected_component(&mut self) -> Option<AAFramework<T>> {
+        if self.init_af.argument_set().is_empty()
+            || self.next_arg_id == self.in_connected_components.len()
+        {
+            None
+        } else {
+            let connected_component = self.find_connected_component_of(
+                self.init_af
+                    .argument_set()
+                    .get_argument_by_id(self.next_arg_id),
+            );
+            Some(self.extract_connected_component(&connected_component))
+        }
+    }
+
+    fn find_connected_component_of(&mut self, arg: &'a Argument<T>) -> Vec<&'a Argument<T>> {
+        self.in_connected_components[arg.id()] = true;
+        let mut current = vec![arg];
+        let mut newly_in_current = vec![arg];
+        self.update_next();
+        while !newly_in_current.is_empty() {
+            let arg = newly_in_current.pop().unwrap();
+            self.init_af
+                .iter_attacks_from(arg)
+                .chain(self.init_af.iter_attacks_to(arg))
+                .for_each(|att| {
+                    let a = if att.attacked() == arg {
+                        att.attacker()
+                    } else {
+                        att.attacked()
+                    };
+                    if !self.in_connected_components[a.id()] {
+                        self.in_connected_components[a.id()] = true;
+                        current.push(a);
+                        newly_in_current.push(a);
+                        if self.next_arg_id == a.id() {
+                            self.update_next()
+                        }
+                    }
+                });
+        }
+        current
+    }
+
+    fn update_next(&mut self) {
+        while self.next_arg_id < self.in_connected_components.len()
+            && (self.in_connected_components[self.next_arg_id]
+                || !self
+                    .init_af
+                    .argument_set()
+                    .has_argument_with_id(self.next_arg_id))
+        {
+            self.next_arg_id += 1;
+        }
+    }
+
+    fn extract_connected_component(&self, connected_component: &[&Argument<T>]) -> AAFramework<T>
+    where
+        T: LabelType,
+    {
+        let mut arg_mapping = vec![None; 1 + self.init_af.max_argument_id().unwrap()];
+        connected_component
+            .iter()
+            .enumerate()
+            .for_each(|(i, a)| arg_mapping[a.id()] = Some(i));
+        let labels = connected_component
+            .iter()
+            .map(|a| a.label().clone())
+            .collect::<Vec<T>>();
+        let arguments = ArgumentSet::new_with_labels(&labels);
+        let mut new_af = AAFramework::new_with_argument_set(arguments);
+        self.init_af.iter_attacks().for_each(|att| {
+            if let Some(new_i) = arg_mapping[att.attacker().id()] {
+                let new_j = arg_mapping[att.attacked().id()].unwrap();
+                new_af.new_attack_by_ids(new_i, new_j).unwrap();
+            }
+        });
+        new_af
+    }
 }
 
 /// Iterates over the connected components of an AF.
-pub fn iter_connected_components<T>(
-    af: &AAFramework<T>,
-) -> impl Iterator<Item = AAFramework<T>> + '_
+pub fn iter_connected_components<T>(af: &AAFramework<T>) -> ConnectedComponentsIterator<T>
 where
     T: LabelType,
 {
-    let connected_components = find_connected_components(af);
-    ConnectedComponentsIter {
-        af,
-        connected_components,
-        next: 0,
+    ConnectedComponentsIterator {
+        computer: ConnectedComponentsComputer::new(af),
     }
 }
 
-fn find_connected_components<T>(af: &AAFramework<T>) -> Vec<Vec<&Argument<T>>>
+pub struct ConnectedComponentsIterator<'a, T>
 where
     T: LabelType,
 {
-    let mut in_connected_components = vec![false; 1 + af.max_argument_id().unwrap()];
-    let mut next = af.argument_set().iter().peekable();
-    let mut connected_components = Vec::new();
-    while next.peek().is_some() {
-        let current = find_connected_component_of(
-            af,
-            next.next().unwrap(),
-            &mut in_connected_components,
-            &mut next,
-        );
-        connected_components.push(current);
-    }
-    connected_components
+    computer: ConnectedComponentsComputer<'a, T>,
 }
 
-fn find_connected_component_of<'a, I, T>(
-    af: &'a AAFramework<T>,
-    arg: &'a Argument<T>,
-    in_connected_components: &mut [bool],
-    next: &mut Peekable<I>,
-) -> Vec<&'a Argument<T>>
-where
-    T: LabelType,
-    I: Iterator<Item = &'a Argument<T>>,
-{
-    in_connected_components[arg.id()] = true;
-    let mut current = vec![arg];
-    let mut newly_in_current = vec![arg];
-    let update_next = |n: &mut Peekable<I>, icc: &mut [bool]| {
-        while let Some(arg) = n.peek() {
-            if icc[arg.id()] {
-                n.next();
-            } else {
-                break;
-            }
-        }
-    };
-    update_next(next, in_connected_components);
-    while !newly_in_current.is_empty() {
-        let arg = newly_in_current.pop().unwrap();
-        let mut add_to_current = |a: &'a Argument<T>| {
-            if !in_connected_components[a.id()] {
-                in_connected_components[a.id()] = true;
-                current.push(a);
-                newly_in_current.push(a);
-                if next.peek() == Some(&a) {
-                    update_next(next, in_connected_components)
-                }
-            }
-        };
-        af.iter_attacks_from(arg).for_each(|att| {
-            add_to_current(att.attacked());
-        });
-        af.iter_attacks_to(arg).for_each(|att| {
-            add_to_current(att.attacker());
-        });
-    }
-    current
-}
-
-fn extract_connected_component<T>(
-    af: &AAFramework<T>,
-    connected_component: &[&Argument<T>],
-) -> AAFramework<T>
-where
-    T: LabelType,
-{
-    let mut arg_mapping = vec![None; 1 + af.max_argument_id().unwrap()];
-    connected_component
-        .iter()
-        .enumerate()
-        .for_each(|(i, a)| arg_mapping[a.id()] = Some(i));
-    let labels = connected_component
-        .iter()
-        .map(|a| a.label().clone())
-        .collect::<Vec<T>>();
-    let arguments = ArgumentSet::new_with_labels(&labels);
-    let mut new_af = AAFramework::new_with_argument_set(arguments);
-    af.iter_attacks().for_each(|att| {
-        if let Some(new_i) = arg_mapping[att.attacker().id()] {
-            let new_j = arg_mapping[att.attacked().id()].unwrap();
-            new_af.new_attack_by_ids(new_i, new_j).unwrap();
-        }
-    });
-    new_af
-}
-
-pub struct ConnectedComponentsIter<'a, T>
-where
-    T: LabelType,
-{
-    af: &'a AAFramework<T>,
-    connected_components: Vec<Vec<&'a Argument<T>>>,
-    next: usize,
-}
-
-impl<T> Iterator for ConnectedComponentsIter<'_, T>
+impl<'a, T> Iterator for ConnectedComponentsIterator<'a, T>
 where
     T: LabelType,
 {
     type Item = AAFramework<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.next == self.connected_components.len() {
-            None
-        } else {
-            let new_af =
-                extract_connected_component(self.af, &self.connected_components[self.next]);
-            self.next += 1;
-            Some(new_af)
-        }
+        self.computer.next_connected_component()
     }
 }
 
@@ -176,8 +176,9 @@ mod tests {
         let mut buffer0 = Cursor::new(Vec::new());
         writer.write_framework(&af, &mut buffer0).unwrap();
         let mut buffer1 = Cursor::new(Vec::new());
+        let mut cc = ConnectedComponentsComputer::new(&af);
         writer
-            .write_framework(&connected_component_of(&af, arg), &mut buffer1)
+            .write_framework(&cc.connected_component_of(arg), &mut buffer1)
             .unwrap();
         let s0 = String::from_utf8(buffer0.into_inner()).unwrap();
         let mut lines0 = s0.split('\n').collect::<Vec<&str>>();

@@ -2,7 +2,7 @@ use super::specs::CredulousAcceptanceComputer;
 use crate::{
     clause,
     sat::{Literal, SatSolver, SatSolverFactoryFn},
-    AAFramework, LabelType,
+    AAFramework, ConnectedComponentsComputer, LabelType,
 };
 use crate::{connected_component_of, Argument};
 
@@ -104,7 +104,8 @@ where
 {
     fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
         let mut solver = (self.solver_factory)();
-        let reduced_af = connected_component_of(self.af, arg);
+        let mut cc_computer = ConnectedComponentsComputer::new(self.af);
+        let reduced_af = cc_computer.connected_component_of(arg);
         encode_complete_semantics_constraints(&reduced_af, solver.as_mut());
         let arg_in_reduced_af = reduced_af.argument_set().get_argument(arg.label()).unwrap();
         solver
