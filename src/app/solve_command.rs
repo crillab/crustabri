@@ -18,6 +18,8 @@ const ARG_ARG: &str = "ARG";
 const ARG_EXTERNAL_SAT_SOLVER: &str = "EXTERNAL_SAT_SOLVER";
 const ARG_EXTERNAL_SAT_SOLVER_OPTIONS: &str = "EXTERNAL_SAT_SOLVER_OPTIONS";
 
+const ARG_CERTIFICATE: &str = "CERTIFICATE";
+
 pub(crate) struct SolveCommand;
 
 impl SolveCommand {
@@ -55,6 +57,14 @@ impl<'a> Command<'a> for SolveCommand {
             )
             .args(&external_sat_solver_args())
             .arg(logging_level_cli_arg())
+            .arg(
+                Arg::with_name(ARG_CERTIFICATE)
+                    .short("c")
+                    .long("with-certificate")
+                    .takes_value(false)
+                    .help("generate a certificate when possible")
+                    .required(false),
+            )
     }
 
     fn execute(&self, arg_matches: &crusti_app_helper::ArgMatches<'_>) -> Result<()> {
@@ -195,8 +205,18 @@ where
         )),
     };
     let mut out = std::io::stdout();
-    let acceptance_status = solver.is_credulously_accepted(arg);
-    writer.write_acceptance_status(&mut out, acceptance_status)
+    let with_certificate = arg_matches.is_present(ARG_CERTIFICATE);
+    if with_certificate {
+        let (acceptance_status, certificate) = solver.is_credulously_accepted_with_certificate(arg);
+        writer.write_acceptance_status(&mut out, acceptance_status)?;
+        if let Some(c) = certificate {
+            writer.write_single_extension(&mut out, &c)?;
+        }
+        Ok(())
+    } else {
+        let acceptance_status = solver.is_credulously_accepted(arg);
+        writer.write_acceptance_status(&mut out, acceptance_status)
+    }
 }
 
 fn check_skeptical_acceptance<T>(
@@ -221,8 +241,18 @@ where
         )),
     };
     let mut out = std::io::stdout();
-    let acceptance_status = solver.is_skeptically_accepted(arg);
-    writer.write_acceptance_status(&mut out, acceptance_status)
+    let with_certificate = arg_matches.is_present(ARG_CERTIFICATE);
+    if with_certificate {
+        let (acceptance_status, certificate) = solver.is_skeptically_accepted_with_certificate(arg);
+        writer.write_acceptance_status(&mut out, acceptance_status)?;
+        if let Some(c) = certificate {
+            writer.write_single_extension(&mut out, &c)?;
+        }
+        Ok(())
+    } else {
+        let acceptance_status = solver.is_skeptically_accepted(arg);
+        writer.write_acceptance_status(&mut out, acceptance_status)
+    }
 }
 
 fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Box<SatSolverFactoryFn> {
