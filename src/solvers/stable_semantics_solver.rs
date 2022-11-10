@@ -1,5 +1,6 @@
-use super::specs::{
-    CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer,
+use super::{
+    specs::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
+    utils::cc_assignment_to_init_af_extension,
 };
 use crate::{
     clause,
@@ -37,6 +38,55 @@ where
     ) -> Self {
         Self { af, solver_factory }
     }
+
+    fn acceptance_with_model(
+        &mut self,
+        arg: &Argument<T>,
+        assumption_polarity: bool,
+        status_on_unsat: bool,
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let mut merged = Vec::new();
+        for cc_af in crate::iter_connected_components(self.af) {
+            let mut solver = (self.solver_factory)();
+            encode(&cc_af, solver.as_mut());
+            match cc_af.argument_set().get_argument(arg.label()) {
+                Ok(cc_arg) => {
+                    let mut assumption_lit =
+                        Literal::from(arg_id_to_solver_var(cc_arg.id()) as isize);
+                    if !assumption_polarity {
+                        assumption_lit = assumption_lit.negate()
+                    }
+                    match solver
+                        .solve_under_assumptions(&[assumption_lit])
+                        .unwrap_model()
+                    {
+                        Some(assignment) => {
+                            let mut local_ext = cc_assignment_to_init_af_extension(
+                                assignment,
+                                &cc_af,
+                                self.af,
+                                |i| Some(arg_id_from_solver_var(i)),
+                            );
+                            merged.append(&mut local_ext)
+                        }
+                        None => return (status_on_unsat, None),
+                    }
+                }
+                Err(_) => match solver.solve().unwrap_model() {
+                    Some(assignment) => {
+                        merged.append(&mut cc_assignment_to_init_af_extension(
+                            assignment,
+                            &cc_af,
+                            self.af,
+                            |i| Some(arg_id_from_solver_var(i)),
+                        ));
+                    }
+                    None => return (status_on_unsat, None),
+                },
+            }
+        }
+        (!status_on_unsat, Some(merged))
+    }
 }
 
 fn encode<T>(af: &AAFramework<T>, solver: &mut dyn SatSolver)
@@ -71,21 +121,14 @@ where
             let mut solver = (self.solver_factory)();
             encode(&cc_af, solver.as_mut());
             match solver.solve().unwrap_model() {
-                Some(assignment) => assignment.iter().for_each(|(var, val)| {
-                    if let Some(true) = val {
-                        merged.push(
-                            self.af
-                                .argument_set()
-                                .get_argument(
-                                    cc_af
-                                        .argument_set()
-                                        .get_argument_by_id(arg_id_from_solver_var(var))
-                                        .label(),
-                                )
-                                .unwrap(),
-                        )
-                    }
-                }),
+                Some(assignment) => {
+                    merged.append(&mut cc_assignment_to_init_af_extension(
+                        assignment,
+                        &cc_af,
+                        self.af,
+                        |i| Some(arg_id_from_solver_var(i)),
+                    ));
+                }
                 None => return None,
             }
         }
@@ -98,29 +141,14 @@ where
     T: LabelType,
 {
     fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
-        for cc_af in crate::iter_connected_components(self.af) {
-            let mut solver = (self.solver_factory)();
-            encode(&cc_af, solver.as_mut());
-            match cc_af.argument_set().get_argument(arg.label()) {
-                Ok(cc_arg) => {
-                    if solver
-                        .solve_under_assumptions(&[Literal::from(
-                            arg_id_to_solver_var(cc_arg.id()) as isize,
-                        )])
-                        .unwrap_model()
-                        .is_none()
-                    {
-                        return false;
-                    }
-                }
-                Err(_) => {
-                    if solver.solve().unwrap_model().is_none() {
-                        return false;
-                    }
-                }
-            }
-        }
-        true
+        self.is_credulously_accepted_with_certificate(arg).0
+    }
+
+    fn is_credulously_accepted_with_certificate(
+        &mut self,
+        arg: &Argument<T>,
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
+        self.acceptance_with_model(arg, true, false)
     }
 }
 
@@ -129,30 +157,14 @@ where
     T: LabelType,
 {
     fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
-        for cc_af in crate::iter_connected_components(self.af) {
-            let mut solver = (self.solver_factory)();
-            encode(&cc_af, solver.as_mut());
-            match cc_af.argument_set().get_argument(arg.label()) {
-                Ok(cc_arg) => {
-                    if solver
-                        .solve_under_assumptions(&[Literal::from(
-                            arg_id_to_solver_var(cc_arg.id()) as isize,
-                        )
-                        .negate()])
-                        .unwrap_model()
-                        .is_none()
-                    {
-                        return true;
-                    }
-                }
-                Err(_) => {
-                    if solver.solve().unwrap_model().is_none() {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
+        self.is_skeptically_accepted_with_certificate(arg).0
+    }
+
+    fn is_skeptically_accepted_with_certificate(
+        &mut self,
+        arg: &Argument<T>,
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
+        self.acceptance_with_model(arg, false, true)
     }
 }
 
@@ -238,6 +250,46 @@ mod tests {
             .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
         assert!(!solver
             .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+    }
+
+    #[test]
+    fn test_certificates() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        att(a0,a1).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StableSemanticsSolver::new(&af);
+        assert_eq!(
+            &["a0"],
+            solver
+                .is_credulously_accepted_with_certificate(
+                    af.argument_set().get_argument(&"a0".to_string()).unwrap()
+                )
+                .1
+                .unwrap()
+                .iter()
+                .map(|a| a.label())
+                .cloned()
+                .collect::<Vec<String>>()
+                .as_slice()
+        );
+        assert_eq!(
+            &["a0"],
+            solver
+                .is_skeptically_accepted_with_certificate(
+                    af.argument_set().get_argument(&"a1".to_string()).unwrap()
+                )
+                .1
+                .unwrap()
+                .iter()
+                .map(|a| a.label())
+                .cloned()
+                .collect::<Vec<String>>()
+                .as_slice()
+        )
     }
 
     #[test]

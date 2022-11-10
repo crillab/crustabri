@@ -1,10 +1,11 @@
 use super::specs::CredulousAcceptanceComputer;
+use super::utils::{cc_arg_to_init_af_arg, cc_assignment_to_init_af_extension};
 use crate::{
     clause,
     sat::{Literal, SatSolver, SatSolverFactoryFn},
     AAFramework, ConnectedComponentsComputer, LabelType,
 };
-use crate::{connected_component_of, Argument};
+use crate::{grounded_extension, Argument};
 
 /// A SAT-based solver for the complete semantics.
 ///
@@ -115,6 +116,41 @@ where
             .unwrap_model()
             .is_some()
     }
+
+    fn is_credulously_accepted_with_certificate(
+        &mut self,
+        arg: &Argument<T>,
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let mut cc_computer = ConnectedComponentsComputer::new(self.af);
+        let reduced_af = cc_computer.connected_component_of(arg);
+        let mut solver = (self.solver_factory)();
+        encode_complete_semantics_constraints(&reduced_af, solver.as_mut());
+        let arg_in_reduced_af = reduced_af.argument_set().get_argument(arg.label()).unwrap();
+        match solver
+            .solve_under_assumptions(&[Literal::from(
+                arg_id_to_solver_var(arg_in_reduced_af.id()) as isize
+            )])
+            .unwrap_model()
+        {
+            Some(model) => {
+                let mut merged = cc_assignment_to_init_af_extension(
+                    model,
+                    &reduced_af,
+                    self.af,
+                    arg_id_from_solver_var,
+                );
+                while let Some(other_cc_af) = cc_computer.next_connected_component() {
+                    let other_cc_grounded = grounded_extension(&other_cc_af);
+                    other_cc_grounded
+                        .iter()
+                        .map(|a| cc_arg_to_init_af_arg(a, self.af))
+                        .for_each(|a| merged.push(a));
+                }
+                (true, Some(merged))
+            }
+            None => (false, None),
+        }
+    }
 }
 
 pub(crate) fn arg_id_to_solver_var(id: usize) -> usize {
@@ -219,5 +255,31 @@ mod tests {
         let mut solver_after = CompleteSemanticsSolver::new(&af);
         assert!(solver_after
             .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+    }
+
+    #[test]
+    fn test_certificates() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        att(a0,a1).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = CompleteSemanticsSolver::new(&af);
+        assert_eq!(
+            &["a0"],
+            solver
+                .is_credulously_accepted_with_certificate(
+                    af.argument_set().get_argument(&"a0".to_string()).unwrap()
+                )
+                .1
+                .unwrap()
+                .iter()
+                .map(|a| a.label())
+                .cloned()
+                .collect::<Vec<String>>()
+                .as_slice()
+        );
     }
 }

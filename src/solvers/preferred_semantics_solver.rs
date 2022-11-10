@@ -1,4 +1,4 @@
-use super::complete_semantics_solver;
+use super::{complete_semantics_solver, utils::cc_arg_to_init_af_arg};
 use crate::{
     sat::{Literal, SatSolver},
     AAFramework, ConnectedComponentsComputer, LabelType, SatSolverFactoryFn,
@@ -36,6 +36,34 @@ where
         solver_factory: Box<SatSolverFactoryFn>,
     ) -> Self {
         Self { af, solver_factory }
+    }
+
+    fn is_skeptically_accepted_in_cc<'b>(
+        &self,
+        cc_af: &'b AAFramework<T>,
+        arg: &'a Argument<T>,
+    ) -> (bool, Option<Vec<&'b Argument<T>>>) {
+        let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
+        let mut solver = (self.solver_factory)();
+        complete_semantics_solver::encode_complete_semantics_constraints(cc_af, solver.as_mut());
+        let mut computer = PreferredExtensionComputer::new(cc_af, solver);
+        loop {
+            computer.compute_next();
+            match computer.state {
+                ComputerState::Preferred => {
+                    if !computer.current.as_ref().unwrap().contains(&cc_arg) {
+                        return (false, computer.current.take());
+                    }
+                }
+                ComputerState::Complete => {
+                    if computer.current.as_ref().unwrap().contains(&cc_arg) {
+                        computer.discard_current_search();
+                    }
+                }
+                ComputerState::None => return (true, None),
+                _ => {}
+            }
+        }
     }
 }
 
@@ -210,27 +238,41 @@ where
     fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let cc_af = cc_computer.connected_component_of(arg);
-        let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
-        let mut solver = (self.solver_factory)();
-        complete_semantics_solver::encode_complete_semantics_constraints(&cc_af, solver.as_mut());
-        let mut computer = PreferredExtensionComputer::new(&cc_af, solver);
-        loop {
-            computer.compute_next();
-            match computer.state {
-                ComputerState::Preferred => {
-                    if !computer.current.as_ref().unwrap().contains(&cc_arg) {
-                        return false;
-                    }
-                }
-                ComputerState::Complete => {
-                    if computer.current.as_ref().unwrap().contains(&cc_arg) {
-                        computer.discard_current_search();
-                    }
-                }
-                ComputerState::None => return true,
-                _ => {}
+        self.is_skeptically_accepted_in_cc(&cc_af, arg).0
+    }
+
+    fn is_skeptically_accepted_with_certificate(
+        &mut self,
+        arg: &Argument<T>,
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let mut cc_computer = ConnectedComponentsComputer::new(self.af);
+        let cc_af = cc_computer.connected_component_of(arg);
+        let mut merged = Vec::new();
+        match self.is_skeptically_accepted_in_cc(&cc_af, arg) {
+            (true, None) => return (true, None),
+            (false, Some(cc_ext)) => {
+                cc_ext
+                    .iter()
+                    .map(|a| cc_arg_to_init_af_arg(a, self.af))
+                    .for_each(|a| merged.push(a));
+            }
+            _ => unreachable!(),
+        }
+        while let Some(other_cc_af) = cc_computer.next_connected_component() {
+            let mut solver = (self.solver_factory)();
+            complete_semantics_solver::encode_complete_semantics_constraints(
+                &other_cc_af,
+                solver.as_mut(),
+            );
+            let mut computer = PreferredExtensionComputer::new(&other_cc_af, solver);
+            while computer.state != ComputerState::Preferred {
+                computer.compute_next();
+            }
+            for cc_arg in computer.current.take().unwrap() {
+                merged.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
             }
         }
+        (false, Some(merged))
     }
 }
 
@@ -292,6 +334,41 @@ mod tests {
         assert!(args.contains(&"a2".to_string()) ^ args.contains(&"a3".to_string()));
         assert!(!args.contains(&"a4".to_string()));
         assert!(args.contains(&"a5".to_string()));
+    }
+
+    #[test]
+    fn test_certificates() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        arg(a5).
+        att(a0,a1).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a3).
+        att(a2,a4).
+        att(a3,a2).
+        att(a3,a4).
+        att(a4,a5).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = PreferredSemanticsSolver::new(&af);
+        let mut cert = solver
+            .is_skeptically_accepted_with_certificate(
+                af.argument_set().get_argument(&"a2".to_string()).unwrap(),
+            )
+            .1
+            .unwrap()
+            .iter()
+            .map(|a| a.label())
+            .cloned()
+            .collect::<Vec<String>>();
+        cert.sort_unstable();
+        assert!(["a0", "a2", "a5"] == cert.as_slice() || ["a0", "a3", "a5"] == cert.as_slice())
     }
 
     #[test]

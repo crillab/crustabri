@@ -35,7 +35,19 @@ where
     T: LabelType,
 {
     fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
-        crate::grounded_extension(self.af).contains(&arg)
+        self.is_credulously_accepted_with_certificate(arg).0
+    }
+
+    fn is_credulously_accepted_with_certificate(
+        &mut self,
+        arg: &Argument<T>,
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let ext = crate::grounded_extension(self.af);
+        if ext.contains(&arg) {
+            (true, Some(ext))
+        } else {
+            (false, None)
+        }
     }
 }
 
@@ -45,6 +57,18 @@ where
 {
     fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
         crate::grounded_extension(self.af).contains(&arg)
+    }
+
+    fn is_skeptically_accepted_with_certificate(
+        &mut self,
+        arg: &Argument<T>,
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let ext = crate::grounded_extension(self.af);
+        if ext.contains(&arg) {
+            (true, None)
+        } else {
+            (false, Some(ext))
+        }
     }
 }
 
@@ -74,5 +98,45 @@ mod tests {
             .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
         assert!(!solver
             .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+    }
+
+    #[test]
+    fn test_certificates() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        att(a0,a1).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = GroundedSemanticsSolver::new(&af);
+        assert_eq!(
+            &["a0"],
+            solver
+                .is_credulously_accepted_with_certificate(
+                    af.argument_set().get_argument(&"a0".to_string()).unwrap()
+                )
+                .1
+                .unwrap()
+                .iter()
+                .map(|a| a.label())
+                .cloned()
+                .collect::<Vec<String>>()
+                .as_slice()
+        );
+        assert_eq!(
+            &["a0"],
+            solver
+                .is_skeptically_accepted_with_certificate(
+                    af.argument_set().get_argument(&"a1".to_string()).unwrap()
+                )
+                .1
+                .unwrap()
+                .iter()
+                .map(|a| a.label())
+                .cloned()
+                .collect::<Vec<String>>()
+                .as_slice()
+        )
     }
 }

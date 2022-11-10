@@ -19,6 +19,16 @@ where
 {
     /// Checks the credulous acceptance of an argument.
     fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool;
+
+    /// Checks the credulous acceptance of an argument, and provide a certificate if it is the case.
+    ///
+    /// The certificate is set to `None` if the result of the test is `false`.
+    /// Otherwise, the certificate is provided as a set of arguments.
+    /// The exact nature of this certificate depends on underlying semantics.
+    fn is_credulously_accepted_with_certificate(
+        &mut self,
+        arg: &Argument<T>,
+    ) -> (bool, Option<Vec<&Argument<T>>>);
 }
 
 /// A trait for solvers able to check the skeptical acceptance of an argument.
@@ -28,4 +38,14 @@ where
 {
     /// Checks the skeptical acceptance of an argument.
     fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool;
+
+    /// Checks the skeptical acceptance of an argument, and provide a certificate if it is the case.
+    ///
+    /// The certificate is set to `None` if the result of the test is `true`.
+    /// Otherwise, the certificate is provided as a set of arguments.
+    /// The exact nature of this certificate depends on underlying semantics.
+    fn is_skeptically_accepted_with_certificate(
+        &mut self,
+        arg: &Argument<T>,
+    ) -> (bool, Option<Vec<&Argument<T>>>);
 }
