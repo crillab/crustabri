@@ -137,6 +137,12 @@ mod tests {
                 .cloned()
                 .collect::<Vec<String>>()
                 .as_slice()
-        )
+        );
+        assert_eq!(
+            (true, None),
+            solver.is_skeptically_accepted_with_certificate(
+                af.argument_set().get_argument(&"a0".to_string()).unwrap()
+            )
+        );
     }
 }

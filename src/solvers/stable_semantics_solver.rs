@@ -293,6 +293,47 @@ mod tests {
     }
 
     #[test]
+    fn test_certificates_connected_components() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        att(a0,a1).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StableSemanticsSolver::new(&af);
+        assert_eq!(
+            &["a0", "a2"],
+            solver
+                .is_credulously_accepted_with_certificate(
+                    af.argument_set().get_argument(&"a0".to_string()).unwrap()
+                )
+                .1
+                .unwrap()
+                .iter()
+                .map(|a| a.label())
+                .cloned()
+                .collect::<Vec<String>>()
+                .as_slice()
+        );
+        assert_eq!(
+            &["a0", "a2"],
+            solver
+                .is_skeptically_accepted_with_certificate(
+                    af.argument_set().get_argument(&"a1".to_string()).unwrap()
+                )
+                .1
+                .unwrap()
+                .iter()
+                .map(|a| a.label())
+                .cloned()
+                .collect::<Vec<String>>()
+                .as_slice()
+        )
+    }
+
+    #[test]
     fn test_acceptance_2() {
         let instance = r#"
         arg(a0).

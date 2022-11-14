@@ -343,6 +343,21 @@ mod tests {
     }
 
     #[test]
+    fn test_compute_one_preferred_after_arg_removal() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        "#;
+        let reader = AspartixReader::default();
+        let mut af = reader.read(&mut instance.as_bytes()).unwrap();
+        af.remove_argument(&"a0".to_string()).unwrap();
+        let mut solver = PreferredSemanticsSolver::new(&af);
+        let ext = solver.compute_one_extension().unwrap();
+        assert_eq!(1, ext.len());
+        assert_eq!("a1", ext[0].label());
+    }
+
+    #[test]
     fn test_certificates() {
         let instance = r#"
         arg(a0).
@@ -375,6 +390,43 @@ mod tests {
             .collect::<Vec<String>>();
         cert.sort_unstable();
         assert!(["a0", "a2", "a5"] == cert.as_slice() || ["a0", "a3", "a5"] == cert.as_slice())
+    }
+
+    #[test]
+    fn test_certificates_connected_components() {
+        let instance = r#"
+        arg(a0).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        arg(a5).
+        att(a2,a3).
+        att(a2,a4).
+        att(a3,a2).
+        att(a3,a4).
+        att(a4,a5).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = PreferredSemanticsSolver::new(&af);
+        let mut cert = solver
+            .is_skeptically_accepted_with_certificate(
+                af.argument_set().get_argument(&"a2".to_string()).unwrap(),
+            )
+            .1
+            .unwrap()
+            .iter()
+            .map(|a| a.label())
+            .cloned()
+            .collect::<Vec<String>>();
+        cert.sort_unstable();
+        assert!(["a0", "a2", "a5"] == cert.as_slice() || ["a0", "a3", "a5"] == cert.as_slice());
+        assert_eq!(
+            (true, None),
+            solver.is_skeptically_accepted_with_certificate(
+                af.argument_set().get_argument(&"a0".to_string()).unwrap(),
+            )
+        );
     }
 
     #[test]
@@ -443,5 +495,18 @@ mod tests {
             .is_skeptically_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
         assert!(!solver
             .is_skeptically_accepted(af.argument_set().get_argument(&"a5".to_string()).unwrap()));
+    }
+
+    #[test]
+    fn test_skeptical_acceptance_auto_attack() {
+        let instance = r#"
+        arg(a0).
+        att(a0,a0).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = PreferredSemanticsSolver::new(&af);
+        assert!(!solver
+            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
     }
 }

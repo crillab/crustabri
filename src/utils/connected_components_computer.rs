@@ -190,6 +190,22 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "this connected component was already computed")]
+    fn test_connected_components_of_twice() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        att(a0,a1).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let arg = af.argument_set().get_argument(&"a1".to_string()).unwrap();
+        let mut cc = ConnectedComponentsComputer::new(&af);
+        cc.connected_component_of(arg);
+        cc.connected_component_of(arg);
+    }
+
+    #[test]
     fn test_connected_components() {
         let instance = r#"
         arg(a0).

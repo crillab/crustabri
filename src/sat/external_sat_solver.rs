@@ -98,6 +98,7 @@ mod tests {
         let model = s.solve().unwrap_model().unwrap();
         assert!(model.value_of(1).unwrap());
         assert!(model.value_of(2).unwrap());
+        assert_eq!(2, s.n_vars());
     }
 
     #[test]
@@ -111,6 +112,7 @@ mod tests {
         let model = s
             .solve_under_assumptions(&[Literal::from(-1), Literal::from(-2)])
             .unwrap_model();
-        assert!(model.is_none())
+        assert!(model.is_none());
+        assert_eq!(2, s.n_vars());
     }
 }

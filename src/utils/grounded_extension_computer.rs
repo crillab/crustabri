@@ -112,4 +112,10 @@ mod tests {
         grounded_after.sort_unstable();
         assert_eq!(vec!["a", "d"], grounded_after);
     }
+
+    #[test]
+    fn test_grounded_extension_empty_af() {
+        let af = AAFramework::<usize>::default();
+        assert!(grounded_extension(&af).is_empty());
+    }
 }

@@ -353,4 +353,14 @@ mod tests {
         let mut args = ArgumentSet::new_with_labels(&arg_labels);
         args.remove_argument(&"c".to_string()).unwrap();
     }
+
+    #[test]
+    fn test_max_id() {
+        let mut args = ArgumentSet::default();
+        assert!(args.max_id().is_none());
+        args.new_argument("a");
+        assert_eq!(0, args.max_id().unwrap());
+        args.new_argument("a");
+        assert_eq!(0, args.max_id().unwrap());
+    }
 }

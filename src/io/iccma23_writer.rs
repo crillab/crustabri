@@ -33,3 +33,71 @@ impl ResponseWriter<usize> for Iccma23Writer {
         super::specs::write_acceptance_status(writer, acceptance_status)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ArgumentSet;
+    use std::io::BufWriter;
+
+    #[test]
+    fn test_write_single_extension() {
+        let arg_names = vec![0, 1, 2];
+        let args = ArgumentSet::new_with_labels(&arg_names);
+        let writer = Iccma23Writer::default();
+        let mut buffer = BufWriter::new(Vec::new());
+        writer
+            .write_single_extension(&mut buffer, &args.iter().collect::<Vec<&Argument<usize>>>())
+            .unwrap();
+        assert_eq!(
+            "w 0 1 2\n",
+            String::from_utf8(buffer.into_inner().unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_write_empty_extension() {
+        let writer = Iccma23Writer::default();
+        let mut buffer = BufWriter::new(Vec::new());
+        writer
+            .write_single_extension(&mut buffer, &[] as &[&Argument<usize>])
+            .unwrap();
+        assert_eq!(
+            "w\n",
+            String::from_utf8(buffer.into_inner().unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_write_no_extension() {
+        let writer = Iccma23Writer::default();
+        let mut buffer = BufWriter::new(Vec::new());
+        writer.write_no_extension(&mut buffer).unwrap();
+        assert_eq!(
+            "NO\n",
+            String::from_utf8(buffer.into_inner().unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_write_acceptance_status_yes() {
+        let writer = Iccma23Writer::default();
+        let mut buffer = BufWriter::new(Vec::new());
+        writer.write_acceptance_status(&mut buffer, true).unwrap();
+        assert_eq!(
+            "YES\n",
+            String::from_utf8(buffer.into_inner().unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_write_acceptance_status_no() {
+        let writer = Iccma23Writer::default();
+        let mut buffer = BufWriter::new(Vec::new());
+        writer.write_acceptance_status(&mut buffer, false).unwrap();
+        assert_eq!(
+            "NO\n",
+            String::from_utf8(buffer.into_inner().unwrap()).unwrap()
+        );
+    }
+}

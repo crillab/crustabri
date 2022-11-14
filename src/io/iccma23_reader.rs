@@ -270,4 +270,29 @@ mod tests {
             .read(&mut instance.as_bytes())
             .is_err());
     }
+
+    #[test]
+    fn test_empty_instance() {
+        let instance = "";
+        assert!(Iccma23Reader::default()
+            .read(&mut instance.as_bytes())
+            .is_err());
+    }
+
+    #[test]
+    fn test_read_arg_from_str() {
+        let instance = "p af 1\n";
+        let reader = Iccma23Reader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        assert!(reader.read_arg_from_str(&af, "1").is_ok());
+        assert!(reader.read_arg_from_str(&af, "2").is_err());
+    }
+
+    #[test]
+    fn test_arg_in_no_attack() {
+        let instance = "p af 1\n";
+        let reader = Iccma23Reader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        assert_eq!(1, af.n_arguments());
+    }
 }

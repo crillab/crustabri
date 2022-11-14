@@ -128,7 +128,7 @@ impl InstanceReader<String> for AspartixReader {
         match af {
             Some(a) => Ok(a),
             None => Ok(AAFramework::new_with_argument_set(
-                ArgumentSet::new_with_labels(&[]),
+                ArgumentSet::new_with_labels(&arg_labels),
             )),
         }
     }
@@ -346,5 +346,22 @@ mod tests {
                 "argument names beginning or ending by spaces may be ambiguous".to_string()
             )]
         );
+    }
+    #[test]
+    fn test_read_arg_from_str() {
+        let instance = "arg(a).\natt(a,a).\n";
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        assert_eq!(1, af.n_arguments());
+        assert!(reader.read_arg_from_str(&af, "a").is_ok());
+        assert!(reader.read_arg_from_str(&af, "b").is_err());
+    }
+
+    #[test]
+    fn test_arg_in_no_attack() {
+        let instance = "arg(a).\n";
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        assert_eq!(1, af.n_arguments());
     }
 }
