@@ -56,8 +56,14 @@ where
                     }
                 }
                 ComputerState::Complete => {
-                    if computer.current.as_ref().unwrap().contains(&cc_arg) {
+                    let current = computer.current.as_ref().unwrap();
+                    if current.contains(&cc_arg) {
                         computer.discard_current_search();
+                    } else if cc_af
+                        .iter_attacks_to(cc_arg)
+                        .any(|att| current.contains(&att.attacker()))
+                    {
+                        return (false, computer.current.take());
                     }
                 }
                 ComputerState::None => return (true, None),
