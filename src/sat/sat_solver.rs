@@ -98,7 +98,6 @@ impl Display for Literal {
 }
 
 /// Builds a clause from a list of integers.
-#[macro_export]
 macro_rules! clause {
     () => (
         vec![] as Vec<Literal>
@@ -107,6 +106,8 @@ macro_rules! clause {
         [$($x),+].into_iter().map(Literal::from).collect::<Vec<Literal>>()
     );
 }
+
+pub(crate) use clause;
 
 /// An assignment of a set of variables.
 ///

@@ -1,16 +1,18 @@
-use crate::{AAFramework, Argument, ArgumentSet, InstanceReader, WarningHandler};
+use super::{InstanceReader, WarningHandler};
+use crate::aa::{AAFramework, Argument, ArgumentSet};
 use anyhow::{anyhow, Context, Result};
 use std::io::{BufRead, BufReader, Read};
 
 /// A reader for the ICCMA 2023 format.
 ///
 /// This object is used to read an [`AAFramework`] encoded using the ICCMA 2023 input format, as defined on [the competition website](https://iccma2023.github.io/rules.html).
-/// The [LabelType](crate::LabelType) of the returned argument frameworks is [usize].
+/// The [LabelType](crate::aa::LabelType) of the returned argument frameworks is [usize].
 ///
 /// # Example
 ///
 /// ```
-/// # use crustabri::{AAFramework, Iccma23Reader, InstanceReader};
+/// # use crustabri::io::{Iccma23Reader, InstanceReader};
+/// # use crustabri::aa::AAFramework;
 /// fn read_af_from_str(s: &str) -> AAFramework<usize> {
 ///     let reader = Iccma23Reader::default();
 ///     reader.read(&mut s.as_bytes()).expect("invalid Aspartix AF")

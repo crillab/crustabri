@@ -1,11 +1,17 @@
 use super::common::{self, ARG_ARG, ARG_PROBLEM};
 use anyhow::{anyhow, Context, Result};
 use crustabri::{
-    AAFramework, Argument, AspartixReader, AspartixWriter, CompleteSemanticsSolver,
-    CredulousAcceptanceComputer, ExternalSatSolver, GroundedSemanticsSolver, Iccma23Reader,
-    Iccma23Writer, InstanceReader, LabelType, PreferredSemanticsSolver, Query, ResponseWriter,
-    SatSolverFactoryFn, Semantics, SingleExtensionComputer, SkepticalAcceptanceComputer,
-    StableSemanticsSolver,
+    aa::{self, AAFramework, Argument, LabelType, Query, Semantics},
+    io::{
+        AspartixReader, AspartixWriter, Iccma23Reader, Iccma23Writer, InstanceReader,
+        ResponseWriter,
+    },
+    sat::{self, ExternalSatSolver, SatSolverFactoryFn},
+    solvers::{
+        CompleteSemanticsSolver, CredulousAcceptanceComputer, GroundedSemanticsSolver,
+        PreferredSemanticsSolver, SingleExtensionComputer, SkepticalAcceptanceComputer,
+        StableSemanticsSolver,
+    },
 };
 use crusti_app_helper::{
     info, logging_level_cli_arg, warn, AppSettings, Arg, ArgMatches, Command, SubCommand,
@@ -82,8 +88,7 @@ where
         .map(|a| reader.read_arg_from_str(&af, a))
         .transpose()
         .context("while parsing the argument passed to the command line")?;
-    let (query, semantics) =
-        crustabri::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
+    let (query, semantics) = aa::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
     check_arg_definition(query, &arg)?;
     match query {
         Query::SE => compute_one_extension(&af, semantics, arg_matches, writer),
@@ -256,6 +261,6 @@ fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Box<SatSolverFacto
         })
     } else {
         info!("using the default SAT solver for problems requiring a SAT solver");
-        Box::new(|| crustabri::default_solver())
+        Box::new(|| sat::default_solver())
     }
 }

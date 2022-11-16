@@ -1,4 +1,7 @@
-use crate::{sat::Assignment, AAFramework, Argument, LabelType};
+use crate::{
+    aa::{AAFramework, Argument, LabelType},
+    sat::Assignment,
+};
 
 // Translates a SAT solver assignment related to a connected component to the corresponding subset of arguments of the initial AF.
 pub(crate) fn cc_assignment_to_init_af_extension<'a, T, F>(

@@ -1,6 +1,8 @@
-use crate::{AAFramework, Argument, LabelType, ResponseWriter};
+use crate::aa::{AAFramework, Argument, LabelType};
 use anyhow::{Context, Result};
 use std::io::Write;
+
+use super::ResponseWriter;
 
 /// A writer for the Aspartix format.
 ///
@@ -11,10 +13,10 @@ use std::io::Write;
 /// The following example retrieves an AF and writes it to the standard output using the Aspartix format.
 ///
 /// ```
-/// # use crustabri::AAFramework;
-/// # use crustabri::ArgumentSet;
-/// # use crustabri::AspartixWriter;
-/// # use crustabri::LabelType;
+/// # use crustabri::aa::AAFramework;
+/// # use crustabri::aa::ArgumentSet;
+/// # use crustabri::io::AspartixWriter;
+/// # use crustabri::aa::LabelType;
 /// # use anyhow::Result;
 /// fn write_af_to_stdout<T: LabelType>(af: &AAFramework<T>) -> Result<()> {
 ///     let writer = AspartixWriter::default();
@@ -38,10 +40,10 @@ impl AspartixWriter {
     /// The following example retrieves an AF and writes it to the standard output using the Aspartix format.
     ///
     /// ```
-    /// # use crustabri::AAFramework;
-    /// # use crustabri::ArgumentSet;
-    /// # use crustabri::AspartixWriter;
-    /// # use crustabri::LabelType;
+    /// # use crustabri::aa::AAFramework;
+    /// # use crustabri::aa::ArgumentSet;
+    /// # use crustabri::io::AspartixWriter;
+    /// # use crustabri::aa::LabelType;
     /// # use anyhow::Result;
     /// fn write_af_to_stdout<T: LabelType>(af: &AAFramework<T>) -> Result<()> {
     ///     let writer = AspartixWriter::default();
@@ -103,7 +105,7 @@ impl ResponseWriter<String> for AspartixWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ArgumentSet;
+    use crate::aa::ArgumentSet;
     use std::io::BufWriter;
 
     #[test]

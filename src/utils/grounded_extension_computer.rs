@@ -1,7 +1,6 @@
-use crate::{AAFramework, Argument, LabelType};
+use crate::aa::{AAFramework, Argument, LabelType};
 
-/// Computes the grounded extension of an AF.
-pub fn grounded_extension<T>(af: &AAFramework<T>) -> Vec<&Argument<T>>
+pub(crate) fn grounded_extension<T>(af: &AAFramework<T>) -> Vec<&Argument<T>>
 where
     T: LabelType,
 {
@@ -44,7 +43,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ArgumentSet, AspartixReader, InstanceReader};
+    use crate::{
+        aa::ArgumentSet,
+        io::{AspartixReader, InstanceReader},
+    };
 
     #[test]
     fn test_grounded_extension_1() {

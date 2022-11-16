@@ -3,11 +3,10 @@ use super::{
     utils::cc_assignment_to_init_af_extension,
 };
 use crate::{
-    clause,
-    sat::{Literal, SatSolver},
-    AAFramework, LabelType,
+    aa::{AAFramework, Argument, LabelType},
+    sat::{self, clause, Literal, SatSolver, SatSolverFactoryFn},
+    utils::ConnectedComponentsComputer,
 };
-use crate::{Argument, SatSolverFactoryFn};
 
 /// A SAT-based solver for the stable semantics.
 pub struct StableSemanticsSolver<'a, T>
@@ -24,9 +23,9 @@ where
 {
     /// Builds a new SAT based solver for the stable semantics.
     ///
-    /// The underlying SAT solver is one returned by [default_solver](crate::default_solver).
+    /// The underlying SAT solver is one returned by [default_solver](crate::sat::default_solver).
     pub fn new(af: &'a AAFramework<T>) -> Self {
-        Self::new_with_sat_solver_factory(af, Box::new(|| crate::default_solver()))
+        Self::new_with_sat_solver_factory(af, Box::new(|| sat::default_solver()))
     }
 
     /// Builds a new SAT based solver for the stable semantics.
@@ -46,7 +45,7 @@ where
         status_on_unsat: bool,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
         let mut merged = Vec::new();
-        for cc_af in crate::iter_connected_components(self.af) {
+        for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
             let mut solver = (self.solver_factory)();
             encode(&cc_af, solver.as_mut());
             match cc_af.argument_set().get_argument(arg.label()) {
@@ -117,7 +116,7 @@ where
 {
     fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
         let mut merged = Vec::new();
-        for cc_af in crate::iter_connected_components(self.af) {
+        for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
             let mut solver = (self.solver_factory)();
             encode(&cc_af, solver.as_mut());
             match solver.solve().unwrap_model() {
@@ -179,7 +178,7 @@ fn arg_id_from_solver_var(var: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{io::InstanceReader, AspartixReader};
+    use crate::io::{AspartixReader, InstanceReader};
 
     #[test]
     fn test_compute_one() {

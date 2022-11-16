@@ -1,4 +1,5 @@
-use crate::{Argument, ResponseWriter};
+use super::ResponseWriter;
+use crate::aa::Argument;
 use anyhow::{Context, Result};
 use std::io::Write;
 
@@ -37,7 +38,7 @@ impl ResponseWriter<usize> for Iccma23Writer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ArgumentSet;
+    use crate::aa::ArgumentSet;
     use std::io::BufWriter;
 
     #[test]

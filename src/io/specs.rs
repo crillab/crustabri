@@ -1,4 +1,4 @@
-use crate::{AAFramework, Argument, LabelType};
+use crate::aa::{AAFramework, Argument, LabelType};
 use anyhow::{Context, Result};
 use std::io::{Read, Write};
 
@@ -11,14 +11,15 @@ where
     T: LabelType,
 {
     /// Reads an [`AAFramework`].
-    /// The [LabelType](crate::LabelType) of the returned AFs is depends on the reader.
+    /// The [LabelType](crate::aa::LabelType) of the returned AFs is depends on the reader.
     ///
     /// In case warnings are raised, the callback functions registered by [add_warning_handler](Self::add_warning_handler) are triggered.
     ///
     /// # Example
     ///
     /// ```
-    /// # use crustabri::{AAFramework, AspartixReader, InstanceReader};
+    /// # use crustabri::io::{AspartixReader, InstanceReader};
+    /// # use crustabri::aa::AAFramework;
     /// fn read_af_from_str(s: &str) -> AAFramework<String> {
     ///     let reader = AspartixReader::default();
     ///     reader.read(&mut s.as_bytes()).expect("invalid Aspartix AF")

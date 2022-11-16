@@ -35,7 +35,7 @@ where
     /// Example
     ///
     /// ```
-    /// # use crustabri::{Argument, LabelType};
+    /// # use crustabri::aa::{Argument, LabelType};
     /// fn describe_argument<T: LabelType>(a: &Argument<T>) {
     ///     println!("argument with id {} has the label {}", a.id(), a.label())    ;
     /// }
@@ -49,7 +49,7 @@ where
     /// Example
     ///
     /// ```
-    /// # use crustabri::{Argument, LabelType};
+    /// # use crustabri::aa::{Argument, LabelType};
     /// fn describe_argument<T: LabelType>(a: &Argument<T>) {
     ///     println!("argument with id {} has the label {}", a.id(), a.label())    ;
     /// }
@@ -95,7 +95,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::ArgumentSet;
+    /// # use crustabri::aa::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(3, arguments.len());
@@ -146,7 +146,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::ArgumentSet;
+    /// # use crustabri::aa::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(3, arguments.len());
@@ -171,7 +171,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::ArgumentSet;
+    /// # use crustabri::aa::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert!(!arguments.is_empty());
@@ -193,7 +193,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::ArgumentSet;
+    /// # use crustabri::aa::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(0, arguments.get_argument_index(&labels[0]).unwrap());
@@ -216,7 +216,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::ArgumentSet;
+    /// # use crustabri::aa::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert!(arguments.get_argument(&"a").is_ok());
@@ -240,7 +240,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::ArgumentSet;
+    /// # use crustabri::aa::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(&labels[0], arguments.get_argument_by_id(0).label());
@@ -263,7 +263,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::ArgumentSet;
+    /// # use crustabri::aa::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(3, arguments.iter().count());

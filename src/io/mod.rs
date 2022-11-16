@@ -1,3 +1,5 @@
+//! Objects used to read and write Argumentation Frameworks and answers to problems.
+
 mod aspartix_reader;
 pub use aspartix_reader::AspartixReader;
 

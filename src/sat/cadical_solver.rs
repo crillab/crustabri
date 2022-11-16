@@ -43,7 +43,7 @@ impl SatSolver for CadicalSolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::clause;
+    use crate::sat::clause;
 
     #[test]
     fn test_sat() {

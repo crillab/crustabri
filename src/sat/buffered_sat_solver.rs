@@ -150,7 +150,7 @@ impl SatSolver for BufferedSatSolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::clause;
+    use crate::sat::sat_solver::clause;
 
     fn input_check_solving_fn(expected_input: &'static str) -> Box<SolvingFn> {
         Box::new(move |mut r| {

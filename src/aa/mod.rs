@@ -1,3 +1,5 @@
+//! This module contains the main material used to define Abstract Argumentation.
+
 mod aa_framework;
 pub use aa_framework::AAFramework;
 pub use aa_framework::Attack;

@@ -1,4 +1,4 @@
-use crate::{Argument, LabelType};
+use crate::aa::{Argument, LabelType};
 
 /// A trait for solvers able to compute an extension.
 pub trait SingleExtensionComputer<T>

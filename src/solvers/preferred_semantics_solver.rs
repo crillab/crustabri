@@ -1,9 +1,12 @@
-use super::{complete_semantics_solver, utils::cc_arg_to_init_af_arg};
-use crate::{
-    sat::{Literal, SatSolver},
-    AAFramework, ConnectedComponentsComputer, LabelType, SatSolverFactoryFn,
+use super::{
+    complete_semantics_solver, utils::cc_arg_to_init_af_arg, SingleExtensionComputer,
+    SkepticalAcceptanceComputer,
 };
-use crate::{Argument, SingleExtensionComputer, SkepticalAcceptanceComputer};
+use crate::{
+    aa::{AAFramework, Argument, LabelType},
+    sat::{self, Literal, SatSolver, SatSolverFactoryFn},
+    utils::ConnectedComponentsComputer,
+};
 
 /// A SAT-based solver for the preferred semantics.
 ///
@@ -23,9 +26,9 @@ where
 {
     /// Builds a new SAT based solver for the preferred semantics.
     ///
-    /// The underlying SAT solver is one returned by [default_solver](crate::default_solver).
+    /// The underlying SAT solver is one returned by [default_solver](crate::sat::default_solver).
     pub fn new(af: &'a AAFramework<T>) -> Self {
-        Self::new_with_sat_solver_factory(af, Box::new(|| crate::default_solver()))
+        Self::new_with_sat_solver_factory(af, Box::new(|| sat::default_solver()))
     }
 
     /// Builds a new SAT based solver for the preferred semantics.
@@ -119,7 +122,7 @@ where
     }
 
     fn compute_grounded(&mut self) {
-        self.current = Some(crate::grounded_extension(self.af));
+        self.current = Some(self.af.grounded_extension());
         self.state = ComputerState::Complete;
     }
 
@@ -219,7 +222,7 @@ where
 {
     fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
         let mut merged = Vec::new();
-        for cc_af in crate::iter_connected_components(self.af) {
+        for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
             let mut solver = (self.solver_factory)();
             complete_semantics_solver::encode_complete_semantics_constraints(
                 &cc_af,
@@ -285,7 +288,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{io::InstanceReader, AspartixReader};
+    use crate::io::{AspartixReader, InstanceReader};
 
     #[test]
     fn test_compute_one_preferred_ext_is_grounded() {

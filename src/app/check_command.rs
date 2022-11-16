@@ -1,6 +1,6 @@
 use super::common;
 use anyhow::Result;
-use crustabri::{AspartixReader, Iccma23Reader};
+use crustabri::io::{AspartixReader, Iccma23Reader};
 use crusti_app_helper::{AppSettings, Command, SubCommand};
 
 const CMD_NAME: &str = "check";

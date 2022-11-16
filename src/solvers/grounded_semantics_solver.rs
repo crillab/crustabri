@@ -1,7 +1,5 @@
-use crate::{
-    AAFramework, Argument, CredulousAcceptanceComputer, LabelType, SingleExtensionComputer,
-    SkepticalAcceptanceComputer,
-};
+use super::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer};
+use crate::aa::{AAFramework, Argument, LabelType};
 
 /// A solver used to solve queries for the grounded semantics.
 pub struct GroundedSemanticsSolver<'a, T>
@@ -26,7 +24,7 @@ where
     T: LabelType,
 {
     fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
-        Some(crate::grounded_extension(self.af))
+        Some(self.af.grounded_extension())
     }
 }
 
@@ -42,7 +40,7 @@ where
         &mut self,
         arg: &Argument<T>,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
-        let ext = crate::grounded_extension(self.af);
+        let ext = self.af.grounded_extension();
         if ext.contains(&arg) {
             (true, Some(ext))
         } else {
@@ -56,14 +54,14 @@ where
     T: LabelType,
 {
     fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
-        crate::grounded_extension(self.af).contains(&arg)
+        self.af.grounded_extension().contains(&arg)
     }
 
     fn is_skeptically_accepted_with_certificate(
         &mut self,
         arg: &Argument<T>,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
-        let ext = crate::grounded_extension(self.af);
+        let ext = self.af.grounded_extension();
         if ext.contains(&arg) {
             (true, None)
         } else {
@@ -75,7 +73,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{io::InstanceReader, AspartixReader};
+    use crate::io::{AspartixReader, InstanceReader};
 
     #[test]
     fn test_grounded_solver() {

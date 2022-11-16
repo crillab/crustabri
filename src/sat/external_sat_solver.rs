@@ -77,7 +77,7 @@ fn exec_solver(mut reader: DimacsInstanceRead, program: &str, options: &[String]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::clause;
+    use crate::sat::clause;
 
     fn get_echo_command(content: &str) -> Option<(String, Vec<String>)> {
         if cfg!(target_family = "unix") {

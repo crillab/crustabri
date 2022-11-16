@@ -1,4 +1,5 @@
 use anyhow::Result;
+use crustabri::aa;
 use crusti_app_helper::{AppSettings, Command, SubCommand};
 
 const CMD_NAME: &str = "problems";
@@ -23,7 +24,7 @@ impl<'a> Command<'a> for ProblemsCommand {
     }
 
     fn execute(&self, _arg_matches: &crusti_app_helper::ArgMatches<'_>) -> Result<()> {
-        let problems = crustabri::iter_problem_strings().fold(String::new(), |mut acc, s| {
+        let problems = aa::iter_problem_strings().fold(String::new(), |mut acc, s| {
             if !acc.is_empty() {
                 acc.push(',')
             };

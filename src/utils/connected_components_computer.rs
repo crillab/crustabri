@@ -1,4 +1,4 @@
-use crate::{AAFramework, Argument, ArgumentSet, LabelType};
+use crate::aa::{AAFramework, Argument, ArgumentSet, LabelType};
 
 /// An object used to decompose an AF into its connected components.
 ///
@@ -126,15 +126,15 @@ where
         });
         new_af
     }
-}
 
-/// Iterates over the connected components of an AF.
-pub fn iter_connected_components<T>(af: &AAFramework<T>) -> ConnectedComponentsIterator<T>
-where
-    T: LabelType,
-{
-    ConnectedComponentsIterator {
-        computer: ConnectedComponentsComputer::new(af),
+    /// Iterates over the connected components of an AF.
+    pub fn iter_connected_components(af: &AAFramework<T>) -> ConnectedComponentsIterator<T>
+    where
+        T: LabelType,
+    {
+        ConnectedComponentsIterator {
+            computer: ConnectedComponentsComputer::new(af),
+        }
     }
 }
 
@@ -159,7 +159,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{io::InstanceReader, AspartixReader, AspartixWriter};
+    use crate::io::{AspartixReader, AspartixWriter, InstanceReader};
     use std::io::Cursor;
 
     #[test]
@@ -215,7 +215,8 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let components = iter_connected_components(&af).collect::<Vec<AAFramework<String>>>();
+        let components = ConnectedComponentsComputer::iter_connected_components(&af)
+            .collect::<Vec<AAFramework<String>>>();
         let writer = AspartixWriter::default();
         let mut instance0 = Cursor::new(Vec::new());
         writer
@@ -246,9 +247,13 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
-        assert_eq!(1, iter_connected_components(&af).count());
+        assert_eq!(
+            1,
+            ConnectedComponentsComputer::iter_connected_components(&af).count()
+        );
         af.remove_argument(&"a1".to_string()).unwrap();
-        let components_after = iter_connected_components(&af).collect::<Vec<AAFramework<String>>>();
+        let components_after = ConnectedComponentsComputer::iter_connected_components(&af)
+            .collect::<Vec<AAFramework<String>>>();
         assert_eq!(2, components_after.len());
         let writer = AspartixWriter::default();
         let mut instance0 = Cursor::new(Vec::new());

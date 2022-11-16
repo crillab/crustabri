@@ -1,5 +1,5 @@
 use super::{warning_result::WarningResult, InstanceReader, WarningHandler};
-use crate::{AAFramework, Argument, ArgumentSet};
+use crate::aa::{AAFramework, Argument, ArgumentSet};
 use anyhow::{anyhow, Context, Result};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
@@ -67,12 +67,13 @@ where
 /// A reader for the Aspartix format.
 ///
 /// This object is used to read an [`AAFramework`] encoded using the Aspartix input format, as defined on [the Aspartix website](https://www.dbai.tuwien.ac.at/research/argumentation/aspartix/dung.html).
-/// The [LabelType](crate::LabelType) of the returned argument frameworks is [String].
+/// The [LabelType](crate::aa::LabelType) of the returned argument frameworks is [String].
 ///
 /// # Example
 ///
 /// ```
-/// # use crustabri::{AAFramework, AspartixReader, InstanceReader};
+/// # use crustabri::aa::AAFramework;
+/// # use crustabri::io::{AspartixReader, InstanceReader};
 /// fn read_af_from_str(s: &str) -> AAFramework<String> {
 ///     let reader = AspartixReader::default();
 ///     reader.read(&mut s.as_bytes()).expect("invalid Aspartix AF")

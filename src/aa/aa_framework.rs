@@ -1,4 +1,5 @@
-use crate::{Argument, ArgumentSet, LabelType};
+use super::{Argument, ArgumentSet, LabelType};
+use crate::utils;
 use anyhow::{anyhow, Context, Result};
 
 /// An Abstract Argumentation framework as defined in Dung semantics.
@@ -30,7 +31,7 @@ where
     /// Example
     ///
     /// ```
-    /// # use crustabri::{Attack, LabelType};
+    /// # use crustabri::aa::{Attack, LabelType};
     /// fn describe_attack<T: LabelType>(attack: &Attack<T>) {
     ///     println!("{} attacks {}", attack.attacker(), attack.attacked());
     /// }
@@ -44,7 +45,7 @@ where
     /// Example
     ///
     /// ```
-    /// # use crustabri::{Attack, LabelType};
+    /// # use crustabri::aa::{Attack, LabelType};
     /// fn describe_attack<T: LabelType>(attack: &Attack<T>) {
     ///     println!("{} attacks {}", attack.attacker(), attack.attacked());
     /// }
@@ -69,7 +70,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::{ArgumentSet, AAFramework};
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
     /// let arguments = ArgumentSet::new_with_labels(&["a", "b", "c"]);
     /// let framework = AAFramework::new_with_argument_set(arguments);
     /// assert_eq!(3, framework.argument_set().len());
@@ -132,7 +133,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::{ArgumentSet, AAFramework};
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new_with_argument_set(arguments);
@@ -227,7 +228,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::{ArgumentSet, AAFramework};
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let framework = AAFramework::new_with_argument_set(arguments);
@@ -242,7 +243,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::{ArgumentSet, AAFramework};
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new_with_argument_set(arguments);
@@ -295,7 +296,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::{ArgumentSet, AAFramework};
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new_with_argument_set(arguments);
@@ -317,7 +318,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::{ArgumentSet, AAFramework};
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new_with_argument_set(arguments);
@@ -327,6 +328,11 @@ where
     /// ```
     pub fn n_attacks(&self) -> usize {
         self.attacks.len() - self.n_removed_attacks
+    }
+
+    /// Computes the grounded extension of the AF.
+    pub fn grounded_extension(&self) -> Vec<&Argument<T>> {
+        utils::grounded_extension(self)
     }
 }
 

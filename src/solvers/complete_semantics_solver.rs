@@ -1,11 +1,11 @@
 use super::specs::CredulousAcceptanceComputer;
 use super::utils::{cc_arg_to_init_af_arg, cc_assignment_to_init_af_extension};
+use crate::aa::{AAFramework, Argument, LabelType};
+use crate::sat::clause;
 use crate::{
-    clause,
-    sat::{Literal, SatSolver, SatSolverFactoryFn},
-    AAFramework, ConnectedComponentsComputer, LabelType,
+    sat::{self, Literal, SatSolver, SatSolverFactoryFn},
+    utils::ConnectedComponentsComputer,
 };
-use crate::{grounded_extension, Argument};
 
 /// A SAT-based solver for the complete semantics.
 ///
@@ -25,12 +25,12 @@ where
 {
     /// Builds a new SAT based solver for the complete semantics.
     ///
-    /// The underlying SAT solver is one returned by [default_solver](crate::default_solver).
+    /// The underlying SAT solver is one returned by [default_solver](crate::sat::default_solver).
     pub fn new(af: &'a AAFramework<T>) -> Self
     where
         T: LabelType,
     {
-        Self::new_with_sat_solver_factory(af, Box::new(|| crate::default_solver()))
+        Self::new_with_sat_solver_factory(af, Box::new(|| sat::default_solver()))
     }
 
     /// Builds a new SAT based solver for the complete semantics.
@@ -140,7 +140,7 @@ where
                     arg_id_from_solver_var,
                 );
                 while let Some(other_cc_af) = cc_computer.next_connected_component() {
-                    let other_cc_grounded = grounded_extension(&other_cc_af);
+                    let other_cc_grounded = other_cc_af.grounded_extension();
                     other_cc_grounded
                         .iter()
                         .map(|a| cc_arg_to_init_af_arg(a, self.af))
@@ -172,7 +172,7 @@ fn arg_id_to_solver_disjunction_var(id: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{io::InstanceReader, AspartixReader};
+    use crate::io::{AspartixReader, InstanceReader};
 
     #[test]
     fn test_acceptance_1() {

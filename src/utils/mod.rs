@@ -1,6 +1,7 @@
+//! Miscellaneous components used in the library.
+
 mod connected_components_computer;
-pub use connected_components_computer::iter_connected_components;
 pub use connected_components_computer::ConnectedComponentsComputer;
 
 mod grounded_extension_computer;
-pub use grounded_extension_computer::grounded_extension;
+pub(crate) use grounded_extension_computer::grounded_extension;
