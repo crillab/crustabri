@@ -8,6 +8,17 @@ use std::io::{BufRead, BufReader, Read};
 /// This object is used to read an [`AAFramework`] encoded using the ICCMA 2023 input format, as defined on [the competition website](https://iccma2023.github.io/rules.html).
 /// The [LabelType](crate::aa::LabelType) of the returned argument frameworks is [usize].
 ///
+/// # ICCMA 2023 format
+///
+/// The following content defines an Argumentation Framework with three arguments (given by the indexes `1`, `2` and `3`) and three attacks (`1` and `2` attack each other and `3` attacks `2`).
+///
+/// ```text
+/// p af 3
+/// 1 2
+/// 2 1
+/// 3 2
+/// ```
+///
 /// # Example
 ///
 /// ```

@@ -69,6 +69,19 @@ where
 /// This object is used to read an [`AAFramework`] encoded using the Aspartix input format, as defined on [the Aspartix website](https://www.dbai.tuwien.ac.at/research/argumentation/aspartix/dung.html).
 /// The [LabelType](crate::aa::LabelType) of the returned argument frameworks is [String].
 ///
+/// # Aspartix format
+///
+/// The following content defines an Argumentation Framework with three arguments labelled `a`, `b` and `c` and three attacks (`a` and `b` attack each other and `c` attacks `b`).
+///
+/// ```text
+/// arg(a).
+/// arg(b).
+/// arg(c).
+/// att(a,b).
+/// att(b,a).
+/// att(c,b).
+/// ```
+///
 /// # Example
 ///
 /// ```

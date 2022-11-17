@@ -4,6 +4,11 @@ use anyhow::{Context, Result};
 use std::io::Write;
 
 /// A writer for the output format used in the ICCMA 2023 competition.
+///
+/// More precisely, the answers to argumentation problems are written this way:
+///   * extension: the letter `w`, followed by a space and the list of argument labels, splitted by spaces
+///   * absence of extension: `NO`
+///   * acceptance status: `YES` and `NO`
 #[derive(Default)]
 pub struct Iccma23Writer;
 

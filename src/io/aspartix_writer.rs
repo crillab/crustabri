@@ -4,9 +4,27 @@ use std::io::Write;
 
 use super::ResponseWriter;
 
-/// A writer for the Aspartix format.
+/// A writer for solvers reading instances encoded with the Aspartix format.
 ///
-/// This object is used to write an [`AAFramework`] using the Aspartix input format, as defined on [the Aspartix website](https://www.dbai.tuwien.ac.at/research/argumentation/aspartix/dung.html).
+/// More precisely, the answers to argumentation problems are written this way:
+///   * extension: the list of argument labels, splitted by spaces
+///   * absence of extension: `NO`
+///   * acceptance status: `YES` and `NO`
+///
+/// In addition, this object is able to write an [`AAFramework`] using the Aspartix input format, as defined on [the Aspartix website](https://www.dbai.tuwien.ac.at/research/argumentation/aspartix/dung.html).
+///
+/// # Aspartix format
+///
+/// The following content defines an Argumentation Framework with three arguments labelled `a`, `b` and `c` and three attacks (`a` and `b` attack each other and `c` attacks `b`).
+///
+/// ```text
+/// arg(a).
+/// arg(b).
+/// arg(c).
+/// att(a,b).
+/// att(b,a).
+/// att(c,b).
+/// ```
 ///
 /// # Example
 ///
@@ -25,15 +43,10 @@ use super::ResponseWriter;
 /// # write_af_to_stdout(&AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&[] as &[String])));
 /// ```
 #[derive(Default)]
-pub struct AspartixWriter {}
+pub struct AspartixWriter;
 
 impl AspartixWriter {
     /// Writes a framework using the Aspartix format to the provided writer.
-    ///
-    /// # Arguments
-    ///
-    /// * `framework` - the framework
-    /// * `writer` - the writer
     ///
     /// # Example
     ///
