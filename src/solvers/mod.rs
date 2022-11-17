@@ -1,4 +1,4 @@
-//! Solvers dedicated to problems related to Abstract Argumentation Frameworks.
+//! Solvers dedicated to problems related to Abstract Argumentation frameworks.
 
 mod complete_semantics_solver;
 pub use complete_semantics_solver::CompleteSemanticsSolver;

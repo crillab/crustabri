@@ -6,20 +6,31 @@ use std::hash::Hash;
 
 /// The trait for argument labels.
 ///
-/// Arguments may be labeled by any type implementing some traits.
-/// This trait is used to combine them.
+/// Arguments may be labeled by any type implementing some traits allowing their use in maps and their display.
+/// This trait is just a shortcut used to combine them.
+///
+/// Simple types like [usize] and [String] implements [LabelType].
 pub trait LabelType: Clone + Debug + Display + Eq + Hash {}
 impl<T: Clone + Debug + Display + Eq + Hash> LabelType for T {}
 
 /// Handles a single argument.
 ///
-/// Each argument has a label and an identifier which is unique in an argument set.
-/// The label must be a [`LabelType`].
+/// Each argument has a label and an identifier which are unique in an argument set.
+/// This uniqueness condition imposes arguments are made from [ArgumentSet] objects, and not directly by the [Argument] struct.
+/// If an argument is deleted from its set, a new one with the same label may be created;
+/// however, the id of the removed argument will not be used for a newer argument.
 ///
-/// Arguments are built by [`ArgumentSet`] objects.
+/// The type of the labels must be [`LabelType`] instances.
+/// The type associated with an argument is the one associated with its argument set.
 ///
-/// [`LabelType`]: trait.LabelType.html
-/// [`ArgumentSet`]: struct.ArgumentSet.html
+/// # Example
+///
+/// ```
+/// # use crustabri::aa::{Argument, LabelType};
+/// fn describe_argument<T: LabelType>(a: &Argument<T>) {
+///     println!("argument with id {} has the label {}", a.id(), a.label())    ;
+/// }
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Argument<T: LabelType> {
     id: usize,
@@ -31,29 +42,11 @@ where
     T: LabelType,
 {
     /// Returns the label of the argument.
-    ///
-    /// Example
-    ///
-    /// ```
-    /// # use crustabri::aa::{Argument, LabelType};
-    /// fn describe_argument<T: LabelType>(a: &Argument<T>) {
-    ///     println!("argument with id {} has the label {}", a.id(), a.label())    ;
-    /// }
-    /// ```
     pub fn label(&self) -> &T {
         &self.label
     }
 
     /// Returns the id of the argument.
-    ///
-    /// Example
-    ///
-    /// ```
-    /// # use crustabri::aa::{Argument, LabelType};
-    /// fn describe_argument<T: LabelType>(a: &Argument<T>) {
-    ///     println!("argument with id {} has the label {}", a.id(), a.label())    ;
-    /// }
-    /// ```
     pub fn id(&self) -> usize {
         self.id
     }
@@ -68,7 +61,17 @@ where
     }
 }
 
-/// Handles the set of arguments of an AA framework.
+/// Handles a set of arguments in an Abstract Argumentation framework.
+///
+/// This structure ensures all arguments have unique identifiers and labels.
+/// Arguments are created by giving their labels, while identifiers are determined by the argument set at their creation.
+///
+/// Arguments may be deleted.
+/// If an argument is deleted from its set, a new one with the same label may be created;
+/// however, the id of the removed argument will not be used for a newer argument.
+///
+/// The type of the labels must be [`LabelType`] instances.
+/// The type associated with an argument is the one associated with its argument set.
 #[derive(Default)]
 pub struct ArgumentSet<T>
 where
@@ -85,20 +88,18 @@ where
 {
     /// Builds a new argument set given the labels of the arguments.
     ///
-    /// Each argument will be assigned an id equal to its index in the provided slice of argument labels.
     /// If a label appears multiple times, the first occurrence is the only one that is considered.
-    ///
-    /// # Arguments
-    ///
-    /// * `labels` - the argument labels
+    /// Each argument will be assigned an id equal to its index in the provided slice of argument labels (after the removal of the duplicates).
     ///
     /// # Example
     ///
     /// ```
     /// # use crustabri::aa::ArgumentSet;
-    /// let labels = vec!["a", "b", "c"];
+    /// let labels = vec!["a", "b"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
-    /// assert_eq!(3, arguments.len());
+    /// assert_eq!(2, arguments.len());
+    /// assert_eq!(0, arguments.get_argument(&"a").unwrap().id());
+    /// assert_eq!(1, arguments.get_argument(&"b").unwrap().id());
     /// ```
     pub fn new_with_labels(labels: &[T]) -> Self {
         let mut argument_set = ArgumentSet {
@@ -116,8 +117,20 @@ where
 
     /// Adds a new argument to this set.
     ///
-    /// The id of the new argument is the previous maximal id plus one.
+    /// The id of the new argument is the previous maximal id that have been given (including arguments that have been deleted) plus one.
     /// In an argument with the same label is already defined, no argument is added.
+    ///
+    /// ```
+    /// # use crustabri::aa::ArgumentSet;
+    /// let arg_labels = vec!["a", "b"];
+    /// let mut arguments = ArgumentSet::new_with_labels(&arg_labels);
+    /// assert_eq!(2, arguments.len());
+    /// arguments.new_argument("c");
+    /// assert_eq!(3, arguments.len());
+    /// assert_eq!(2, arguments.get_argument(&"c").unwrap().id());
+    /// arguments.new_argument("c");
+    /// assert_eq!(3, arguments.len());
+    /// ```
     pub fn new_argument(&mut self, label: T) {
         self.label_to_id.entry(label.clone()).or_insert_with(|| {
             self.arguments.push(Some(Argument {
@@ -130,7 +143,23 @@ where
 
     /// Removes an argument from this set.
     ///
-    /// The argument id will not be attributed to new arguments.
+    /// The argument id will not be attributed to new arguments, but an argument with the same label can be added.
+    ///
+    /// An error is returned if no argument with the provided label exists.
+    ///
+    /// ```
+    /// # use crustabri::aa::ArgumentSet;
+    /// let arg_labels = vec!["a", "b"];
+    /// let mut arguments = ArgumentSet::new_with_labels(&arg_labels);
+    /// assert_eq!(2, arguments.len());
+    /// assert_eq!(1, arguments.get_argument(&"b").unwrap().id());
+    /// assert!(arguments.remove_argument(&"b").is_ok());
+    /// assert!(arguments.remove_argument(&"b").is_err());
+    /// assert_eq!(1, arguments.len());
+    /// arguments.new_argument("b");
+    /// assert_eq!(2, arguments.len());
+    /// assert_eq!(2, arguments.get_argument(&"b").unwrap().id());
+    /// ```
     pub fn remove_argument(&mut self, label: &T) -> Result<Argument<T>> {
         match self.label_to_id.remove(label) {
             Some(id) => {
@@ -143,13 +172,17 @@ where
 
     /// Returns the number of arguments in the set.
     ///
+    /// This number does not take into account the arguments that have been removed.
+    ///
     /// # Example
     ///
     /// ```
     /// # use crustabri::aa::ArgumentSet;
-    /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new_with_labels(&labels);
-    /// assert_eq!(3, arguments.len());
+    /// let arg_labels = vec!["a", "b"];
+    /// let mut arguments = ArgumentSet::new_with_labels(&arg_labels);
+    /// assert_eq!(2, arguments.len());
+    /// arguments.remove_argument(&"b");
+    /// assert_eq!(1, arguments.len());
     /// ```
     pub fn len(&self) -> usize {
         self.arguments.len() - self.n_removed
@@ -158,6 +191,17 @@ where
     /// Returns the maximal argument id given so far, or `None` if no argument has been added yet.
     ///
     /// This id may refer to a removed argument.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::ArgumentSet;
+    /// let arg_labels = vec!["a", "b"];
+    /// let mut arguments = ArgumentSet::new_with_labels(&arg_labels);
+    /// assert_eq!(1, arguments.max_id().unwrap());
+    /// arguments.remove_argument(&"b");
+    /// assert_eq!(1, arguments.max_id().unwrap());
+    /// ```
     pub fn max_id(&self) -> Option<usize> {
         if self.arguments.is_empty() {
             None
@@ -166,52 +210,26 @@ where
         }
     }
 
-    /// Returns `true` iff the set has no argument.
+    /// Returns `true` if and only if the set has no argument.
     ///
     /// # Example
     ///
     /// ```
     /// # use crustabri::aa::ArgumentSet;
-    /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new_with_labels(&labels);
+    /// let arg_labels = vec!["a", "b"];
+    /// let mut arguments = ArgumentSet::new_with_labels(&arg_labels);
     /// assert!(!arguments.is_empty());
+    /// arguments.remove_argument(&"a");
+    /// arguments.remove_argument(&"b");
+    /// assert!(arguments.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
         self.arguments.len() == self.n_removed
     }
 
-    /// Returns the unique index associated to an argument label.
-    ///
-    /// If no such label exists, an error is returned.
-    ///
-    /// See constructor methods for information about indexes.
-    ///
-    /// # Arguments
-    ///
-    /// * `label` - the argument label
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use crustabri::aa::ArgumentSet;
-    /// let labels = vec!["a", "b", "c"];
-    /// let arguments = ArgumentSet::new_with_labels(&labels);
-    /// assert_eq!(0, arguments.get_argument_index(&labels[0]).unwrap());
-    /// assert_eq!(1, arguments.get_argument_index(&labels[1]).unwrap());
-    /// assert_eq!(2, arguments.get_argument_index(&labels[2]).unwrap());
-    /// ```
-    pub fn get_argument_index(&self, label: &T) -> Result<usize> {
-        self.label_to_id
-            .get(label)
-            .ok_or_else(|| anyhow!("no such argument: {}", label))
-            .map(|i| *i)
-    }
-
     /// Returns the argument associated to an argument label.
     ///
-    /// # Arguments
-    ///
-    /// * `label` - the argument label
+    /// In case no such argument exists, an error is returned.
     ///
     /// # Example
     ///
@@ -231,7 +249,8 @@ where
 
     /// Returns the argument with the corresponding id.
     ///
-    /// See constructor methods for information about indexes.
+    /// Indexes are [usize] from 0 to `n - 1`, where `n` is the number of arguments created so far in this set.
+    /// Beware that arguments may be removed; in this case, their identifiers does not refer anymore to existing arguments, making this function panic.
     ///
     /// # Panics
     ///
@@ -254,6 +273,18 @@ where
     /// Returns `true` if and only if an argument with the provided id exists.
     ///
     /// If the argument existed but has been remove, this function returns `false`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::ArgumentSet;
+    /// let labels = vec!["a", "b", "c"];
+    /// let mut arguments = ArgumentSet::new_with_labels(&labels);
+    /// arguments.remove_argument(&"b");
+    /// assert!(arguments.has_argument_with_id(0));
+    /// assert!(!arguments.has_argument_with_id(1));
+    /// assert!(arguments.has_argument_with_id(2));
+    /// ```
     pub fn has_argument_with_id(&self, id: usize) -> bool {
         id < self.arguments.len() && self.arguments[id].is_some()
     }

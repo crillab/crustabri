@@ -3,6 +3,13 @@ use crate::utils;
 use anyhow::{anyhow, Context, Result};
 
 /// An Abstract Argumentation framework as defined in Dung semantics.
+///
+/// [AAFramework] objects hold both an argument set and the attacks between these arguments.
+/// They maintain the coherence between the arguments and the attacks:
+/// if an argument is removed, then all the attacks involving it are also removed.
+///
+/// While the majority of the functions defined in this objects are related to the addition and deletion of arguments and attacks,
+/// some computation methods are defined here. See e.g. the [grounded_extension](Self::grounded_extension) function.
 #[derive(Default)]
 pub struct AAFramework<T>
 where
@@ -18,6 +25,21 @@ where
 /// An attack, represented as a couple of two arguments.
 ///
 /// Attacks are built by [`AAFramework`] objects.
+///
+/// Since attacks refer to [Argument] objects which themselves refer to [AAFramework] objects, it is impossible to remove an argument if [Attack] objects are handled out of their framework.
+/// This implies that the arguments n the attack always exists (i.e. you do not have to check if the two arguments still exist).
+///
+/// # Example
+///
+/// ```
+/// # use crustabri::aa::AAFramework;
+/// # use crustabri::aa::LabelType;
+/// fn print_af_attacks<T>(af: &AAFramework<T>) where T: LabelType {
+///     af
+///         .iter_attacks()
+///         .for_each(|att| println!("{} attacks {}", att.attacker(), att.attacked()));
+/// }
+/// ```
 pub struct Attack<'a, T>(&'a Argument<T>, &'a Argument<T>)
 where
     T: LabelType;
@@ -28,7 +50,7 @@ where
 {
     /// Returns the attacker.
     ///
-    /// Example
+    /// # Example
     ///
     /// ```
     /// # use crustabri::aa::{Attack, LabelType};
@@ -42,7 +64,7 @@ where
 
     /// Returns the attacked argument.
     ///
-    /// Example
+    /// # Example
     ///
     /// ```
     /// # use crustabri::aa::{Attack, LabelType};
@@ -59,13 +81,9 @@ impl<T> AAFramework<T>
 where
     T: LabelType,
 {
-    /// Builds an AA framework.
+    /// Builds an AA framework with its initial argument set.
     ///
-    /// The set of arguments used in the framework is provided.
-    ///
-    /// # Arguments
-    ///
-    /// * `arguments` - the set of arguments
+    /// Although a set of arguments is provided, it may change over the time.
     ///
     /// # Example
     ///
@@ -88,7 +106,22 @@ where
         }
     }
 
-    /// Adds a new argument to this argumentation framework.
+    /// Adds a new argument to this argumentation framework given its label.
+    ///
+    /// If such an argument already exists, the AF is left unchanged.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+    /// let args = ArgumentSet::new_with_labels(&arg_labels);
+    /// let mut af = AAFramework::new_with_argument_set(args);
+    /// af.new_argument("d".to_string());
+    /// assert_eq!(4, af.n_arguments());
+    /// af.new_argument("d".to_string());
+    /// assert_eq!(4, af.n_arguments());
+    /// ```
     pub fn new_argument(&mut self, label: T) {
         let old_len = self.arguments.len();
         self.arguments.new_argument(label);
@@ -98,9 +131,36 @@ where
         }
     }
 
-    /// Removes an argument from this argumentation framework.
+    /// Removes an argument from this argumentation framework and all the related attacks.
     ///
     /// The argument id will not be attributed to new arguments.
+    /// See [Argument] for more information on argument identifiers.
+    ///
+    /// If no argument in the AF has the same label as provided, this function returns an error.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+    /// let args = ArgumentSet::new_with_labels(&arg_labels);
+    /// let mut af = AAFramework::new_with_argument_set(args);
+    /// assert_eq!(0, af.n_attacks());
+    /// // adding all the possible attacks
+    /// for i in 0..3 {
+    ///     for j in 0..3 {
+    ///         af.new_attack(&arg_labels[i], &arg_labels[j]).unwrap();
+    ///     }
+    /// }
+    /// assert_eq!(9, af.n_attacks());
+    /// // removing argument "a"
+    /// assert!(af.remove_argument(&arg_labels[0]).is_ok());
+    /// assert!(af.remove_argument(&arg_labels[0]).is_err());
+    /// assert_eq!(4, af.n_attacks());
+    /// assert!(af
+    ///     .iter_attacks()
+    ///     .all(|att| att.attacker().label() != "a" && att.attacked().label() != "a"));
+    /// ```
     pub fn remove_argument(&mut self, label: &T) -> Result<()> {
         let removed = self.arguments.remove_argument(label)?;
         let removed_id = removed.id();
@@ -123,12 +183,7 @@ where
     /// If the provided arguments are undefined, an error is returned.
     /// Else, the attack is added.
     ///
-    /// If the attack already exists, no new attack is added.
-    ///
-    /// # Arguments
-    ///
-    /// * `from` - the label of the source arguments (attacker)
-    /// * `to` - the label of the destination argument (attacked)
+    /// If the attack already exists, no new attack is added and no error is returned.
     ///
     /// # Example
     ///
@@ -145,12 +200,10 @@ where
         let context = || format!("cannot add an attack from {:?} to {:?}", from, to,);
         let attacker_id = self
             .arguments
-            .get_argument_index(from)
-            .with_context(context)?;
-        let attacked_id = self
-            .arguments
-            .get_argument_index(to)
-            .with_context(context)?;
+            .get_argument(from)
+            .with_context(context)?
+            .id();
+        let attacked_id = self.arguments.get_argument(to).with_context(context)?.id();
         if !self.attacks_from[attacker_id]
             .iter()
             .any(|id| self.attacks[*id] == Some((attacker_id, attacked_id)))
@@ -162,19 +215,30 @@ where
         Ok(())
     }
 
-    /// Removes an attack.
+    /// Removes an attack given the labels of the source and destination arguments.
     ///
     /// If the provided attack or one of its arguments does not belong to this framework, an error is returned.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// let labels = vec!["a", "b", "c"];
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
+    /// let mut framework = AAFramework::new_with_argument_set(arguments);
+    /// assert_eq!(0, framework.iter_attacks().count());
+    /// framework.new_attack(&labels[0], &labels[1]);
+    /// assert_eq!(1, framework.iter_attacks().count());
+    /// assert!(framework.remove_attack(&labels[0], &labels[1]).is_ok());
+    /// assert!(framework.remove_attack(&labels[0], &labels[1]).is_err());
     pub fn remove_attack(&mut self, from: &T, to: &T) -> Result<()> {
         let context = || format!("while removing an attack from {:?} to {:?}", from, to);
         let attacker_id = self
             .arguments
-            .get_argument_index(from)
-            .with_context(context)?;
-        let attacked_id = self
-            .arguments
-            .get_argument_index(to)
-            .with_context(context)?;
+            .get_argument(from)
+            .with_context(context)?
+            .id();
+        let attacked_id = self.arguments.get_argument(to).with_context(context)?.id();
         let attacks_from = &self.attacks_from[attacker_id];
         match attacks_from
             .iter()
@@ -264,6 +328,17 @@ where
     }
 
     /// Provides an iterator to the attacks that have the given argument as attacker.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// let labels = vec!["a", "b", "c"];
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
+    /// let mut af = AAFramework::new_with_argument_set(arguments);
+    /// af.new_attack(&"a", &"b");
+    /// assert_eq!(1, af.iter_attacks_from(af.argument_set().get_argument(&"a").unwrap()).count());
+    /// assert_eq!(0, af.iter_attacks_from(af.argument_set().get_argument(&"b").unwrap()).count());
     pub fn iter_attacks_from(&self, arg: &Argument<T>) -> impl Iterator<Item = Attack<'_, T>> + '_ {
         self.attacks_from[arg.id()]
             .iter()
@@ -278,6 +353,17 @@ where
     }
 
     /// Provides an iterator to the attacks that have the given argument as attacked.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// let labels = vec!["a", "b", "c"];
+    /// let arguments = ArgumentSet::new_with_labels(&labels);
+    /// let mut af = AAFramework::new_with_argument_set(arguments);
+    /// af.new_attack(&"a", &"b");
+    /// assert_eq!(0, af.iter_attacks_to(af.argument_set().get_argument(&"a").unwrap()).count());
+    /// assert_eq!(1, af.iter_attacks_to(af.argument_set().get_argument(&"b").unwrap()).count());
     pub fn iter_attacks_to(&self, arg: &Argument<T>) -> impl Iterator<Item = Attack<'_, T>> + '_ {
         self.attacks_to[arg.id()]
             .iter()
@@ -292,6 +378,8 @@ where
     }
 
     /// Returns the number of arguments in this framework.
+    ///
+    /// See [ArgumentSet::len] for more information.
     ///
     /// # Example
     ///
@@ -308,12 +396,14 @@ where
 
     /// Returns the maximal argument id given so far, or `None` if no argument has been added yet.
     ///
-    /// This id may refer to a removed argument.
+    /// See [ArgumentSet::max_id] for more information.
     pub fn max_argument_id(&self) -> Option<usize> {
         self.argument_set().max_id()
     }
 
     /// Returns the number of attacks in this framework.
+    ///
+    /// Removed attacks do not count.
     ///
     /// # Example
     ///
@@ -325,12 +415,38 @@ where
     /// assert_eq!(0, framework.n_attacks());
     /// framework.new_attack(&"a", &"b");
     /// assert_eq!(1, framework.n_attacks());
+    /// framework.remove_attack(&"a", &"b");
+    /// assert_eq!(0, framework.n_attacks());
     /// ```
     pub fn n_attacks(&self) -> usize {
         self.attacks.len() - self.n_removed_attacks
     }
 
     /// Computes the grounded extension of the AF.
+    ///
+    /// The grounded extension is the minimal complete extension (see [CompleteSemanticsSolver](crate::solvers::CompleteSemanticsSolver) for more information).
+    /// It is computed in time polynomial in the size of the framework.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// let arg_labels = vec!["a", "b", "c", "d", "e", "f"];
+    /// let args = ArgumentSet::new_with_labels(&arg_labels);
+    /// let mut af = AAFramework::new_with_argument_set(args);
+    /// af.new_attack(&"a", &"b").unwrap();
+    /// af.new_attack(&"b", &"c").unwrap();
+    /// af.new_attack(&"b", &"d").unwrap();
+    /// af.new_attack(&"c", &"e").unwrap();
+    /// af.new_attack(&"d", &"e").unwrap();
+    /// af.new_attack(&"e", &"f").unwrap();
+    /// let mut grounded_labels = af.grounded_extension()
+    ///     .iter()
+    ///     .map(|a| *a.label())
+    ///     .collect::<Vec<&str>>();
+    /// grounded_labels.sort_unstable();
+    /// assert_eq!(vec!["a", "c", "d", "f"], grounded_labels)
+    /// ```
     pub fn grounded_extension(&self) -> Vec<&Argument<T>> {
         utils::grounded_extension(self)
     }

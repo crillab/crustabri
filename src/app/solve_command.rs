@@ -1,7 +1,7 @@
 use super::common::{self, ARG_ARG, ARG_PROBLEM};
 use anyhow::{anyhow, Context, Result};
 use crustabri::{
-    aa::{self, AAFramework, Argument, LabelType, Query, Semantics},
+    aa::{AAFramework, Argument, LabelType, Query, Semantics},
     io::{
         AspartixReader, AspartixWriter, Iccma23Reader, Iccma23Writer, InstanceReader,
         ResponseWriter,
@@ -88,7 +88,8 @@ where
         .map(|a| reader.read_arg_from_str(&af, a))
         .transpose()
         .context("while parsing the argument passed to the command line")?;
-    let (query, semantics) = aa::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
+    let (query, semantics) =
+        Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
     check_arg_definition(query, &arg)?;
     match query {
         Query::SE => compute_one_extension(&af, semantics, arg_matches, writer),

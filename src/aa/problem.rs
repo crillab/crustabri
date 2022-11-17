@@ -40,6 +40,38 @@ pub enum Query {
     DS,
 }
 
+impl Query {
+    /// Reads a string depicting a problem with an XX-YY pattern.
+    ///
+    /// This functions reads a problem string following the format in ICCMA competitions.
+    /// The string is split at the first hyphen found in it.
+    /// The substring before this hyphen is considered as the query, while the substring after it is considered as the semantics.
+    ///
+    /// In case there is no hyphen, an error is returned.
+    /// In case there is more then one, then all the hyphen,s except the first are considered as part of the semantics.
+    pub fn read_problem_string(problem: &str) -> Result<(Query, Semantics)> {
+        let context = || format!(r#"while parsing problem string "{}""#, problem);
+        match problem.find('-') {
+            Some(n) => {
+                let query = Query::try_from(&problem[0..n]).with_context(context)?;
+                let semantics = Semantics::try_from(&problem[1 + n..]).with_context(context)?;
+                Ok((query, semantics))
+            }
+            None => Err(anyhow!("no hyphen in problem string")).with_context(context),
+        }
+    }
+
+    /// Returns an iterator through the known problems given as strings.
+    ///
+    /// This functions returns strings representing the problems as defined in ICCMA competitions.
+    /// Each string is composed by the query, an hyphen, and the semantics.
+    /// The queries and problems are given by the sequences of strings representing them in the competitions.
+    pub fn iter_problem_strings() -> impl Iterator<Item = String> + 'static {
+        Semantics::iter()
+            .flat_map(|sem| Query::iter().map(move |q| format!("{}-{}", q.as_ref(), sem.as_ref())))
+    }
+}
+
 impl TryFrom<&str> for Query {
     type Error = anyhow::Error;
 
@@ -53,36 +85,6 @@ impl TryFrom<&str> for Query {
     }
 }
 
-/// Reads a string depicting a problem with an XX-YY pattern.
-///
-/// This functions reads a problem string following the format in ICCMA competitions.
-/// The string is split at the first hyphen found in it.
-/// The substring before this hyphen is considered as the query, while the substring after it is considered as the semantics.
-///
-/// In case there is no hyphen, an error is returned.
-/// In case there is more then one, then all the hyphen,s except the first are considered as part of the semantics.
-pub fn read_problem_string(problem: &str) -> Result<(Query, Semantics)> {
-    let context = || format!(r#"while parsing problem string "{}""#, problem);
-    match problem.find('-') {
-        Some(n) => {
-            let query = Query::try_from(&problem[0..n]).with_context(context)?;
-            let semantics = Semantics::try_from(&problem[1 + n..]).with_context(context)?;
-            Ok((query, semantics))
-        }
-        None => Err(anyhow!("no hyphen in problem string")).with_context(context),
-    }
-}
-
-/// Returns an iterator through the known problems given as strings.
-///
-/// This functions returns strings representing the problems as defined in ICCMA competitions.
-/// Each string is composed by the query, an hyphen, and the semantics.
-/// The queries and problems are given by the sequences of strings representing them in the competitions.
-pub fn iter_problem_strings() -> impl Iterator<Item = String> + 'static {
-    Semantics::iter()
-        .flat_map(|sem| Query::iter().map(move |q| format!("{}-{}", q.as_ref(), sem.as_ref())))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -91,27 +93,27 @@ mod tests {
     fn test_read_problem_ok() {
         assert_eq!(
             (Query::SE, Semantics::ST),
-            read_problem_string("SE-ST").unwrap()
+            Query::read_problem_string("SE-ST").unwrap()
         );
         assert_eq!(
             (Query::SE, Semantics::ST),
-            read_problem_string("se-st").unwrap()
+            Query::read_problem_string("se-st").unwrap()
         );
     }
 
     #[test]
     fn test_read_problem_unknown_query() {
-        assert!(read_problem_string("foo-ST").is_err());
+        assert!(Query::read_problem_string("foo-ST").is_err());
     }
 
     #[test]
     fn test_read_problem_unknown_semantics() {
-        assert!(read_problem_string("SE-foo").is_err());
+        assert!(Query::read_problem_string("SE-foo").is_err());
     }
 
     #[test]
     fn test_read_problem_no_hyphen() {
-        assert!(read_problem_string("SEST").is_err());
+        assert!(Query::read_problem_string("SEST").is_err());
     }
 
     #[test]
@@ -124,7 +126,7 @@ mod tests {
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
         expected.sort_unstable();
-        let mut actual = iter_problem_strings().collect::<Vec<String>>();
+        let mut actual = Query::iter_problem_strings().collect::<Vec<String>>();
         actual.sort_unstable();
         assert_eq!(expected, actual)
     }
