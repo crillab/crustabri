@@ -8,6 +8,7 @@ use std::{
 ///
 /// A variable is represented by a non-null positive integer.
 /// It can be obtained through the [From] trait from an integer type.
+/// Trying to get a variable from a negative or null integer creates a panic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Variable(NonZeroUsize);
 
@@ -54,16 +55,40 @@ impl From<Variable> for usize {
 
 /// A literal in a SAT solver.
 ///
-/// A literal is represented by a non-null integer.
+/// A literal is represented by a non-null integer, representing a variable (absolute value of the integer) with a polarity (given by the sign).
 /// It can be obtained through the [From] trait from a signed integer type.
+/// Trying to get a literal from a null integer creates a panic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Literal(NonZeroIsize);
 
 impl Literal {
+    /// Returns the literal with the same variable but the opposite polarity.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::sat::Literal;
+    /// fn always_ok(l: Literal) {
+    ///     assert_ne!(l, l.negate());
+    ///     assert_eq!(l, l.negate().negate());
+    /// }
+    /// # always_ok(Literal::from(1));
+    /// ```
     pub fn negate(self) -> Self {
         Self::from(-self.0.get())
     }
 
+    /// Returns the underlying variable.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::sat::Literal;
+    /// fn are_opposite_literals(l0: Literal, l1: Literal) -> bool {
+    ///     l0 != l1 && l0.var() == l1.var()
+    /// }
+    /// # assert!(are_opposite_literals(Literal::from(1), Literal::from(-1)));
+    /// ```
     pub fn var(&self) -> Variable {
         Variable(self.0.unsigned_abs())
     }
@@ -112,7 +137,7 @@ pub(crate) use clause;
 /// An assignment of a set of variables.
 ///
 /// Inside the set of variables involved in the assignment, some may be unassigned.
-/// This is the reason why accessors to assigned value returns an [Option<bool>].
+/// This is the reason why accessors to assigned value return an [Option<bool>].
 #[derive(Debug, PartialEq, Eq)]
 pub struct Assignment(Vec<Option<bool>>);
 
@@ -126,6 +151,28 @@ impl Assignment {
     /// The result in an [Option].
     /// In case the variable is not assigned, [Option::None] is returned.
     /// Else, [Option::Some] is returned and contains the assigned value.
+    ///
+    /// In order to iterate over an assignment, prefer the [iter](Self::iter) function.
+    ///
+    /// # Panic
+    ///
+    /// If the provided variable does not belong to the underlying problem, this function panics.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::sat::{Assignment, self};
+    /// # fn get_assignment() -> Assignment {let mut s = sat::default_solver(); s.solve().unwrap_model().unwrap()}
+    /// let assignment = get_assignment(); // user defined function
+    /// # fn get_n_vars() -> usize {0}
+    /// let n_vars = get_n_vars(); // user defined function
+    /// for i in 1 ..= n_vars {
+    ///     match assignment.value_of(i) {
+    ///         Some(v) => println!("var {} is set to {}", i, v),
+    ///         None => println!("var {} is left unassigned", i),
+    ///     }
+    /// }
+    /// ```
     pub fn value_of<T>(&self, v: T) -> Option<bool>
     where
         T: Into<Variable>,
@@ -133,11 +180,27 @@ impl Assignment {
         self.0[usize::from(v.into()) - 1]
     }
 
-    pub(crate) fn iter(&self) -> AssignmentIterator {
-        AssignmentIterator {
-            assignment: self,
-            next: 0,
-        }
+    /// Iterates over an assignment.
+    ///
+    /// Yielded values are [Option].
+    /// In case the variable is not assigned, [Option::None] is returned.
+    /// Else, [Option::Some] is returned and contains the assigned value.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::sat::{Assignment, self};
+    /// # fn get_assignment() -> Assignment {let mut s = sat::default_solver(); s.solve().unwrap_model().unwrap()}
+    /// let assignment = get_assignment(); // user defined function
+    /// assignment.iter().for_each(|opt_lit| {
+    ///     match opt_lit {
+    ///         (i, Some(v)) => println!("var {} is set to {}", i, v),
+    ///         (i, None) => println!("var {} is left unassigned", i),
+    ///     }
+    /// });
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (usize, Option<bool>)> + '_ {
+        self.0.iter().enumerate().map(|(i, l)| (i + 1, *l))
     }
 }
 
@@ -159,10 +222,19 @@ impl Iterator for AssignmentIterator<'_> {
     }
 }
 
+/// The result produced by a SAT solver search process.
+///
+/// This object handles positive result (satisfiable, with a model), negative result (unsatisfiable) and also erroneous invocations (timeout, solver crash, ...).
+/// Models are given by a dedicated [Assignment] object.
+///
+/// In case a solver can't fail, one can safely call the [unwrap_model](Self::unwrap_model) function to safely get the result as an [Option].
 #[derive(Debug, PartialEq, Eq)]
 pub enum SolvingResult {
+    /// The solver found a model
     Satisfiable(Assignment),
+    /// The solver proved there is no model
     Unsatisfiable,
+    /// The solver was not able to decide
     Unknown,
 }
 
@@ -171,7 +243,7 @@ impl SolvingResult {
     ///
     /// # Panics
     ///
-    /// If the solving result is set [SolvingResult::Unknown], this function panics.
+    /// If the solving result is set to [SolvingResult::Unknown], this function panics.
     pub fn unwrap_model(self) -> Option<Assignment> {
         match self {
             SolvingResult::Satisfiable(assignment) => Some(assignment),
@@ -186,26 +258,94 @@ impl SolvingResult {
 /// A trait for SAT solvers.
 pub trait SatSolver {
     /// Adds a clause to this solver.
+    ///
+    /// The variables involved in the clause are automatically declared.
     fn add_clause(&mut self, cl: Vec<Literal>);
 
     /// Solves the problem formed by the clauses added so far.
+    ///
+    /// This function can return a positive result (satisfiable, with a model), a negative result (unsatisfiable) or a value indicating the solver was not able to check the satisfiability of the underlying formula.
+    /// See the [SolvingResult] documentation for more information.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::sat::{self, Literal, SatSolver, SolvingResult};
+    /// fn try_to_solve(s: &mut dyn SatSolver) {
+    ///     match s.solve() {
+    ///         SolvingResult::Satisfiable(assignment) => {
+    ///             println!("a model was found for the problem");
+    ///             for i in 1..s.n_vars() {
+    ///                 match assignment.value_of(i) {
+    ///                     Some(v) => println!("var {} is set to {}", i, v),
+    ///                     None => println!("var {} is left unassigned", i),
+    ///                 }
+    ///             }
+    ///         }
+    ///         SolvingResult::Unsatisfiable => println!("the problem has no model"),
+    ///         SolvingResult::Unknown => println!("solver was not able to determine")
+    ///     }
+    /// }
+    /// # try_to_solve(sat::default_solver().as_mut())
+    /// ```
     fn solve(&mut self) -> SolvingResult;
 
     /// Solves the problem formed by the clauses added so far and the provided assumptions.
+    ///
+    /// This function can return a positive result (satisfiable, with a model), a negative result (unsatisfiable) or a value indicating the solver was not able to check the satisfiability of the underlying formula.
+    /// See the [SolvingResult] documentation for more information.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::sat::{self, Literal, SatSolver, SolvingResult};
+    /// fn try_to_solve_under_assumptions(s: &mut dyn SatSolver, assumptions: &[Literal]) {
+    ///     match s.solve_under_assumptions(assumptions) {
+    ///         SolvingResult::Satisfiable(assignment) => {
+    ///             println!("a model was found for the problem with literals {:?}", assumptions);
+    ///             for i in 1..s.n_vars() {
+    ///                 match assignment.value_of(i) {
+    ///                     Some(v) => println!("var {} is set to {}", i, v),
+    ///                     None => println!("var {} is left unassigned", i),
+    ///                 }
+    ///             }
+    ///         }
+    ///         SolvingResult::Unsatisfiable => println!(
+    ///             "the problem has no model with literals {:?}",
+    ///             assumptions
+    ///         ),
+    ///         SolvingResult::Unknown => println!("solver was not able to determine")
+    ///     }
+    /// }
+    /// # try_to_solve_under_assumptions(sat::default_solver().as_mut(), &[])
     fn solve_under_assumptions(&mut self, assumptions: &[Literal]) -> SolvingResult;
 
     /// Returns the number of variables defined so far.
     ///
     /// This number is equal to the highest variable identifier used in added clauses.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::sat::{self, Literal};
+    /// let mut solver = sat::default_solver();
+    /// assert_eq!(0, solver.n_vars());
+    /// solver.add_clause(vec![Literal::from(1), Literal::from(-2)]);
+    /// assert_eq!(2, solver.n_vars());
+    /// ```
     fn n_vars(&self) -> usize;
 }
 
-/// The default SAT solver (Cadical).
+/// Returns the default SAT solver.
+///
+/// This is currently the [CadicalSolver].
 pub fn default_solver() -> Box<dyn SatSolver> {
     Box::new(CadicalSolver::default())
 }
 
 /// The type of solver factories.
+///
+/// SAT solver factories are functions without parameters that return a SAT solver.
 pub type SatSolverFactoryFn = dyn Fn() -> Box<dyn SatSolver>;
 
 #[cfg(test)]

@@ -1,7 +1,9 @@
 use super::{sat_solver::SolvingResult, Assignment, Literal, SatSolver};
 use cadical::Solver as CadicalCSolver;
 
-/// A wrapper around the Cadical SAT solver.
+/// A wrapper around the CaDiCaL SAT solver.
+///
+/// See CaDiCaL on [crates.io](https://crates.io/crates/cadical).
 #[derive(Default)]
 pub struct CadicalSolver {
     solver: CadicalCSolver,

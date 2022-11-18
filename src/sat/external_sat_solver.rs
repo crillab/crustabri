@@ -10,8 +10,10 @@ use std::{
 
 /// A SAT solver which execution is made by a system command.
 ///
-/// The SAT solver must be able to read from Stdin. This behavior can be triggered by a CLI option.
-/// The input and output formats must follow the ones from the SAT competition.
+/// The system command is composed by an executable program, and a potential list of CLI arguments.
+///
+/// The SAT solver must read from the standard input (if it does not by default, this may be possible with the right CLI arguments).
+/// The input and output formats must follow the ones from the SAT competitions.
 pub struct ExternalSatSolver {
     buffered_sat_solver: BufferedSatSolver,
 }
@@ -19,8 +21,22 @@ pub struct ExternalSatSolver {
 impl ExternalSatSolver {
     /// Builds a new external SAT solver.
     ///
-    /// The `program` argument is the path from a directory in PATH to the software to execute.
+    /// The `program` argument is the path from a directory in execution path to the software to execute.
     /// The `options` parameter is the CLI options to provide to the software under execution.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use crustabri::sat::{ExternalSatSolver, Literal, SatSolver, self};
+    /// let mut solver = ExternalSatSolver::new(
+    ///     "/home/me/my_solver".to_string(),
+    ///     vec!["-i".to_string(), "/dev/stdin".to_string()],
+    /// );
+    /// solver.add_clause(vec![Literal::from(-1), Literal::from(-2)]);
+    /// solver.add_clause(vec![Literal::from(-1), Literal::from(2)]);
+    /// let model = solver.solve().unwrap_model().unwrap();
+    /// assert_eq!(Some(true), model.value_of(1));
+    /// ```
     pub fn new(program: String, options: Vec<String>) -> Self {
         Self {
             buffered_sat_solver: BufferedSatSolver::new(Box::new(move |r| {
