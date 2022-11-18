@@ -2,6 +2,14 @@ use super::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAccep
 use crate::aa::{AAFramework, Argument, LabelType};
 
 /// A solver used to solve queries for the grounded semantics.
+///
+/// The (unique) grounded extension is the minimal complete extension (see [CompleteSemanticsSolver](crate::solvers::CompleteSemanticsSolver) for more information).
+/// It is computed in time polynomial in the size of the framework.
+///
+/// This solver implements [SingleExtensionComputer] and both [CredulousAcceptanceComputer] and [SkepticalAcceptanceComputer] interfaces.
+/// In these three cases, the computation resumes to the (polynomial time) computation of the grounded extension.
+///
+/// When a certificate is provided, the certificate is the grounded extension itself.
 pub struct GroundedSemanticsSolver<'a, T>
 where
     T: LabelType,
@@ -14,6 +22,19 @@ where
     T: LabelType,
 {
     /// Builds a new solver dedicated to the grounded semantics.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{AAFramework, LabelType};
+    /// # use crustabri::solvers::{SingleExtensionComputer, GroundedSemanticsSolver};
+    /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
+    ///     let mut solver = GroundedSemanticsSolver::new(af);
+    ///     let ext = solver.compute_one_extension().unwrap();
+    ///     println!("found the grounded extension: {:?}", ext);
+    /// }
+    /// # search_one_extension::<usize>(&AAFramework::default());
+    /// ```
     pub fn new(af: &'a AAFramework<T>) -> Self {
         Self { af }
     }

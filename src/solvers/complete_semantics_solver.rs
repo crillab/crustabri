@@ -9,8 +9,14 @@ use crate::{
 
 /// A SAT-based solver for the complete semantics.
 ///
-/// This solver does not provides function to compute an extension or to check the skeptical acceptance
-/// of an argument as they can be computed in a more efficient way by a [GroundedSemanticsSolver](super::GroundedSemanticsSolver).
+/// A definition of the complete extensions of an Argumentation Framework is given in the [tracks definition](https://iccma2023.github.io/tracks.html) of ICCMA'23 competition.
+///
+/// A special case of complete extension is the grounded extension.
+/// Thus, this solver does not provides function to compute an extension or to check the skeptical acceptance
+/// of an argument as they can be computed in an efficient way by a [GroundedSemanticsSolver](super::GroundedSemanticsSolver).
+///
+/// The implementation of the [CredulousAcceptanceComputer] problems relies on a single call to a SAT solver.
+/// The certificate provided in case an argument is credulously accepted is a complete extension containing the argument.
 pub struct CompleteSemanticsSolver<'a, T>
 where
     T: LabelType,
@@ -26,6 +32,24 @@ where
     /// Builds a new SAT based solver for the complete semantics.
     ///
     /// The underlying SAT solver is one returned by [default_solver](crate::sat::default_solver).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{AAFramework, Argument, ArgumentSet, LabelType};
+    /// # use crustabri::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
+    /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &Argument<T>) where T: LabelType {
+    ///     let mut solver = CompleteSemanticsSolver::new(af);
+    ///     if solver.is_credulously_accepted(arg) {
+    ///         println!("there exists complete extension(s) with {}", arg.label())
+    ///     } else {
+    ///         println!("there is no complete extension with {}", arg.label())
+    ///     }
+    /// }
+    /// # let arg_set = ArgumentSet::new_with_labels(&["a"]);
+    /// # let af = AAFramework::new_with_argument_set(arg_set);
+    /// # let arg = af.argument_set().get_argument(&"a").unwrap();
+    /// # check_credulous_acceptance(&af, &arg);
     pub fn new(af: &'a AAFramework<T>) -> Self
     where
         T: LabelType,
@@ -36,6 +60,28 @@ where
     /// Builds a new SAT based solver for the complete semantics.
     ///
     /// The SAT solver to use in given through the solver factory.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{AAFramework, Argument, ArgumentSet, LabelType};
+    /// # use crustabri::sat::CadicalSolver;
+    /// # use crustabri::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
+    /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &Argument<T>) where T: LabelType {
+    ///     let mut solver = CompleteSemanticsSolver::new_with_sat_solver_factory(
+    ///         af,
+    ///         Box::new(|| Box::new(CadicalSolver::default())),
+    ///     );
+    ///     if solver.is_credulously_accepted(arg) {
+    ///         println!("there exists complete extension(s) with {}", arg.label())
+    ///     } else {
+    ///         println!("there is no complete extension with {}", arg.label())
+    ///     }
+    /// }
+    /// # let arg_set = ArgumentSet::new_with_labels(&["a"]);
+    /// # let af = AAFramework::new_with_argument_set(arg_set);
+    /// # let arg = af.argument_set().get_argument(&"a").unwrap();
+    /// # check_credulous_acceptance(&af, &arg);
     pub fn new_with_sat_solver_factory(
         af: &'a AAFramework<T>,
         solver_factory: Box<SatSolverFactoryFn>,

@@ -12,6 +12,14 @@ use crate::{
 ///
 /// This solver does not provides function to check the credulous acceptance
 /// of an argument as it can be computed in a more efficient way by a [CompleteSemanticsSolver](super::CompleteSemanticsSolver).
+///
+/// Concerning the skeptical acceptance and the extension computation, this solver relies on successive calls to a SAT solver making the computation reach the second level of the polynomial hierarchy.
+///
+/// The certificates for the skeptical acceptance may be of two kinds:
+///   * a preferred extension that does not contain the argument under consideration;
+///   * or an admissible set of argument that attacks the argument under consideration.
+///
+/// In order to know which kind of certificate is provided, the caller must check if any of the attacks to the argument under consideration comes from an argument in the certificate.
 pub struct PreferredSemanticsSolver<'a, T>
 where
     T: LabelType,
@@ -27,6 +35,19 @@ where
     /// Builds a new SAT based solver for the preferred semantics.
     ///
     /// The underlying SAT solver is one returned by [default_solver](crate::sat::default_solver).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{AAFramework, LabelType};
+    /// # use crustabri::solvers::{SingleExtensionComputer, PreferredSemanticsSolver};
+    /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
+    ///     let mut solver = PreferredSemanticsSolver::new(af);
+    ///     let ext = solver.compute_one_extension().unwrap();
+    ///     println!("found a preferred extension: {:?}", ext);
+    /// }
+    /// # search_one_extension::<usize>(&AAFramework::default());
+    /// ```
     pub fn new(af: &'a AAFramework<T>) -> Self {
         Self::new_with_sat_solver_factory(af, Box::new(|| sat::default_solver()))
     }
@@ -34,6 +55,23 @@ where
     /// Builds a new SAT based solver for the preferred semantics.
     ///
     /// The SAT solver to use in given through the solver factory.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{AAFramework, LabelType};
+    /// # use crustabri::sat::CadicalSolver;
+    /// # use crustabri::solvers::{SingleExtensionComputer, PreferredSemanticsSolver};
+    /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
+    ///     let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory(
+    ///         af,
+    ///         Box::new(|| Box::new(CadicalSolver::default())),
+    ///     );
+    ///     let ext = solver.compute_one_extension().unwrap();
+    ///     println!("found a preferred extension: {:?}", ext);
+    /// }
+    /// # search_one_extension::<usize>(&AAFramework::default());
+    /// ```
     pub fn new_with_sat_solver_factory(
         af: &'a AAFramework<T>,
         solver_factory: Box<SatSolverFactoryFn>,

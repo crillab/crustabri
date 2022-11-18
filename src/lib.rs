@@ -10,4 +10,4 @@ pub mod solvers;
 
 pub mod sat;
 
-pub mod utils;
+pub(crate) mod utils;

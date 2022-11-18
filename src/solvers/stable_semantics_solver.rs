@@ -9,6 +9,15 @@ use crate::{
 };
 
 /// A SAT-based solver for the stable semantics.
+///
+/// A definition of the stable extensions of an Argumentation Framework is given in the [tracks definition](https://iccma2023.github.io/tracks.html) of ICCMA'23 competition.
+///
+/// This solver implements [SingleExtensionComputer] and both [CredulousAcceptanceComputer] and [SkepticalAcceptanceComputer] interfaces.
+/// In these three cases, the computation resumes to a single call to a SAT solver.
+///
+/// When a certificate is needed, a stable extension is given.
+/// It contains the argument under consideration when considering credulous acceptance, while it does not contain it while considering skeptical acceptance.
+///
 pub struct StableSemanticsSolver<'a, T>
 where
     T: LabelType,
@@ -24,6 +33,23 @@ where
     /// Builds a new SAT based solver for the stable semantics.
     ///
     /// The underlying SAT solver is one returned by [default_solver](crate::sat::default_solver).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{AAFramework, LabelType};
+    /// # use crustabri::solvers::{SingleExtensionComputer, StableSemanticsSolver};
+    /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
+    ///     let mut solver = StableSemanticsSolver::new(af);
+    ///     let opt_ext = solver.compute_one_extension();
+    ///     if let Some(ext) = opt_ext {
+    ///         println!("found an extension: {:?}", ext);
+    ///     } else {
+    ///         println!("the problem has no stable extension");
+    ///     }
+    /// }
+    /// # search_one_extension::<usize>(&AAFramework::default());
+    /// ```
     pub fn new(af: &'a AAFramework<T>) -> Self {
         Self::new_with_sat_solver_factory(af, Box::new(|| sat::default_solver()))
     }
@@ -31,6 +57,27 @@ where
     /// Builds a new SAT based solver for the stable semantics.
     ///
     /// The SAT solver to use in given through the solver factory.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{AAFramework, LabelType};
+    /// # use crustabri::sat::CadicalSolver;
+    /// # use crustabri::solvers::{SingleExtensionComputer, StableSemanticsSolver};
+    /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
+    ///     let mut solver = StableSemanticsSolver::new_with_sat_solver_factory(
+    ///         af,
+    ///         Box::new(|| Box::new(CadicalSolver::default())),
+    ///     );
+    ///     let opt_ext = solver.compute_one_extension();
+    ///     if let Some(ext) = opt_ext {
+    ///         println!("found an extension: {:?}", ext);
+    ///     } else {
+    ///         println!("the problem has no stable extension");
+    ///     }
+    /// }
+    /// # search_one_extension::<usize>(&AAFramework::default());
+    /// ```
     pub fn new_with_sat_solver_factory(
         af: &'a AAFramework<T>,
         solver_factory: Box<SatSolverFactoryFn>,
