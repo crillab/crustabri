@@ -93,7 +93,7 @@ where
     }
 }
 
-fn encode_disjunction_vars<T>(af: &AAFramework<T>, solver: &mut dyn SatSolver)
+pub(crate) fn encode_disjunction_vars<T>(af: &AAFramework<T>, solver: &mut dyn SatSolver)
 where
     T: LabelType,
 {
