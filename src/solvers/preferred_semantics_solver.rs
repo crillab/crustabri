@@ -1,6 +1,8 @@
 use super::{
-    complete_semantics_solver, utils::cc_arg_to_init_af_arg, SingleExtensionComputer,
-    SkepticalAcceptanceComputer,
+    complete_semantics_solver,
+    maximal_extension_computer::{MaximalExtensionComputer, MaximalExtensionComputerState},
+    utils::{self},
+    SingleExtensionComputer, SkepticalAcceptanceComputer,
 };
 use crate::{
     aa::{AAFramework, Argument, LabelType},
@@ -87,171 +89,80 @@ where
         let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
         let mut solver = (self.solver_factory)();
         complete_semantics_solver::encode_complete_semantics_constraints(cc_af, solver.as_mut());
-        let mut computer = PreferredExtensionComputer::new(cc_af, solver);
+        let mut computer = new_maximal_extension_computer(cc_af, solver);
         loop {
             computer.compute_next();
-            match computer.state {
-                ComputerState::Preferred => {
-                    if !computer.current.as_ref().unwrap().contains(&cc_arg) {
-                        return (false, computer.current.take());
+            match computer.state() {
+                MaximalExtensionComputerState::Maximal => {
+                    if !computer.current().contains(&cc_arg) {
+                        return (false, Some(computer.take_current()));
                     }
                 }
-                ComputerState::Complete => {
-                    let current = computer.current.as_ref().unwrap();
+                MaximalExtensionComputerState::Intermediate => {
+                    let current = computer.current();
                     if current.contains(&cc_arg) {
                         computer.discard_current_search();
                     } else if cc_af
                         .iter_attacks_to(cc_arg)
                         .any(|att| current.contains(&att.attacker()))
                     {
-                        return (false, computer.current.take());
+                        return (false, Some(computer.take_current()));
                     }
                 }
-                ComputerState::None => return (true, None),
+                MaximalExtensionComputerState::None => return (true, None),
                 _ => {}
             }
         }
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum ComputerState {
-    Preferred,
-    Complete,
-    JustDiscarded,
-    None,
-    Init,
-}
-
-struct PreferredExtensionComputer<'a, T>
-where
-    T: LabelType,
-{
-    af: &'a AAFramework<T>,
+fn new_maximal_extension_computer<T>(
+    cc_af: &AAFramework<T>,
     solver: Box<dyn SatSolver>,
-    current: Option<Vec<&'a Argument<T>>>,
-    state: ComputerState,
-    selector: Literal,
-}
-
-impl<'a, T> PreferredExtensionComputer<'a, T>
+) -> MaximalExtensionComputer<T>
 where
     T: LabelType,
 {
-    fn new(af: &'a AAFramework<T>, solver: Box<dyn SatSolver>) -> Self {
-        let selector = Literal::from(1 + solver.n_vars() as isize);
-        Self {
-            af,
-            solver,
-            current: None,
-            state: ComputerState::Init,
-            selector,
-        }
-    }
-
-    fn compute_next(&mut self) {
-        match &self.state {
-            ComputerState::Preferred => self.discard_preferred_and_new_search(),
-            ComputerState::Complete => self.increase_current(),
-            ComputerState::JustDiscarded => self.new_search(),
-            ComputerState::None => panic!("no more extensions"),
-            ComputerState::Init => self.compute_grounded(),
-        };
-    }
-
-    fn compute_grounded(&mut self) {
-        self.current = Some(self.af.grounded_extension());
-        self.state = ComputerState::Complete;
-    }
-
-    fn increase_current(&mut self) {
-        let (mut in_ext, mut not_in_ext) = self.split_current_args();
-        not_in_ext.push(self.selector);
-        in_ext.push(self.selector.negate());
-        self.solver.add_clause(not_in_ext);
-        match self.solve(&in_ext) {
-            Some(ext) => {
-                self.current = Some(ext);
-                self.state = ComputerState::Complete
-            }
-            None => self.state = ComputerState::Preferred,
-        }
-    }
-
-    fn discard_current_search(&mut self) {
-        let (mut in_ext, _) = self.split_current_args();
+    let mut computer = MaximalExtensionComputer::new(cc_af, solver);
+    computer.set_increase_current_fn(Box::new(|fn_data| {
+        let (mut in_ext, mut not_in_ext) =
+            split_in_extension(fn_data.current_arg_set, fn_data.af.n_arguments());
+        not_in_ext.push(fn_data.selector);
+        in_ext.push(fn_data.selector.negate());
+        fn_data.sat_solver.add_clause(not_in_ext);
+        in_ext
+    }));
+    computer.set_discard_current_fn(Box::new(|fn_data| {
+        let (mut in_ext, _) = split_in_extension(fn_data.current_arg_set, fn_data.af.n_arguments());
         in_ext.iter_mut().for_each(|l| *l = l.negate());
-        in_ext.push(self.selector);
-        self.solver.add_clause(in_ext);
-        self.state = ComputerState::JustDiscarded;
-    }
-
-    fn discard_preferred_and_new_search(&mut self) {
-        let (_, mut not_in_ext) = self.split_current_args();
-        not_in_ext.push(self.selector);
-        self.solver.add_clause(not_in_ext);
-        self.new_search()
-    }
-
-    fn new_search(&mut self) {
-        let assumptions = vec![self.selector.negate()];
-        match self.solve(&assumptions) {
-            Some(ext) => {
-                self.current = Some(ext);
-                self.state = ComputerState::Complete
-            }
-            None => self.state = ComputerState::None,
-        }
-    }
-
-    fn split_current_args(&self) -> (Vec<Literal>, Vec<Literal>) {
-        let current = self.current.as_ref().unwrap();
-        let mut in_ext_bool = vec![false; self.af.n_arguments()];
-        current.iter().for_each(|a| in_ext_bool[a.id()] = true);
-        let mut not_in_ext = Vec::with_capacity(self.af.n_arguments());
-        let mut in_ext = Vec::with_capacity(self.af.n_arguments());
-        in_ext_bool.iter().enumerate().for_each(|(i, b)| {
-            let lit = Literal::from(complete_semantics_solver::arg_id_to_solver_var(i) as isize);
-            match *b {
-                true => in_ext.push(lit),
-                false => not_in_ext.push(lit),
-            }
-        });
-        (in_ext, not_in_ext)
-    }
-
-    fn solve(&mut self, assumptions: &[Literal]) -> Option<Vec<&'a Argument<T>>> {
-        self.solver
-            .solve_under_assumptions(assumptions)
-            .unwrap_model()
-            .map(|new_ext_assignment| {
-                let ext = new_ext_assignment
-                    .iter()
-                    .filter_map(|(var, opt_v)| match opt_v {
-                        Some(true) => complete_semantics_solver::arg_id_from_solver_var(var)
-                            .and_then(|id| {
-                                if id < self.af.n_arguments() {
-                                    Some(id)
-                                } else {
-                                    None
-                                }
-                            })
-                            .map(|id| self.af.argument_set().get_argument_by_id(id)),
-                        _ => None,
-                    })
-                    .collect();
-                ext
-            })
-    }
+        in_ext.push(fn_data.selector);
+        fn_data.sat_solver.add_clause(in_ext);
+    }));
+    computer.set_discard_maximal_fn(Box::new(|fn_data| {
+        let (_, mut not_in_ext) =
+            split_in_extension(fn_data.current_arg_set, fn_data.af.n_arguments());
+        not_in_ext.push(fn_data.selector);
+        fn_data.sat_solver.add_clause(not_in_ext);
+    }));
+    computer
 }
 
-impl<T> Drop for PreferredExtensionComputer<'_, T>
+fn split_in_extension<T>(current: &[&Argument<T>], n_args: usize) -> (Vec<Literal>, Vec<Literal>)
 where
     T: LabelType,
 {
-    fn drop(&mut self) {
-        self.solver.add_clause(vec![self.selector]);
-    }
+    let mut in_ext_bool = vec![false; n_args];
+    current.iter().for_each(|a| in_ext_bool[a.id()] = true);
+    let mut not_in_ext = Vec::with_capacity(n_args);
+    let mut in_ext = Vec::with_capacity(n_args);
+    in_ext_bool.iter().enumerate().for_each(|(i, b)| {
+        let lit = Literal::from(complete_semantics_solver::arg_id_to_solver_var(i) as isize);
+        match *b {
+            true => in_ext.push(lit),
+            false => not_in_ext.push(lit),
+        }
+    });
+    (in_ext, not_in_ext)
 }
 
 impl<T> SingleExtensionComputer<T> for PreferredSemanticsSolver<'_, T>
@@ -266,11 +177,8 @@ where
                 &cc_af,
                 solver.as_mut(),
             );
-            let mut computer = PreferredExtensionComputer::new(&cc_af, solver);
-            while computer.state != ComputerState::Preferred {
-                computer.compute_next();
-            }
-            for cc_arg in computer.current.take().unwrap() {
+            let computer = new_maximal_extension_computer(&cc_af, solver);
+            for cc_arg in computer.compute_maximal() {
                 merged.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
             }
         }
@@ -300,7 +208,7 @@ where
             (false, Some(cc_ext)) => {
                 cc_ext
                     .iter()
-                    .map(|a| cc_arg_to_init_af_arg(a, self.af))
+                    .map(|a| utils::cc_arg_to_init_af_arg(a, self.af))
                     .for_each(|a| merged.push(a));
             }
             _ => unreachable!(),
@@ -311,11 +219,8 @@ where
                 &other_cc_af,
                 solver.as_mut(),
             );
-            let mut computer = PreferredExtensionComputer::new(&other_cc_af, solver);
-            while computer.state != ComputerState::Preferred {
-                computer.compute_next();
-            }
-            for cc_arg in computer.current.take().unwrap() {
+            let computer = new_maximal_extension_computer(&other_cc_af, solver);
+            for cc_arg in computer.compute_maximal() {
                 merged.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
             }
         }

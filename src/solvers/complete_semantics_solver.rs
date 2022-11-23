@@ -211,7 +211,7 @@ pub(crate) fn arg_id_from_solver_var(v: usize) -> Option<usize> {
     }
 }
 
-fn arg_id_to_solver_disjunction_var(id: usize) -> usize {
+pub(crate) fn arg_id_to_solver_disjunction_var(id: usize) -> usize {
     arg_id_to_solver_var(id) - 1
 }
 
