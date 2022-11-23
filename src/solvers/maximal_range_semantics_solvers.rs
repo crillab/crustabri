@@ -10,7 +10,6 @@ use crate::{
     sat::{self, clause, Literal, SatSolver, SatSolverFactoryFn},
     utils::ConnectedComponentsComputer,
 };
-use std::{cell::RefCell, rc::Rc};
 
 macro_rules! maximal_range_solver {
     ($solver_ident:ident, $sem_name:literal, $constraints_encoder:expr) => {
@@ -266,20 +265,20 @@ where
             computer.compute_next();
             match computer.state() {
                 MaximalExtensionComputerState::Maximal => {
-                    let stop_enum = Rc::new(RefCell::new(false));
+                    let mut stop_enum = false;
                     enumerate_extensions_for_range(
                         &mut computer.state_data(),
                         first_range_var,
-                        &|ext| {
+                        &mut |ext| {
                             if ext.contains(&cc_arg) == is_credulous_acceptance {
-                                *stop_enum.borrow_mut() = true;
+                                stop_enum = true;
                                 false
                             } else {
                                 true
                             }
                         },
                     );
-                    if *stop_enum.borrow() {
+                    if stop_enum {
                         return (is_credulous_acceptance, Some(computer.take_current()));
                     }
                 }
@@ -352,7 +351,7 @@ where
 fn enumerate_extensions_for_range<T>(
     fn_data: &mut MaximalExtensionComputerStateData<T>,
     first_range_var: usize,
-    callback: &dyn Fn(&[&Argument<T>]) -> bool,
+    callback: &mut dyn FnMut(&[&Argument<T>]) -> bool,
 ) where
     T: LabelType,
 {
