@@ -13,6 +13,12 @@ pub enum Semantics {
     PR,
     /// The stable semantics
     ST,
+    /// The semi-stable semantics
+    SST,
+    /// The stage semantics
+    STG,
+    /// The ideal semantics
+    ID,
 }
 
 impl TryFrom<&str> for Semantics {
@@ -24,6 +30,9 @@ impl TryFrom<&str> for Semantics {
             "co" => Ok(Semantics::CO),
             "pr" => Ok(Semantics::PR),
             "st" => Ok(Semantics::ST),
+            "sst" => Ok(Semantics::SST),
+            "stg" => Ok(Semantics::STG),
+            "id" => Ok(Semantics::ID),
             _ => Err(anyhow!(r#"undefined semantics "{}""#, value)),
         }
     }
@@ -119,8 +128,9 @@ mod tests {
     #[test]
     fn test_iter_as_strings() {
         let mut expected = [
-            "SE-CO", "DC-CO", "DS-CO", "SE-GR", "DC-GR", "DS-GR", "SE-PR", "DC-PR", "DS-PR",
-            "SE-ST", "DC-ST", "DS-ST",
+            "DC-CO", "DC-GR", "DC-ID", "DC-PR", "DC-SST", "DC-ST", "DC-STG", "DS-CO", "DS-GR",
+            "DS-ID", "DS-PR", "DS-SST", "DS-ST", "DS-STG", "SE-CO", "SE-GR", "SE-ID", "SE-PR",
+            "SE-SST", "SE-ST", "SE-STG",
         ]
         .iter()
         .map(|s| s.to_string())

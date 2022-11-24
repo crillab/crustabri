@@ -1,13 +1,13 @@
+use super::{
+    complete_semantics_solver, maximal_extension_computer::MaximalExtensionComputer,
+    preferred_semantics_solver, CredulousAcceptanceComputer, PreferredSemanticsSolver,
+    SingleExtensionComputer, SkepticalAcceptanceComputer,
+};
 use crate::{
     aa::{AAFramework, Argument, LabelType},
     sat,
     sat::{Literal, SatSolver, SatSolverFactoryFn},
     utils::{self, ConnectedComponentsComputer},
-};
-use super::{
-    complete_semantics_solver, maximal_extension_computer::MaximalExtensionComputer,
-    preferred_semantics_solver, CredulousAcceptanceComputer, PreferredSemanticsSolver,
-    SingleExtensionComputer,
 };
 
 /// A SAT-based solver for the ideal semantics.
@@ -253,6 +253,27 @@ where
             }
         }
         (true, Some(merged))
+    }
+}
+
+impl<T> SkepticalAcceptanceComputer<T> for IdealSemanticsSolver<'_, T>
+where
+    T: LabelType,
+{
+    fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
+        self.is_credulously_accepted(arg)
+    }
+
+    fn is_skeptically_accepted_with_certificate(
+        &mut self,
+        arg: &Argument<T>,
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let ext = self.compute_one_extension().unwrap();
+        if ext.contains(&arg) {
+            (true, None)
+        } else {
+            (false, Some(ext))
+        }
     }
 }
 

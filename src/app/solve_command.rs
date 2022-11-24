@@ -9,8 +9,9 @@ use crustabri::{
     sat::{self, ExternalSatSolver, SatSolverFactoryFn},
     solvers::{
         CompleteSemanticsSolver, CredulousAcceptanceComputer, GroundedSemanticsSolver,
-        PreferredSemanticsSolver, SingleExtensionComputer, SkepticalAcceptanceComputer,
-        StableSemanticsSolver,
+        IdealSemanticsSolver, PreferredSemanticsSolver, SemiStableSemanticsSolver,
+        SingleExtensionComputer, SkepticalAcceptanceComputer, StableSemanticsSolver,
+        StageSemanticsSolver,
     },
 };
 use crusti_app_helper::{
@@ -162,6 +163,18 @@ where
             af,
             create_sat_solver_factory(arg_matches),
         )),
+        Semantics::SST => Box::new(SemiStableSemanticsSolver::new_with_sat_solver_factory(
+            af,
+            create_sat_solver_factory(arg_matches),
+        )),
+        Semantics::STG => Box::new(StageSemanticsSolver::new_with_sat_solver_factory(
+            af,
+            create_sat_solver_factory(arg_matches),
+        )),
+        Semantics::ID => Box::new(IdealSemanticsSolver::new_with_sat_solver_factory(
+            af,
+            create_sat_solver_factory(arg_matches),
+        )),
     };
     let mut out = std::io::stdout();
     match solver.compute_one_extension() {
@@ -189,6 +202,18 @@ where
             ))
         }
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
+            af,
+            create_sat_solver_factory(arg_matches),
+        )),
+        Semantics::SST => Box::new(SemiStableSemanticsSolver::new_with_sat_solver_factory(
+            af,
+            create_sat_solver_factory(arg_matches),
+        )),
+        Semantics::STG => Box::new(StageSemanticsSolver::new_with_sat_solver_factory(
+            af,
+            create_sat_solver_factory(arg_matches),
+        )),
+        Semantics::ID => Box::new(IdealSemanticsSolver::new_with_sat_solver_factory(
             af,
             create_sat_solver_factory(arg_matches),
         )),
@@ -225,6 +250,18 @@ where
             create_sat_solver_factory(arg_matches),
         )),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
+            af,
+            create_sat_solver_factory(arg_matches),
+        )),
+        Semantics::SST => Box::new(SemiStableSemanticsSolver::new_with_sat_solver_factory(
+            af,
+            create_sat_solver_factory(arg_matches),
+        )),
+        Semantics::STG => Box::new(StageSemanticsSolver::new_with_sat_solver_factory(
+            af,
+            create_sat_solver_factory(arg_matches),
+        )),
+        Semantics::ID => Box::new(IdealSemanticsSolver::new_with_sat_solver_factory(
             af,
             create_sat_solver_factory(arg_matches),
         )),
