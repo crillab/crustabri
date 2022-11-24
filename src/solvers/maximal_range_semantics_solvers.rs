@@ -196,7 +196,7 @@ where
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
             let mut solver = (self.solver_factory)();
             (self.constraints_encoder)(&cc_af, solver.as_mut());
-            let (computer, _) = new_maximal_extension_computer(&cc_af, solver);
+            let (computer, _) = new_maximal_extension_computer(&cc_af, solver.as_mut());
             for cc_arg in computer.compute_maximal() {
                 merged.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
             }
@@ -260,7 +260,8 @@ where
         let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
         let mut solver = (self.solver_factory)();
         (self.constraints_encoder)(cc_af, solver.as_mut());
-        let (mut computer, first_range_var) = new_maximal_extension_computer(cc_af, solver);
+        let (mut computer, first_range_var) =
+            new_maximal_extension_computer(cc_af, solver.as_mut());
         loop {
             computer.compute_next();
             match computer.state() {
@@ -298,7 +299,7 @@ where
         while let Some(other_cc_af) = cc_computer.next_connected_component() {
             let mut solver = (self.solver_factory)();
             (self.constraints_encoder)(&other_cc_af, solver.as_mut());
-            let (computer, _) = new_maximal_extension_computer(&other_cc_af, solver);
+            let (computer, _) = new_maximal_extension_computer(&other_cc_af, solver.as_mut());
             for cc_arg in computer.compute_maximal() {
                 ext.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
             }
@@ -306,14 +307,14 @@ where
     }
 }
 
-fn new_maximal_extension_computer<T>(
-    af: &AAFramework<T>,
-    mut solver: Box<dyn SatSolver>,
-) -> (MaximalExtensionComputer<T>, usize)
+fn new_maximal_extension_computer<'a, 'b, T>(
+    af: &'a AAFramework<T>,
+    solver: &'b mut dyn SatSolver,
+) -> (MaximalExtensionComputer<'a, 'b, T>, usize)
 where
     T: LabelType,
 {
-    let first_range_var = encode_range_constraints(af, solver.as_mut());
+    let first_range_var = encode_range_constraints(af, solver);
     let mut computer = MaximalExtensionComputer::new(af, solver);
     computer.set_increase_current_fn(Box::new(move |fn_data| {
         let (mut in_range, mut not_in_range) = split_in_range(&fn_data, first_range_var);
