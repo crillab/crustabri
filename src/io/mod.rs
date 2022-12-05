@@ -6,7 +6,7 @@ pub use aspartix_reader::AspartixReader;
 mod aspartix_writer;
 pub use aspartix_writer::AspartixWriter;
 
-mod iccma23_reader;
+pub(crate) mod iccma23_reader;
 pub use iccma23_reader::Iccma23Reader;
 
 mod iccma23_writer;

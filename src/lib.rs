@@ -4,6 +4,8 @@
 
 pub mod aa;
 
+pub mod aba;
+
 pub mod io;
 
 pub mod solvers;

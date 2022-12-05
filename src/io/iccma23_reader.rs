@@ -18,18 +18,6 @@ use std::io::{BufRead, BufReader, Read};
 /// 2 1
 /// 3 2
 /// ```
-///
-/// # Example
-///
-/// ```
-/// # use crustabri::io::{Iccma23Reader, InstanceReader};
-/// # use crustabri::aa::AAFramework;
-/// fn read_af_from_str(s: &str) -> AAFramework<usize> {
-///     let reader = Iccma23Reader::default();
-///     reader.read(&mut s.as_bytes()).expect("invalid Aspartix AF")
-/// }
-/// # read_af_from_str("p af 1");
-/// ```
 #[derive(Default)]
 pub struct Iccma23Reader {
     warning_handlers: Vec<WarningHandler>,
@@ -37,10 +25,9 @@ pub struct Iccma23Reader {
 
 impl InstanceReader<usize> for Iccma23Reader {
     fn read(&self, reader: &mut dyn Read) -> Result<AAFramework<usize>> {
-        let mut af = None;
-        let mut n_args = None;
         let br = BufReader::new(reader);
-        let mut empty_lines = false;
+        let mut af = None;
+        let mut found_empty_lines = false;
         for (i, line) in br.lines().enumerate() {
             let context = || format!("while reading line with index {}", i);
             let l = line.with_context(context)?;
@@ -48,45 +35,17 @@ impl InstanceReader<usize> for Iccma23Reader {
                 continue;
             }
             if l.is_empty() {
-                empty_lines = true;
+                found_empty_lines = true;
                 continue;
             }
-            if empty_lines {
+            if found_empty_lines {
                 return Err(anyhow!("got content after an empty line")).with_context(context);
             }
             let words = l.split_whitespace().collect::<Vec<&str>>();
             if af.is_none() {
-                if words.len() != 3 {
-                    return Err(anyhow!(
-                        r#"error in preamble; expected 3 words, got {}"#,
-                        words.len()
-                    ))
-                    .with_context(context);
-                }
-                if words[0] != "p" {
-                    return Err(anyhow!(
-                        r#"error in first word of preamble; expected "p", got "{}""#,
-                        words[0]
-                    ))
-                    .with_context(context);
-                }
-                if words[1] != "af" {
-                    return Err(anyhow!(
-                        r#"error in second word of preamble; expected "af", got "{}""#,
-                        words[1]
-                    ))
-                    .with_context(context);
-                }
-                n_args = match words[2].parse::<isize>() {
-                    Ok(n) if n >= 0 => Some(n as usize),
-                    _ => {
-                        return Err(anyhow!("error in preamble: invalid number of arguments"))
-                            .with_context(context)
-                    }
-                };
-                let argument_set = ArgumentSet::new_with_labels(
-                    (1..=n_args.unwrap()).collect::<Vec<usize>>().as_slice(),
-                );
+                let n_args = read_preamble(&words, "af").with_context(context)?;
+                let argument_set =
+                    ArgumentSet::new_with_labels((1..=n_args).collect::<Vec<usize>>().as_slice());
                 af = Some(AAFramework::new_with_argument_set(argument_set));
                 continue;
             }
@@ -94,36 +53,27 @@ impl InstanceReader<usize> for Iccma23Reader {
                 return Err(anyhow!(
                     r#"error in attack; expected 2 words, got {}"#,
                     words.len()
-                ))
-                .with_context(context);
+                ));
             }
-            let attacker = match words[0].parse::<isize>() {
-                Ok(n) if n >= 1 && (n as usize) <= n_args.unwrap() => n as usize,
-                _ => {
-                    return Err(anyhow!(
-                        "error in attack: invalid argument index for attacker"
-                    ))
-                    .with_context(context)
-                }
+            let n_args = af.as_ref().unwrap().n_arguments();
+            let read_arg = |word: &str, arg_type| match word.parse::<isize>() {
+                Ok(n) if n >= 1 && (n as usize) <= n_args => Ok(n as usize),
+                _ => Err(anyhow!(
+                    "error in attack: invalid argument index for {}",
+                    arg_type
+                )),
             };
-            let attacked = match words[1].parse::<isize>() {
-                Ok(n) if n >= 1 && (n as usize) <= n_args.unwrap() => n as usize,
-                _ => {
-                    return Err(anyhow!(
-                        "error in attack: invalid argument index for attacked"
-                    ))
-                    .with_context(context)
-                }
-            };
+            let attacker = read_arg(words[0], "attacker").with_context(context)?;
+            let attacked = read_arg(words[1], "attacked").with_context(context)?;
             af.as_mut()
                 .unwrap()
                 .new_attack_by_ids(attacker - 1, attacked - 1)
                 .unwrap();
         }
-        match af {
-            Some(a) => Ok(a),
-            None => Err(anyhow!("missing preamble")),
+        if af.is_none() {
+            return Err(anyhow!("missing preamble"));
         }
+        Ok(af.unwrap())
     }
 
     fn read_arg_from_str<'a>(
@@ -144,6 +94,33 @@ impl InstanceReader<usize> for Iccma23Reader {
     }
 }
 
+pub(crate) fn read_preamble<'a>(words: &[&'a str], expected_kind: &str) -> Result<usize> {
+    if words.len() != 3 {
+        return Err(anyhow!(
+            r#"error in preamble; expected 3 words, got {}"#,
+            words.len()
+        ));
+    }
+    if words[0] != "p" {
+        return Err(anyhow!(
+            r#"error in first word of preamble; expected "p", got "{}""#,
+            words[0]
+        ));
+    }
+    if words[1] != expected_kind {
+        return Err(anyhow!(
+            r#"error in second word of preamble; expected "{}", got "{}""#,
+            expected_kind,
+            words[1]
+        ));
+    }
+    let n_args = match words[2].parse::<isize>() {
+        Ok(n) if n >= 0 => Some(n as usize),
+        _ => return Err(anyhow!("error in preamble: invalid number of arguments")),
+    };
+    Ok(n_args.unwrap())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,9 +128,8 @@ mod tests {
     #[test]
     fn test_ok() {
         let instance = "p af 3\n1 2\n3 3\n";
-        let af = Iccma23Reader::default()
-            .read(&mut instance.as_bytes())
-            .unwrap();
+        let reader = Iccma23Reader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
         assert_eq!(3, af.n_arguments());
         assert_eq!(2, af.n_attacks());
         assert!(af
@@ -167,9 +143,8 @@ mod tests {
     #[test]
     fn test_ok_missing_last_lf() {
         let instance = "p af 3\n1 2\n3 3";
-        let af = Iccma23Reader::default()
-            .read(&mut instance.as_bytes())
-            .unwrap();
+        let reader = Iccma23Reader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
         assert_eq!(3, af.n_arguments());
         assert_eq!(2, af.n_attacks());
         assert!(af
@@ -183,9 +158,8 @@ mod tests {
     #[test]
     fn test_ok_empty_lines_at_the_end() {
         let instance = "p af 3\n1 2\n3 3\n\n";
-        let af = Iccma23Reader::default()
-            .read(&mut instance.as_bytes())
-            .unwrap();
+        let reader = Iccma23Reader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
         assert_eq!(3, af.n_arguments());
         assert_eq!(2, af.n_attacks());
         assert!(af
@@ -215,9 +189,8 @@ mod tests {
     #[test]
     fn test_comment() {
         let instance = "#foo\np af 3\n1 2\n3 3\n";
-        let af = Iccma23Reader::default()
-            .read(&mut instance.as_bytes())
-            .unwrap();
+        let reader = Iccma23Reader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
         assert_eq!(3, af.n_arguments());
         assert_eq!(2, af.n_attacks());
         assert!(af
