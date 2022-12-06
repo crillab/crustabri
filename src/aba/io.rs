@@ -1,14 +1,18 @@
 use super::Language;
 use crate::{aba::ABAFramework, io::iccma23_reader};
 use anyhow::{anyhow, Context, Result};
-use std::io::{BufRead, BufReader, Read};
+use std::{
+    fmt::Display,
+    io::{BufRead, BufReader, Read, Write},
+};
 
 /// A reader for the ICCMA 2023 ABA format.
 #[derive(Default)]
 pub struct Iccma23ABAReader;
 
 impl Iccma23ABAReader {
-    fn read(&mut self, reader: &mut dyn Read) -> Result<ABAFramework<usize>> {
+    /// Reads an Assumption-based Argumentation framework.
+    pub fn read(&mut self, reader: &mut dyn Read) -> Result<ABAFramework<usize>> {
         let br = BufReader::new(reader);
         let mut aba = None;
         let mut assumption_with_no_contrary = None;
@@ -49,7 +53,7 @@ impl Iccma23ABAReader {
                 }
             };
             let read_atom_index = |word: &str| match word.parse::<isize>() {
-                Ok(n) if n >= 1 && (n as usize) <= aba.as_ref().unwrap().language_len() => {
+                Ok(n) if n >= 1 && (n as usize) <= aba.as_ref().unwrap().language().len() => {
                     Ok(n as usize)
                 }
                 _ => Err(anyhow!("invalid atom index")),
@@ -112,5 +116,44 @@ impl Iccma23ABAReader {
                 .context("while finalizing the result")?;
         }
         Ok(aba.unwrap())
+    }
+}
+
+/// A structure used to write answers for ICCMA'23 ABA tracks.
+#[derive(Default)]
+pub struct Iccma23ABAWriter;
+
+impl Iccma23ABAWriter {
+    /// Writes the text associated with the fact the problem has no extension.
+    pub fn write_no_extension(&self, writer: &mut dyn Write) -> Result<()> {
+        let context = "while writing problem has no extension";
+        writeln!(writer, "NO").context(context)?;
+        writer.flush().context(context)
+    }
+
+    /// Writes a single extension.
+    pub fn write_single_extension<I, T>(&self, writer: &mut dyn Write, extension: I) -> Result<()>
+    where
+        I: IntoIterator<Item = T>,
+        T: Display,
+    {
+        let context = "while writing an extension";
+        write!(writer, "w").context(context)?;
+        extension
+            .into_iter()
+            .try_for_each(|t| write!(writer, " {}", t).context(context))?;
+        writeln!(writer).context(context)?;
+        writer.flush().context(context)
+    }
+
+    /// Writes an acceptance status.
+    pub fn write_acceptance_status(
+        &self,
+        writer: &mut dyn Write,
+        acceptance_status: bool,
+    ) -> Result<()> {
+        let context = "while writing an acceptance_status";
+        writeln!(writer, "{}", if acceptance_status { "YES" } else { "NO" }).context(context)?;
+        writer.flush().context(context)
     }
 }

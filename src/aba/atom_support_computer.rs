@@ -58,14 +58,14 @@ where
     /// Computes the set of assumptions supporting the atoms of an ABA framework.
     pub fn compute(framework: &'a ABAFramework<T>) -> Self {
         let derivable_atoms = compute_derivables(framework);
-        let language_len = framework.language_len();
+        let language_len = framework.language().len();
         let mut sc = AtomSupport {
             framework,
             supports: vec![None; language_len],
             closed: vec![false; language_len],
             assumption_set: AssumptionSet::new(language_len),
         };
-        for i in 0..sc.framework.language_len() {
+        for i in 0..sc.framework.language().len() {
             sc.close_atom(vec![i], &derivable_atoms);
         }
         sc
@@ -202,7 +202,7 @@ where
     T: LabelType,
 {
     use AtomDerivationType::*;
-    let mut derivable_atoms = vec![None; framework.language_len()];
+    let mut derivable_atoms = vec![None; framework.language().len()];
     for index in framework.assumption_ids() {
         derivable_atoms[*index] = Some(Assumption);
     }

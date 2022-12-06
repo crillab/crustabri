@@ -2,6 +2,7 @@ use super::common::{self, ARG_ARG, ARG_PROBLEM};
 use anyhow::{anyhow, Context, Result};
 use crustabri::{
     aa::{AAFramework, Argument, LabelType, Query, Semantics},
+    aba::{ABAFrameworkInstantiation, Iccma23ABAReader, Iccma23ABAWriter},
     io::{
         AspartixReader, AspartixWriter, Iccma23Reader, Iccma23Writer, InstanceReader,
         ResponseWriter,
@@ -69,6 +70,7 @@ impl<'a> Command<'a> for SolveCommand {
                 &mut Iccma23Reader::default(),
                 &mut Iccma23Writer::default(),
             ),
+            "iccma23_aba" => execute_for_iccma23_aba(arg_matches),
             _ => unreachable!(),
         }
     }
@@ -92,10 +94,90 @@ where
     let (query, semantics) =
         Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
     check_arg_definition(query, &arg)?;
+    let mut out = std::io::stdout();
+    let mut acceptance_status_writer = |status, opt_certificate: Option<Vec<&Argument<T>>>| {
+        writer.write_acceptance_status(&mut out, status)?;
+        if let Some(c) = opt_certificate {
+            writer.write_single_extension(&mut out, c.as_slice())?
+        }
+        Ok(())
+    };
     match query {
-        Query::SE => compute_one_extension(&af, semantics, arg_matches, writer),
-        Query::DC => check_credulous_acceptance(&af, semantics, arg.unwrap(), arg_matches, writer),
-        Query::DS => check_skeptical_acceptance(&af, semantics, arg.unwrap(), arg_matches, writer),
+        Query::SE => {
+            compute_one_extension(
+                &af,
+                semantics,
+                arg_matches,
+                &mut |opt_model| match opt_model {
+                    Some(m) => writer.write_single_extension(&mut out, &m),
+                    None => writer.write_no_extension(&mut out),
+                },
+            )
+        }
+        Query::DC => check_credulous_acceptance(
+            &af,
+            semantics,
+            arg.unwrap(),
+            arg_matches,
+            &mut acceptance_status_writer,
+        ),
+        Query::DS => check_skeptical_acceptance(
+            &af,
+            semantics,
+            arg.unwrap(),
+            arg_matches,
+            &mut acceptance_status_writer,
+        ),
+    }
+}
+
+fn execute_for_iccma23_aba(arg_matches: &crusti_app_helper::ArgMatches<'_>) -> Result<()> {
+    let file = arg_matches.value_of(common::ARG_INPUT).unwrap();
+    let aba = common::read_file_path_with(file, &|r| Iccma23ABAReader::default().read(r))?;
+    let instantiation = ABAFrameworkInstantiation::instantiate(&aba);
+    let arg = arg_matches
+        .value_of(ARG_ARG)
+        .map(|a| {
+            a.parse::<usize>()
+                .map_err(|_| anyhow!("no such assumption: {}", a))
+                .and_then(|n| aba.language().get_atom(&n))
+                .map(|assumption| instantiation.aba_assumption_to_instantiated_arg(assumption))
+        })
+        .transpose()
+        .context("while parsing the argument passed to the command line")?;
+    let (query, semantics) =
+        Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
+    check_arg_definition(query, &arg)?;
+    let af = instantiation.instantiated();
+    let writer = Iccma23ABAWriter::default();
+    let mut out = std::io::stdout();
+    match query {
+        Query::SE => {
+            compute_one_extension(
+                af,
+                semantics,
+                arg_matches,
+                &mut |opt_model| match opt_model {
+                    Some(m) => {
+                        let assumptions =
+                            instantiation.instantiated_extension_to_aba_assumptions(&m);
+                        writer
+                            .write_single_extension(&mut out, assumptions.iter().map(|a| a.label()))
+                    }
+                    None => writer.write_no_extension(&mut out),
+                },
+            )
+        }
+        Query::DC => {
+            check_credulous_acceptance(af, semantics, arg.unwrap(), arg_matches, &mut |b, _| {
+                writer.write_acceptance_status(&mut out, b)
+            })
+        }
+        Query::DS => {
+            check_skeptical_acceptance(af, semantics, arg.unwrap(), arg_matches, &mut |b, _| {
+                writer.write_acceptance_status(&mut out, b)
+            })
+        }
     }
 }
 
@@ -144,14 +226,15 @@ where
     }
 }
 
-fn compute_one_extension<T>(
+fn compute_one_extension<F, T>(
     af: &AAFramework<T>,
     semantics: Semantics,
     arg_matches: &ArgMatches<'_>,
-    writer: &mut dyn ResponseWriter<T>,
+    writing_fn: &mut F,
 ) -> Result<()>
 where
     T: LabelType,
+    F: FnMut(Option<Vec<&Argument<T>>>) -> Result<()>,
 {
     let mut solver: Box<dyn SingleExtensionComputer<T>> = match semantics {
         Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
@@ -176,22 +259,19 @@ where
             create_sat_solver_factory(arg_matches),
         )),
     };
-    let mut out = std::io::stdout();
-    match solver.compute_one_extension() {
-        Some(ext) => writer.write_single_extension(&mut out, &ext),
-        None => writer.write_no_extension(&mut out),
-    }
+    (writing_fn)(solver.compute_one_extension())
 }
 
-fn check_credulous_acceptance<T>(
+fn check_credulous_acceptance<F, T>(
     af: &AAFramework<T>,
     semantics: Semantics,
     arg: &Argument<T>,
     arg_matches: &ArgMatches<'_>,
-    writer: &mut dyn ResponseWriter<T>,
+    writing_fn: &mut F,
 ) -> Result<()>
 where
     T: LabelType,
+    F: FnMut(bool, Option<Vec<&Argument<T>>>) -> Result<()>,
 {
     let mut solver: Box<dyn CredulousAcceptanceComputer<T>> = match semantics {
         Semantics::GR => Box::new(GroundedSemanticsSolver::new(af)),
@@ -218,30 +298,26 @@ where
             create_sat_solver_factory(arg_matches),
         )),
     };
-    let mut out = std::io::stdout();
     let with_certificate = arg_matches.is_present(ARG_CERTIFICATE);
     if with_certificate {
         let (acceptance_status, certificate) = solver.is_credulously_accepted_with_certificate(arg);
-        writer.write_acceptance_status(&mut out, acceptance_status)?;
-        if let Some(c) = certificate {
-            writer.write_single_extension(&mut out, &c)?;
-        }
-        Ok(())
+        (writing_fn)(acceptance_status, certificate)
     } else {
         let acceptance_status = solver.is_credulously_accepted(arg);
-        writer.write_acceptance_status(&mut out, acceptance_status)
+        (writing_fn)(acceptance_status, None)
     }
 }
 
-fn check_skeptical_acceptance<T>(
+fn check_skeptical_acceptance<F, T>(
     af: &AAFramework<T>,
     semantics: Semantics,
     arg: &Argument<T>,
     arg_matches: &ArgMatches<'_>,
-    writer: &mut dyn ResponseWriter<T>,
+    writing_fn: &mut F,
 ) -> Result<()>
 where
     T: LabelType,
+    F: FnMut(bool, Option<Vec<&Argument<T>>>) -> Result<()>,
 {
     let mut solver: Box<dyn SkepticalAcceptanceComputer<T>> = match semantics {
         Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
@@ -266,18 +342,13 @@ where
             create_sat_solver_factory(arg_matches),
         )),
     };
-    let mut out = std::io::stdout();
     let with_certificate = arg_matches.is_present(ARG_CERTIFICATE);
     if with_certificate {
         let (acceptance_status, certificate) = solver.is_skeptically_accepted_with_certificate(arg);
-        writer.write_acceptance_status(&mut out, acceptance_status)?;
-        if let Some(c) = certificate {
-            writer.write_single_extension(&mut out, &c)?;
-        }
-        Ok(())
+        (writing_fn)(acceptance_status, certificate)
     } else {
         let acceptance_status = solver.is_skeptically_accepted(arg);
-        writer.write_acceptance_status(&mut out, acceptance_status)
+        (writing_fn)(acceptance_status, None)
     }
 }
 

@@ -7,7 +7,7 @@ use crustabri::{
 use crusti_app_helper::{info, warn, AppHelper, Arg, Command};
 use std::{
     fs::{self, File},
-    io::BufReader,
+    io::{BufReader, Read},
     path::PathBuf,
 };
 
@@ -73,7 +73,7 @@ pub(crate) fn reader_arg() -> Arg<'static, 'static> {
         .long("reader")
         .empty_values(false)
         .multiple(false)
-        .possible_values(&["apx", "iccma23"])
+        .possible_values(&["apx", "iccma23", "iccma23_aba"])
         .default_value("iccma23")
         .help("the input file format")
         .required(false)
@@ -86,17 +86,24 @@ pub(crate) fn read_file_path<T>(
 where
     T: LabelType,
 {
-    let canonicalized = canonicalize_file_path(file_path)?;
-    info!("reading input file {:?}", canonicalized);
-    let mut file_reader = BufReader::new(File::open(canonicalized)?);
     reader.add_warning_handler(Box::new(|line, msg| warn!("at line {}: {}", line, msg)));
-    let af = reader.read(&mut file_reader)?;
+    let af = read_file_path_with(file_path, &|r| reader.read(r))?;
     info!(
         "the argumentation framework has {} argument(s) and {} attack(s)",
         af.n_arguments(),
         af.n_attacks(),
     );
     Ok(af)
+}
+
+pub(crate) fn read_file_path_with<F, R>(file_path: &str, reader: &F) -> Result<R>
+where
+    F: Fn(&mut dyn Read) -> Result<R>,
+{
+    let canonicalized = canonicalize_file_path(file_path)?;
+    info!("reading input file {:?}", canonicalized);
+    let mut file_reader = BufReader::new(File::open(canonicalized)?);
+    (reader)(&mut file_reader)
 }
 
 /// Canonicalize a path given by the user.

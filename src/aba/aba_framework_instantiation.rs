@@ -10,7 +10,6 @@ where
     T: LabelType,
 {
     aba_framework: &'a ABAFramework<T>,
-    deductions: LayeredDeductionVec<'a, T>,
     aa_framework: AAFramework<InstantiationLabel<'a, T>>,
 }
 
@@ -61,7 +60,6 @@ where
         add_attacks(&mut aa_framework, aba_framework, &deductions);
         ABAFrameworkInstantiation {
             aba_framework,
-            deductions,
             aa_framework,
         }
     }
@@ -76,17 +74,18 @@ where
         &mut self.aa_framework
     }
 
+    /// Returns the set of ABA assumptions involved in the provided AA extension.
     pub fn instantiated_extension_to_aba_assumptions(
         &self,
         extension: &'a [&Argument<InstantiationLabel<T>>],
     ) -> Vec<&'a Atom<T>> {
-        let mut in_result = vec![false; self.aba_framework.language_len()];
+        let mut in_result = vec![false; self.aba_framework.language().len()];
         extension
             .iter()
             .filter_map(|arg| {
                 let claim = arg.label().deduction.claim;
                 if self.aba_framework.is_assumption(claim.label()).unwrap() {
-                    if !in_result[claim.id()] {
+                    if in_result[claim.id()] {
                         None
                     } else {
                         in_result[claim.id()] = true;
@@ -99,6 +98,7 @@ where
             .collect()
     }
 
+    /// Returns the argument of the instantiated AA framework corresponding to the given ABA assumption.
     pub fn aba_assumption_to_instantiated_arg(
         &self,
         assumption: &'a Atom<T>,
@@ -171,7 +171,7 @@ where
     T: LabelType,
 {
     let supports_for_claims = AtomSupport::compute(aba_framework);
-    let mut deductions = LayeredDeductionVec::new(aba_framework.language_len());
+    let mut deductions = LayeredDeductionVec::new(aba_framework.language().len());
     for (i, opt_supports) in supports_for_claims.iter_supports().enumerate() {
         if opt_supports.is_none() {
             deductions.new_layer(0);
@@ -207,23 +207,5 @@ fn add_attacks<'a, T>(
                 (min_bound..max_bound).for_each(|k| aa.new_attack_by_ids(k, i).unwrap())
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::aba::language::Language;
-
-    fn toni_tutorial_ex() -> ABAFramework<&'static str> {
-        let l = Language::new_with_labels(&["a", "b", "c", "p", "q", "r", "s", "t"]);
-        let mut framework = ABAFramework::with_capacity(l, 3, 3);
-        framework.new_assumption(&"a", &"r").unwrap();
-        framework.new_assumption(&"b", &"s").unwrap();
-        framework.new_assumption(&"c", &"t").unwrap();
-        framework.new_rule(&"p", &[&"q", &"a"]).unwrap();
-        framework.new_rule(&"q", &[] as &[&&str]).unwrap();
-        framework.new_rule(&"r", &[&"b", &"c"]).unwrap();
-        framework
     }
 }

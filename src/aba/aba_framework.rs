@@ -432,25 +432,9 @@ where
         }
     }
 
-    /// Return an iterator the the atoms of the language.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use crustabri::aba::ABAFramework;
-    /// # use crustabri::aa::LabelType;
-    /// fn debug_language<T: LabelType>(f: &ABAFramework<T>) {
-    ///     let mut count = 0;
-    ///     for (i,l) in f.iter_language().enumerate() {
-    ///         assert_eq!(l, f.get_atom_by_id(i));
-    ///         println!("atom {}: {:?}", i, l);
-    ///         count += 1;
-    ///     }
-    ///     assert_eq!(count, f.language_len());
-    /// }
-    /// ```
-    pub fn iter_language(&self) -> impl Iterator<Item = &Atom<T>> {
-        self.language.iter()
+    /// Returns the underlying language.
+    pub fn language(&self) -> &Language<T> {
+        &self.language
     }
 
     /// Returns the atom with the corresponding identifier.
@@ -458,45 +442,8 @@ where
     /// # Panics
     ///
     /// Panics if the provided identifier does not refer to an existing atom.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use crustabri::aba::ABAFramework;
-    /// # use crustabri::aa::LabelType;
-    /// fn debug_language<T: LabelType>(f: &ABAFramework<T>) {
-    ///     let mut count = 0;
-    ///     for (i,l) in f.iter_language().enumerate() {
-    ///         assert_eq!(l, f.get_atom_by_id(i));
-    ///         println!("atom {}: {:?}", i, l);
-    ///         count += 1;
-    ///     }
-    ///     assert_eq!(count, f.language_len());
-    /// }
-    /// ```
-    pub fn get_atom_by_id(&self, id: usize) -> &Atom<T> {
+    pub(crate) fn get_atom_by_id(&self, id: usize) -> &Atom<T> {
         self.language.get_atom_by_id(id)
-    }
-
-    /// Return the number of atoms the language has.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use crustabri::aba::ABAFramework;
-    /// # use crustabri::aa::LabelType;
-    /// fn debug_language<T: LabelType>(f: &ABAFramework<T>) {
-    ///     let mut count = 0;
-    ///     for (i,l) in f.iter_language().enumerate() {
-    ///         assert_eq!(l, f.get_atom_by_id(i));
-    ///         println!("atom {}: {:?}", i, l);
-    ///         count += 1;
-    ///     }
-    ///     assert_eq!(count, f.language_len());
-    /// }
-    /// ```
-    pub fn language_len(&self) -> usize {
-        self.language.len()
     }
 
     /// Returns the number of rules of the framework.
