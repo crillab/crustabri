@@ -21,6 +21,7 @@ impl<'a> Command<'a> for ProblemsCommand {
         SubCommand::with_name(CMD_NAME)
             .about("Displays the problems handled by the solver")
             .setting(AppSettings::DisableVersion)
+            .arg(crusti_app_helper::logging_level_cli_arg())
     }
 
     fn execute(&self, _arg_matches: &crusti_app_helper::ArgMatches<'_>) -> Result<()> {

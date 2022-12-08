@@ -27,6 +27,7 @@ impl<'a> Command<'a> for CheckCommand {
             .setting(AppSettings::DisableVersion)
             .arg(common::input_args())
             .arg(common::reader_arg())
+            .arg(crusti_app_helper::logging_level_cli_arg())
     }
 
     fn execute(&self, arg_matches: &crusti_app_helper::ArgMatches<'_>) -> Result<()> {

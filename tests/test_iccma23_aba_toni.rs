@@ -19,7 +19,7 @@ r 6 2 3
 
 fn test_answer_for_track(
     track: &str,
-    possible_answers: &[&str],
+    possible_answers: &[&'static str],
     additional_arg: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let file = NamedTempFile::new("toni.aba")?;
@@ -29,9 +29,9 @@ fn test_answer_for_track(
     if let Some(a) = additional_arg {
         cmd.arg("-a").arg(a);
     }
-    let mut pred = BoxPredicate::new(predicate::never());
+    let mut pred: BoxPredicate<str> = BoxPredicate::new(predicate::never());
     for a in possible_answers {
-        pred = BoxPredicate::new(pred.or(predicate::str::contains(*a)));
+        pred = BoxPredicate::new(pred.or(predicate::eq(*a)));
     }
     cmd.assert().success().stdout(pred);
     file.close().unwrap();
@@ -45,32 +45,32 @@ fn test_complete_se() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_complete_dc_1() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DC-CO", &["NO"], Some("1"))
+    test_answer_for_track("DC-CO", &["NO\n"], Some("1"))
 }
 
 #[test]
 fn test_complete_dc_2() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DC-CO", &["YES"], Some("2"))
+    test_answer_for_track("DC-CO", &["YES\n"], Some("2"))
 }
 
 #[test]
 fn test_complete_dc_3() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DC-CO", &["YES"], Some("3"))
+    test_answer_for_track("DC-CO", &["YES\n"], Some("3"))
 }
 
 #[test]
 fn test_complete_ds_1() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DS-CO", &["NO"], Some("1"))
+    test_answer_for_track("DS-CO", &["NO\n"], Some("1"))
 }
 
 #[test]
 fn test_complete_ds_2() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DS-CO", &["YES"], Some("2"))
+    test_answer_for_track("DS-CO", &["YES\n"], Some("2"))
 }
 
 #[test]
 fn test_complete_ds_3() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DS-CO", &["YES"], Some("3"))
+    test_answer_for_track("DS-CO", &["YES\n"], Some("3"))
 }
 
 #[test]
@@ -80,32 +80,32 @@ fn test_preferred_se() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_preferred_dc_1() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DC-PR", &["NO"], Some("1"))
+    test_answer_for_track("DC-PR", &["NO\n"], Some("1"))
 }
 
 #[test]
 fn test_preferred_dc_2() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DC-PR", &["YES"], Some("2"))
+    test_answer_for_track("DC-PR", &["YES\n"], Some("2"))
 }
 
 #[test]
 fn test_preferred_dc_3() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DC-PR", &["YES"], Some("3"))
+    test_answer_for_track("DC-PR", &["YES\n"], Some("3"))
 }
 
 #[test]
 fn test_preferred_ds_1() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DS-PR", &["NO"], Some("1"))
+    test_answer_for_track("DS-PR", &["NO\n"], Some("1"))
 }
 
 #[test]
 fn test_preferred_ds_2() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DS-PR", &["YES"], Some("2"))
+    test_answer_for_track("DS-PR", &["YES\n"], Some("2"))
 }
 
 #[test]
 fn test_preferred_ds_3() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DS-PR", &["YES"], Some("3"))
+    test_answer_for_track("DS-PR", &["YES\n"], Some("3"))
 }
 
 #[test]
@@ -115,30 +115,30 @@ fn test_stable_se() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_stable_dc_1() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DC-ST", &["NO"], Some("1"))
+    test_answer_for_track("DC-ST", &["NO\n"], Some("1"))
 }
 
 #[test]
 fn test_stable_dc_2() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DC-ST", &["YES"], Some("2"))
+    test_answer_for_track("DC-ST", &["YES\n"], Some("2"))
 }
 
 #[test]
 fn test_stable_dc_3() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DC-ST", &["YES"], Some("3"))
+    test_answer_for_track("DC-ST", &["YES\n"], Some("3"))
 }
 
 #[test]
 fn test_stable_ds_1() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DS-ST", &["NO"], Some("1"))
+    test_answer_for_track("DS-ST", &["NO\n"], Some("1"))
 }
 
 #[test]
 fn test_stable_ds_2() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DS-ST", &["YES"], Some("2"))
+    test_answer_for_track("DS-ST", &["YES\n"], Some("2"))
 }
 
 #[test]
 fn test_stable_ds_3() -> Result<(), Box<dyn std::error::Error>> {
-    test_answer_for_track("DS-ST", &["YES"], Some("3"))
+    test_answer_for_track("DS-ST", &["YES\n"], Some("3"))
 }

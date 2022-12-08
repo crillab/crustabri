@@ -4,7 +4,41 @@ use std::{fmt::Display, rc::Rc};
 
 /// An ABA framework instantiation to an AA framework.
 ///
-/// Contains both the initial ABA framework and the instantiated AA framework, and the arguments/attacks mappings.
+/// This objects allows the translation from flat ABA frameworks to Abstract frameworks in order to solver them using algorithms defined for [AAFramework] objects.
+/// [AAFramework] extensions can also be mapped back to their related set of assumptions in order to answer queries on [ABAFramework] objects.
+///
+/// # Example
+///
+/// ```
+/// # use crustabri::aa::LabelType;
+/// # use crustabri::aba::{ABAFramework, ABAFrameworkInstantiation, Atom};
+/// # use crustabri::solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, StableSemanticsSolver};
+/// fn compute_stable_extension_in_term_of_assumptions<T>(aba: &ABAFramework<T>)
+/// where T: LabelType
+/// {
+///     let instantiation = ABAFrameworkInstantiation::instantiate(aba);
+///     let mut extension_computer = StableSemanticsSolver::new(instantiation.instantiated());
+///     if let Some(ext) = extension_computer.compute_one_extension() {
+///         let assumptions = instantiation.instantiated_extension_to_aba_assumptions(&ext);
+///         println!("ABA admits a stable extensions: {:?}", assumptions);
+///     } else {
+///         println!("ABA admits no stable extensions");
+///     }
+/// }
+///
+/// fn check_stable_assumption_cred_acceptance<T>(aba: &ABAFramework<T>, assumption: &Atom<T>)
+/// where T: LabelType
+/// {
+///     let instantiation = ABAFrameworkInstantiation::instantiate(aba);
+///     let mut acceptance_checker = StableSemanticsSolver::new(instantiation.instantiated());
+///     let assumption_arg = instantiation.aba_assumption_to_instantiated_arg(assumption);
+///     if acceptance_checker.is_credulously_accepted(assumption_arg) {
+///         println!("the argument is credulously accepted");
+///     } else {
+///         println!("the argument is not credulously accepted");
+///     }
+/// }
+/// ```
 pub struct ABAFrameworkInstantiation<'a, T>
 where
     T: LabelType,
@@ -41,11 +75,24 @@ impl<'a, T> ABAFrameworkInstantiation<'a, T>
 where
     T: LabelType,
 {
-    /// Instantiates an ABA framework, producing an AA framework.
+    /// Computes an instantiation of the ABA framework.
     ///
-    /// # Arguments
+    /// # Example
     ///
-    /// * `aba_framework` - the ABA framework
+    /// ```
+    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::aba::{ABAFrameworkInstantiation, ABAFramework};
+    /// fn instantiation_data<T>(aba: &ABAFramework<T>)
+    /// where T: LabelType
+    /// {
+    ///     let instantiation = ABAFrameworkInstantiation::instantiate(aba);
+    ///     println!(
+    ///         "instantiated AA framework has {} arguments and {} attacks",
+    ///         instantiation.instantiated().n_arguments(),
+    ///         instantiation.instantiated().n_attacks(),
+    ///     )
+    /// }
+    /// ```
     pub fn instantiate(aba_framework: &'a ABAFramework<T>) -> Self {
         let deductions = build_deductions(aba_framework);
         let mut aa_framework = AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(
@@ -65,16 +112,50 @@ where
     }
 
     /// Returns a reference to the instantiated abstract framework.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::aba::{ABAFrameworkInstantiation, ABAFramework};
+    /// fn instantiation_data<T>(aba: &ABAFramework<T>)
+    /// where T: LabelType
+    /// {
+    ///     let instantiation = ABAFrameworkInstantiation::instantiate(aba);
+    ///     println!(
+    ///         "instantiated AA framework has {} arguments and {} attacks",
+    ///         instantiation.instantiated().n_arguments(),
+    ///         instantiation.instantiated().n_attacks(),
+    ///     )
+    /// }
+    /// ```
     pub fn instantiated(&self) -> &AAFramework<InstantiationLabel<'a, T>> {
         &self.aa_framework
     }
 
-    /// Returns a mutable reference to the instantiated abstract framework.
-    pub fn instantiated_mut(&mut self) -> &mut AAFramework<InstantiationLabel<'a, T>> {
-        &mut self.aa_framework
-    }
-
     /// Returns the set of ABA assumptions involved in the provided AA extension.
+    ///
+    /// This functions allows to translate back an extension of the instantiated AA framework into a set of ABA assumptions.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::aba::{ABAFramework, ABAFrameworkInstantiation};
+    /// # use crustabri::solvers::{SingleExtensionComputer, StableSemanticsSolver};
+    /// fn compute_stable_extension_in_term_of_assumptions<T>(aba: &ABAFramework<T>)
+    /// where T: LabelType
+    /// {
+    ///     let instantiation = ABAFrameworkInstantiation::instantiate(aba);
+    ///     let mut extension_computer = StableSemanticsSolver::new(instantiation.instantiated());
+    ///     if let Some(ext) = extension_computer.compute_one_extension() {
+    ///         let assumptions = instantiation.instantiated_extension_to_aba_assumptions(&ext);
+    ///         println!("ABA admits a stable extensions: {:?}", assumptions);
+    ///     } else {
+    ///         println!("ABA admits no stable extensions");
+    ///     }
+    /// }
+    /// ```
     pub fn instantiated_extension_to_aba_assumptions(
         &self,
         extension: &'a [&Argument<InstantiationLabel<T>>],
@@ -99,6 +180,28 @@ where
     }
 
     /// Returns the argument of the instantiated AA framework corresponding to the given ABA assumption.
+    ///
+    /// This function may be useful to compute acceptance computations on the AA framework to determine acceptance of an assumption in the ABA framework.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::aba::{ABAFramework, ABAFrameworkInstantiation, Atom};
+    /// # use crustabri::solvers::{CredulousAcceptanceComputer, StableSemanticsSolver};
+    /// fn check_stable_assumption_cred_acceptance<T>(aba: &ABAFramework<T>, assumption: &Atom<T>)
+    /// where T: LabelType
+    /// {
+    ///     let instantiation = ABAFrameworkInstantiation::instantiate(aba);
+    ///     let mut acceptance_checker = StableSemanticsSolver::new(instantiation.instantiated());
+    ///     let assumption_arg = instantiation.aba_assumption_to_instantiated_arg(assumption);
+    ///     if acceptance_checker.is_credulously_accepted(assumption_arg) {
+    ///         println!("the argument is credulously accepted");
+    ///     } else {
+    ///         println!("the argument is not credulously accepted");
+    ///     }
+    /// }
+    /// ```
     pub fn aba_assumption_to_instantiated_arg(
         &self,
         assumption: &'a Atom<T>,

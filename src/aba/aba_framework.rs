@@ -46,7 +46,11 @@ where
     }
 }
 
-/// Handles an ABA framework.
+/// Handles a flat ABA framework.
+///
+/// [ABAFramework] objects hold a language, including the assumptions and their contrary, and the rules built on top of this language.
+/// Such kind of framework is initialized with its languages. Assumptions, contraries and rules are defined after with dedicated methods
+/// ensuring the constraints on them (no assumption on rule heads, each assumption has a contrary, ...).
 ///
 /// # Example
 ///
@@ -64,7 +68,7 @@ where
 ///     ("b", "s"),
 ///     ("c", "t"),
 /// ];
-/// let mut aba_framework = ABAFramework::with_capacity(language, rules.len(), assumptions.len());
+/// let mut aba_framework = ABAFramework::new_with_language(language);
 /// for (head, tail) in &rules {
 ///     aba_framework.new_rule(&head, tail).unwrap();
 /// }
@@ -96,23 +100,7 @@ where
     /// # use crustabri::aba::ABAFramework;
     /// # use crustabri::aba::Language;
     /// let language = Language::new_with_labels(&["a", "b", "c", "p", "q", "r", "s", "t"]);
-    /// let rules = [
-    ///    ("p", vec![&"q", &"a"]),
-    ///    ("q", vec![]),
-    ///    ("r", vec![&"b", &"c"]),
-    /// ];
-    /// let assumptions = [ // tuples give assumptions and their contraries
-    ///     ("a", "r"),
-    ///     ("b", "s"),
-    ///     ("c", "t"),
-    /// ];
-    /// let mut aba_framework = ABAFramework::new_with_language(language);
-    /// for (head, tail) in &rules {
-    ///     aba_framework.new_rule(&head, tail).unwrap();
-    /// }
-    /// for (assumption, contrary) in &assumptions {
-    ///     aba_framework.new_assumption(assumption, contrary).unwrap();
-    /// }
+    /// let aba_framework = ABAFramework::new_with_language(language);
     /// ```
     pub fn new_with_language(language: Language<T>) -> Self {
         let language_len = language.len();
@@ -125,50 +113,13 @@ where
         }
     }
 
-    /// Builds a ABA framework given its associated language and the initial capacity to reserve for rules and assumptions.
-    ///
-    /// These capacities are memory hints; the final numbers of rules and assumptions may be different.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use crustabri::aba::ABAFramework;
-    /// # use crustabri::aba::Language;
-    /// let language = Language::new_with_labels(&["a", "b", "c", "p", "q", "r", "s", "t"]);
-    /// let rules = [
-    ///    ("p", vec![&"q", &"a"]),
-    ///    ("q", vec![]),
-    ///    ("r", vec![&"b", &"c"]),
-    /// ];
-    /// let assumptions = [ // tuples give assumptions and their contraries
-    ///     ("a", "r"),
-    ///     ("b", "s"),
-    ///     ("c", "t"),
-    /// ];
-    /// let mut aba_framework = ABAFramework::with_capacity(language, rules.len(), assumptions.len());
-    /// for (head, tail) in &rules {
-    ///     aba_framework.new_rule(&head, tail).unwrap();
-    /// }
-    /// for (assumption, contrary) in &assumptions {
-    ///     aba_framework.new_assumption(assumption, contrary).unwrap();
-    /// }
-    /// ```
-    pub fn with_capacity(language: Language<T>, n_rules: usize, n_assumptions: usize) -> Self {
-        let language_len = language.len();
-        ABAFramework {
-            language,
-            is_head_of_rule: vec![false; language_len],
-            atom_type: vec![AtomType::NotAssumption; language_len],
-            assumption_indices: Vec::with_capacity(n_assumptions),
-            rules: Vec::with_capacity(n_rules),
-        }
-    }
-
     /// Adds a rule to the framework.
     ///
     /// The atoms in the head and the tail are given by their labels.
     /// If an atom is not part of the language of the framework, an error is returned.
     ///
+    /// Since ABA frameworks under consideration are flat, an error is also returned if the head of the rule has been set as an assumption.
+    ///
     /// # Example
     ///
     /// ```
@@ -180,7 +131,7 @@ where
     ///    ("q", vec![]),
     ///    ("r", vec![&"b", &"c"]),
     /// ];
-    /// let mut aba_framework = ABAFramework::with_capacity(language, rules.len(), 0);
+    /// let mut aba_framework = ABAFramework::new_with_language(language);
     /// for (head, tail) in &rules {
     ///     aba_framework.new_rule(head, &tail).unwrap();
     /// }
@@ -214,19 +165,7 @@ where
     /// # Panics
     ///
     /// This method panics if the provided index does not refer to an existing rule.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use crustabri::aba::ABAFramework;
-    /// # use crustabri::aa::LabelType;
-    /// fn debug_rules<T: LabelType>(f: &ABAFramework<T>) {
-    ///     for i in 0..f.n_rules() {
-    ///         println!("rule {}: {:?}", i, f.get_rule_by_id(i));
-    ///     }
-    /// }
-    /// ```
-    pub fn get_rule_by_id(&self, index: usize) -> Rule<T> {
+    pub(crate) fn get_rule_by_id(&self, index: usize) -> Rule<T> {
         Rule {
             rule_ids: &self.rules[index],
             language: &self.language,
@@ -236,7 +175,7 @@ where
     /// Sets a language atom as an assumption. Its contrary atom must be provided.
     ///
     /// The atom names must refer to existing atoms.
-    /// The new assumption must not be already set as an assumption.
+    /// The new assumption must not be already set as an assumption, or be set as the head of a rule.
     /// The contrary atom must be different from the assumption.
     /// If one of these conditions is not met, an error is returned.
     ///
@@ -251,7 +190,7 @@ where
     ///     ("b", "s"),
     ///     ("c", "t"),
     /// ];
-    /// let mut aba_framework = ABAFramework::with_capacity(language, 0, assumptions.len());
+    /// let mut aba_framework = ABAFramework::new_with_language(language);
     /// for (assumption, contrary) in &assumptions {
     ///     aba_framework.new_assumption(assumption, contrary).unwrap();
     /// }
@@ -302,17 +241,7 @@ where
     /// # use crustabri::aa::LabelType;
     /// # use crustabri::aba::ABAFramework;
     /// fn debug_assumptions<T: LabelType>(f: &ABAFramework<T>) {
-    ///     let mut n_assumptions = 0;
-    ///     for a in f.iter_assumptions() {
-    ///         n_assumptions += 1;
-    ///         assert!(f.is_assumption(a.label()).unwrap());
-    ///         println!(
-    ///             "assumption {} admits {} as contrary",
-    ///             a.label(),
-    ///             f.get_contrary(a.label()).unwrap().label()
-    ///         );
-    ///     }
-    ///     assert_eq!(n_assumptions, f.n_assumptions());
+    ///     assert_eq!(f.n_assumptions(), f.iter_assumptions().count())
     /// }
     /// ```
     pub fn n_assumptions(&self) -> usize {
@@ -329,17 +258,9 @@ where
     /// # use crustabri::aa::LabelType;
     /// # use crustabri::aba::ABAFramework;
     /// fn debug_assumptions<T: LabelType>(f: &ABAFramework<T>) {
-    ///     let mut n_assumptions = 0;
     ///     for a in f.iter_assumptions() {
-    ///         n_assumptions += 1;
     ///         assert!(f.is_assumption(a.label()).unwrap());
-    ///         println!(
-    ///             "assumption {} admits {} as contrary",
-    ///             a.label(),
-    ///             f.get_contrary(a.label()).unwrap().label()
-    ///         );
     ///     }
-    ///     assert_eq!(n_assumptions, f.n_assumptions());
     /// }
     /// ```
     pub fn is_assumption(&self, s: &T) -> Result<bool> {
@@ -359,25 +280,19 @@ where
     /// # use crustabri::aba::ABAFramework;
     /// # use crustabri::aa::LabelType;
     /// fn debug_assumptions<T: LabelType>(f: &ABAFramework<T>) {
-    ///     let mut n_assumptions = 0;
     ///     for a in f.iter_assumptions() {
-    ///         n_assumptions += 1;
-    ///         assert!(f.is_assumption(a.label()).unwrap());
     ///         println!(
     ///             "assumption {} admits {} as contrary",
     ///             a.label(),
     ///             f.get_contrary(a.label()).unwrap().label()
     ///         );
     ///     }
-    ///     assert_eq!(n_assumptions, f.n_assumptions());
     /// }
     /// ```
-    pub fn iter_assumptions<'a>(&'a self) -> Box<dyn Iterator<Item = &Atom<T>> + 'a> {
-        Box::new(
-            self.assumption_indices
-                .iter()
-                .map(move |i| self.language.get_atom_by_id(*i)),
-        )
+    pub fn iter_assumptions(&self) -> impl Iterator<Item = &Atom<T>> + '_ {
+        self.assumption_indices
+            .iter()
+            .map(move |i| self.language.get_atom_by_id(*i))
     }
 
     /// Returns the assumption ids.
@@ -387,7 +302,7 @@ where
 
     /// Returns the contrary of an assumption given by its label.
     ///
-    /// If the provided label does not refer to an element of the language, an error is returned.
+    /// If the provided label does not refer to the contrary of an assumption, an error is returned.
     ///
     /// # Example
     ///
@@ -454,9 +369,7 @@ where
     /// # use crustabri::aba::ABAFramework;
     /// # use crustabri::aa::LabelType;
     /// fn debug_rules<T: LabelType>(f: &ABAFramework<T>) {
-    ///     for i in 0..f.n_rules() {
-    ///         println!("rule {}: {:?}", i, f.get_rule_by_id(i));
-    ///     }
+    ///     assert_eq!(f.n_rules(), f.iter_rules().count());
     /// }
     /// ```
     pub fn n_rules(&self) -> usize {
@@ -532,7 +445,7 @@ mod tests {
     pub fn test_with_capacity() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut framework = ABAFramework::with_capacity(l, 1, 0);
+        let mut framework = ABAFramework::new_with_language(l);
         assert_eq!(0, framework.rules.len());
         framework.new_rule(&"a", &[&"b", &"c"]).unwrap();
         assert_eq!(1, framework.rules.len());
@@ -545,7 +458,7 @@ mod tests {
     fn test_add_rule_wrong_name_1() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut framework = ABAFramework::with_capacity(l, 1, 0);
+        let mut framework = ABAFramework::new_with_language(l);
         framework.new_rule(&"d", &[&"b", &"c"]).unwrap_err();
     }
 
@@ -553,7 +466,7 @@ mod tests {
     fn test_add_rule_wrong_name_2() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut framework = ABAFramework::with_capacity(l, 1, 0);
+        let mut framework = ABAFramework::new_with_language(l);
         framework.new_rule(&"a", &[&"d", &"c"]).unwrap_err();
     }
 
@@ -561,7 +474,7 @@ mod tests {
     fn test_new_assumption_ok() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut f = ABAFramework::with_capacity(l, 0, 0);
+        let mut f = ABAFramework::new_with_language(l);
         assert_eq!(0, f.n_assumptions());
         f.new_assumption(&"a", &"b").unwrap();
         assert_eq!(1, f.n_assumptions());
@@ -572,7 +485,7 @@ mod tests {
     fn test_new_assumption_own_contrary() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut f = ABAFramework::with_capacity(l, 0, 0);
+        let mut f = ABAFramework::new_with_language(l);
         f.new_assumption(&"a", &"a").unwrap_err();
     }
 
@@ -580,7 +493,7 @@ mod tests {
     fn test_new_assumption_unknown_name_1() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut f = ABAFramework::with_capacity(l, 0, 0);
+        let mut f = ABAFramework::new_with_language(l);
         f.new_assumption(&"d", &"a").unwrap_err();
     }
 
@@ -588,7 +501,7 @@ mod tests {
     fn test_new_assumption_unknown_name_2() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut f = ABAFramework::with_capacity(l, 0, 0);
+        let mut f = ABAFramework::new_with_language(l);
         f.new_assumption(&"a", &"d").unwrap_err();
     }
 
@@ -596,7 +509,7 @@ mod tests {
     fn test_new_assumption_already_registered() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut f = ABAFramework::with_capacity(l, 0, 0);
+        let mut f = ABAFramework::new_with_language(l);
         f.new_assumption(&"a", &"b").unwrap();
         f.new_assumption(&"a", &"b").unwrap_err();
     }
@@ -605,7 +518,7 @@ mod tests {
     fn test_is_assumption() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut f = ABAFramework::with_capacity(l, 0, 0);
+        let mut f = ABAFramework::new_with_language(l);
         f.new_assumption(&"a", &"b").unwrap();
         assert!(f.is_assumption(&"a").unwrap());
         assert!(!f.is_assumption(&"b").unwrap());
@@ -615,7 +528,7 @@ mod tests {
     fn test_is_assumption_unknown_name() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut f = ABAFramework::with_capacity(l, 0, 0);
+        let mut f = ABAFramework::new_with_language(l);
         f.new_assumption(&"a", &"b").unwrap();
         f.is_assumption(&"d").unwrap_err();
     }
@@ -624,7 +537,7 @@ mod tests {
     fn test_get_contrary() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut f = ABAFramework::with_capacity(l, 0, 0);
+        let mut f = ABAFramework::new_with_language(l);
         f.new_assumption(&"a", &"b").unwrap();
         assert_eq!(&"b", f.get_contrary(&"a").unwrap().label());
     }
@@ -633,7 +546,7 @@ mod tests {
     fn test_get_contrary_unknown_name() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut f = ABAFramework::with_capacity(l, 0, 0);
+        let mut f = ABAFramework::new_with_language(l);
         f.new_assumption(&"a", &"b").unwrap();
         f.get_contrary(&"d").unwrap_err();
     }
@@ -642,7 +555,7 @@ mod tests {
     fn test_get_contrary_not_an_assumption() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut f = ABAFramework::with_capacity(l, 0, 0);
+        let mut f = ABAFramework::new_with_language(l);
         f.new_assumption(&"a", &"b").unwrap();
         f.get_contrary(&"b").unwrap_err();
     }
@@ -651,7 +564,7 @@ mod tests {
     fn test_add_head_as_assumption() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut framework = ABAFramework::with_capacity(l, 1, 0);
+        let mut framework = ABAFramework::new_with_language(l);
         framework.new_rule(&"a", &[&"b", &"c"]).unwrap();
         framework.new_assumption(&"a", &"b").unwrap_err();
     }
@@ -660,7 +573,7 @@ mod tests {
     fn test_new_assumption_as_head() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut framework = ABAFramework::with_capacity(l, 1, 0);
+        let mut framework = ABAFramework::new_with_language(l);
         framework.new_assumption(&"a", &"b").unwrap();
         framework.new_rule(&"a", &[&"b", &"c"]).unwrap_err();
     }
@@ -683,7 +596,7 @@ mod tests {
 
     fn toni_tutorial_ex() -> ABAFramework<&'static str> {
         let l = Language::new_with_labels(&["a", "b", "c", "p", "q", "r", "s", "t"]);
-        let mut framework = ABAFramework::with_capacity(l, 3, 3);
+        let mut framework = ABAFramework::new_with_language(l);
         framework.new_assumption(&"a", &"r").unwrap();
         framework.new_assumption(&"b", &"s").unwrap();
         framework.new_assumption(&"c", &"t").unwrap();
@@ -707,7 +620,7 @@ mod tests {
     pub fn test_rule_debug() {
         let atoms = vec!["a", "b", "c"];
         let l = Language::new_with_labels(&atoms);
-        let mut framework = ABAFramework::with_capacity(l, 1, 0);
+        let mut framework = ABAFramework::new_with_language(l);
         framework.new_rule(&"a", &[&"b"]).unwrap();
         framework.new_rule(&"a", &[&"c"]).unwrap();
         assert_eq!(
@@ -724,10 +637,10 @@ mod tests {
     pub fn test_framework_debug() {
         let atoms = vec!["a", "b", "c"];
         let l1 = Language::new_with_labels(&atoms);
-        let mut framework1 = ABAFramework::with_capacity(l1, 1, 0);
+        let mut framework1 = ABAFramework::new_with_language(l1);
         framework1.new_rule(&"a", &[&"b"]).unwrap();
         let l2 = Language::new_with_labels(&atoms);
-        let mut framework2 = ABAFramework::with_capacity(l2, 1, 0);
+        let mut framework2 = ABAFramework::new_with_language(l2);
         framework2.new_rule(&"a", &[&"c"]).unwrap();
         assert_eq!(format!("{:?}", framework1), format!("{:?}", framework1));
         assert_ne!(format!("{:?}", framework1), format!("{:?}", framework2));

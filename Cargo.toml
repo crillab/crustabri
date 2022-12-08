@@ -1,5 +1,6 @@
 [package]
 name = "crustabri"
+authors = ["Jean-Marie Lagniez <lagniez@cril.fr>", "Emmanuel Lonca <lonca@cril.fr>", "Jean-Guy Mailly <jean-guy.mailly@u-paris.fr>"]
 version = "0.1.0"
 edition = "2021"
 default-run = "crustabri"

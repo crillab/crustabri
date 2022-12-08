@@ -15,9 +15,7 @@ use crustabri::{
         StageSemanticsSolver,
     },
 };
-use crusti_app_helper::{
-    info, logging_level_cli_arg, warn, AppSettings, Arg, ArgMatches, Command, SubCommand,
-};
+use crusti_app_helper::{info, warn, AppSettings, Arg, ArgMatches, Command, SubCommand};
 
 const CMD_NAME: &str = "solve";
 
@@ -47,7 +45,7 @@ impl<'a> Command<'a> for SolveCommand {
             .arg(common::reader_arg())
             .args(&common::problem_args())
             .args(&external_sat_solver_args())
-            .arg(logging_level_cli_arg())
+            .arg(crusti_app_helper::logging_level_cli_arg())
             .arg(
                 Arg::with_name(ARG_CERTIFICATE)
                     .short("c")

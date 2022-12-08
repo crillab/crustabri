@@ -257,7 +257,7 @@ mod tests {
 
     fn toni_tutorial_ex() -> ABAFramework<&'static str> {
         let l = Language::new_with_labels(&["a", "b", "c", "p", "q", "r", "s", "t"]);
-        let mut framework = ABAFramework::with_capacity(l, 3, 3);
+        let mut framework = ABAFramework::new_with_language(l);
         framework.new_assumption(&"a", &"r").unwrap();
         framework.new_assumption(&"b", &"s").unwrap();
         framework.new_assumption(&"c", &"t").unwrap();

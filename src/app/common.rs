@@ -11,19 +11,18 @@ use std::{
     path::PathBuf,
 };
 
-const AUTHORS: &str = "Jean-Marie Lagniez <lagniez@cril.fr>, Emmanuel Lonca <lonca@cril.fr> and Jean-Guy Mailly <jean-guy.mailly@u-paris.fr>";
-
 pub(crate) fn create_app_helper() -> AppHelper<'static> {
     let app_name = option_env!("CARGO_PKG_NAME").unwrap_or("unknown app name");
     let app_version = option_env!("CARGO_PKG_VERSION").unwrap_or("unknown version");
+    let authors = option_env!("CARGO_PKG_AUTHORS").unwrap_or("unknown authors");
     let mut app = AppHelper::new(
         app_name,
         app_version,
-        AUTHORS,
+        authors,
         "Crustabri, an abstract argumentation solver.",
     );
     let commands: Vec<Box<dyn Command>> = vec![
-        Box::new(AuthorsCommand::new(app_name, app_version, AUTHORS)),
+        Box::new(AuthorsCommand::new(app_name, app_version, authors)),
         Box::new(CheckCommand::new()),
         Box::new(ProblemsCommand::new()),
         Box::new(SolveCommand::new()),
