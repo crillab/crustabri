@@ -7,7 +7,6 @@ pub use aa_framework::Attack;
 mod arguments;
 pub use arguments::Argument;
 pub use arguments::ArgumentSet;
-pub use arguments::LabelType;
 
 mod problem;
 pub use problem::Query;

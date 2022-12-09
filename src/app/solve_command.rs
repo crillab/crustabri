@@ -1,7 +1,7 @@
 use super::common::{self, ARG_ARG, ARG_PROBLEM};
 use anyhow::{anyhow, Context, Result};
 use crustabri::{
-    aa::{AAFramework, Argument, LabelType, Query, Semantics},
+    aa::{AAFramework, Argument, Query, Semantics},
     aba::{ABAFrameworkInstantiation, Iccma23ABAReader, Iccma23ABAWriter},
     io::{
         AspartixReader, AspartixWriter, Iccma23Reader, Iccma23Writer, InstanceReader,
@@ -14,6 +14,7 @@ use crustabri::{
         SingleExtensionComputer, SkepticalAcceptanceComputer, StableSemanticsSolver,
         StageSemanticsSolver,
     },
+    utils::LabelType,
 };
 use crusti_app_helper::{info, warn, AppSettings, Arg, ArgMatches, Command, SubCommand};
 

@@ -1,7 +1,8 @@
 use super::specs::CredulousAcceptanceComputer;
 use super::utils::{cc_arg_to_init_af_arg, cc_assignment_to_init_af_extension};
-use crate::aa::{AAFramework, Argument, LabelType};
+use crate::aa::{AAFramework, Argument};
 use crate::sat::clause;
+use crate::utils::LabelType;
 use crate::{
     sat::{self, Literal, SatSolver, SatSolverFactoryFn},
     utils::ConnectedComponentsComputer,
@@ -36,7 +37,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework, Argument, ArgumentSet, LabelType};
+    /// # use crustabri::aa::{AAFramework, Argument, ArgumentSet};
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
     /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &Argument<T>) where T: LabelType {
     ///     let mut solver = CompleteSemanticsSolver::new(af);
@@ -64,7 +66,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework, Argument, ArgumentSet, LabelType};
+    /// # use crustabri::aa::{AAFramework, Argument, ArgumentSet};
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::sat::CadicalSolver;
     /// # use crustabri::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
     /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &Argument<T>) where T: LabelType {

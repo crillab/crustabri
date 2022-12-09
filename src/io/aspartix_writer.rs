@@ -1,8 +1,10 @@
-use crate::aa::{AAFramework, Argument, LabelType};
+use super::ResponseWriter;
+use crate::{
+    aa::{AAFramework, Argument},
+    utils::LabelType,
+};
 use anyhow::{Context, Result};
 use std::io::Write;
-
-use super::ResponseWriter;
 
 /// A writer for solvers reading instances encoded with the Aspartix format.
 ///
@@ -34,7 +36,7 @@ use super::ResponseWriter;
 /// # use crustabri::aa::AAFramework;
 /// # use crustabri::aa::ArgumentSet;
 /// # use crustabri::io::AspartixWriter;
-/// # use crustabri::aa::LabelType;
+/// # use crustabri::utils::LabelType;
 /// # use anyhow::Result;
 /// fn write_af_to_stdout<T: LabelType>(af: &AAFramework<T>) -> Result<()> {
 ///     let writer = AspartixWriter::default();
@@ -56,7 +58,7 @@ impl AspartixWriter {
     /// # use crustabri::aa::AAFramework;
     /// # use crustabri::aa::ArgumentSet;
     /// # use crustabri::io::AspartixWriter;
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::utils::LabelType;
     /// # use anyhow::Result;
     /// fn write_af_to_stdout<T: LabelType>(af: &AAFramework<T>) -> Result<()> {
     ///     let writer = AspartixWriter::default();
@@ -64,11 +66,14 @@ impl AspartixWriter {
     /// }
     /// # write_af_to_stdout(&AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&[] as &[String])));
     /// ```
-    pub fn write_framework<T: LabelType>(
+    pub fn write_framework<T>(
         &self,
         framework: &AAFramework<T>,
         writer: &mut dyn Write,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        T: LabelType,
+    {
         let args = framework.argument_set();
         for arg in args.iter() {
             writeln!(writer, "arg({}).", arg)?;

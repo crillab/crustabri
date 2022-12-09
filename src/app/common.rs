@@ -1,9 +1,6 @@
 use super::{AuthorsCommand, CheckCommand, ProblemsCommand, SolveCommand};
 use anyhow::{Context, Result};
-use crustabri::{
-    aa::{AAFramework, LabelType},
-    io::InstanceReader,
-};
+use crustabri::{aa::AAFramework, io::InstanceReader, utils::LabelType};
 use crusti_app_helper::{info, warn, AppHelper, Arg, Command};
 use std::{
     fs::{self, File},

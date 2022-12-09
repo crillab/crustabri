@@ -1,7 +1,8 @@
 use super::complete_semantics_solver;
 use crate::{
-    aa::{AAFramework, Argument, LabelType},
+    aa::{AAFramework, Argument},
     sat::Assignment,
+    utils::LabelType,
 };
 
 // Translates a SAT solver assignment into an argument set for a Complete semantics based encoding.

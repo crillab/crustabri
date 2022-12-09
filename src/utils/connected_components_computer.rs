@@ -1,4 +1,5 @@
-use crate::aa::{AAFramework, Argument, ArgumentSet, LabelType};
+use super::LabelType;
+use crate::aa::{AAFramework, Argument, ArgumentSet};
 
 /// An object used to decompose an AF into its connected components.
 ///

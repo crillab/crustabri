@@ -5,9 +5,9 @@ use super::{
     SingleExtensionComputer, SkepticalAcceptanceComputer,
 };
 use crate::{
-    aa::{AAFramework, Argument, LabelType},
+    aa::{AAFramework, Argument},
     sat::{self, Literal, SatSolver, SatSolverFactoryFn},
-    utils::ConnectedComponentsComputer,
+    utils::{ConnectedComponentsComputer, LabelType},
 };
 
 /// A SAT-based solver for the preferred semantics.
@@ -41,7 +41,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework, LabelType};
+    /// # use crustabri::aa::{AAFramework};
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::solvers::{SingleExtensionComputer, PreferredSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = PreferredSemanticsSolver::new(af);
@@ -61,7 +62,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework, LabelType};
+    /// # use crustabri::aa::{AAFramework};
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::sat::CadicalSolver;
     /// # use crustabri::solvers::{SingleExtensionComputer, PreferredSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {

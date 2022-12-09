@@ -6,9 +6,9 @@ use super::{
     utils, CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer,
 };
 use crate::{
-    aa::{AAFramework, Argument, LabelType},
+    aa::{AAFramework, Argument},
     sat::{self, clause, Literal, SatSolver, SatSolverFactoryFn},
-    utils::ConnectedComponentsComputer,
+    utils::{ConnectedComponentsComputer, LabelType},
 };
 
 macro_rules! maximal_range_solver {
@@ -38,7 +38,8 @@ macro_rules! maximal_range_solver {
             /// # Example
             ///
             /// ```
-            /// # use crustabri::aa::{AAFramework, LabelType};
+            /// # use crustabri::aa::{AAFramework};
+            /// # use crustabri::utils::LabelType;
             #[doc = concat!(" # use crustabri::solvers::{SingleExtensionComputer, ", stringify!($solver_ident), "};")]
             /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
             #[doc = concat!("     let mut solver = ", stringify!($solver_ident), "::new(af);")]
@@ -60,7 +61,8 @@ macro_rules! maximal_range_solver {
             /// # Example
             ///
             /// ```
-            /// # use crustabri::aa::{AAFramework, LabelType};
+            /// # use crustabri::aa::{AAFramework};
+            /// # use crustabri::utils::LabelType;
             /// # use crustabri::sat::CadicalSolver;
             #[doc = concat!(" # use crustabri::solvers::{SingleExtensionComputer, ", stringify!($solver_ident), "};")]
             /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {

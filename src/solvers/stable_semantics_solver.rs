@@ -3,9 +3,9 @@ use super::{
     utils::cc_assignment_to_init_af_extension,
 };
 use crate::{
-    aa::{AAFramework, Argument, LabelType},
+    aa::{AAFramework, Argument},
     sat::{self, clause, Literal, SatSolver, SatSolverFactoryFn},
-    utils::ConnectedComponentsComputer,
+    utils::{ConnectedComponentsComputer, LabelType},
 };
 
 /// A SAT-based solver for the stable semantics.
@@ -37,7 +37,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework, LabelType};
+    /// # use crustabri::aa::{AAFramework};
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::solvers::{SingleExtensionComputer, StableSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = StableSemanticsSolver::new(af);
@@ -61,7 +62,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework, LabelType};
+    /// # use crustabri::aa::{AAFramework};
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::sat::CadicalSolver;
     /// # use crustabri::solvers::{SingleExtensionComputer, StableSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {

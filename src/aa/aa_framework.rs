@@ -1,5 +1,5 @@
-use super::{Argument, ArgumentSet, LabelType};
-use crate::utils;
+use super::{Argument, ArgumentSet};
+use crate::utils::{self, LabelType};
 use anyhow::{anyhow, Context, Result};
 
 /// An Abstract Argumentation framework as defined in Dung semantics.
@@ -33,7 +33,7 @@ where
 ///
 /// ```
 /// # use crustabri::aa::AAFramework;
-/// # use crustabri::aa::LabelType;
+/// # use crustabri::utils::LabelType;
 /// fn print_af_attacks<T>(af: &AAFramework<T>) where T: LabelType {
 ///     af
 ///         .iter_attacks()
@@ -53,7 +53,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{Attack, LabelType};
+    /// # use crustabri::aa::{Attack};
+    /// # use crustabri::utils::LabelType;
     /// fn describe_attack<T: LabelType>(attack: &Attack<T>) {
     ///     println!("{} attacks {}", attack.attacker(), attack.attacked());
     /// }
@@ -67,7 +68,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{Attack, LabelType};
+    /// # use crustabri::aa::{Attack};
+    /// # use crustabri::utils::LabelType;
     /// fn describe_attack<T: LabelType>(attack: &Attack<T>) {
     ///     println!("{} attacks {}", attack.attacker(), attack.attacked());
     /// }

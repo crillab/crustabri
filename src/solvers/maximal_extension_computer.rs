@@ -1,7 +1,8 @@
 use super::utils;
 use crate::{
-    aa::{AAFramework, Argument, LabelType},
+    aa::{AAFramework, Argument},
     sat::{Assignment, Literal, SatSolver},
+    utils::LabelType,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

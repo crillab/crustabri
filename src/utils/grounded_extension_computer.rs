@@ -1,4 +1,5 @@
-use crate::aa::{AAFramework, Argument, LabelType};
+use super::LabelType;
+use crate::aa::{AAFramework, Argument};
 
 pub(crate) fn grounded_extension<T>(af: &AAFramework<T>) -> Vec<&Argument<T>>
 where

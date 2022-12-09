@@ -1,6 +1,6 @@
-use crate::aa::LabelType;
 use crate::aba::aba_framework::ABAFramework;
 use crate::aba::aba_framework::Rule;
+use crate::utils::LabelType;
 
 struct AssumptionSet {
     data: Vec<bool>,

@@ -1,4 +1,7 @@
-use crate::aa::{AAFramework, Argument, LabelType};
+use crate::{
+    aa::{AAFramework, Argument},
+    utils::LabelType,
+};
 use anyhow::{Context, Result};
 use std::io::{Read, Write};
 
@@ -43,7 +46,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework, LabelType};
+    /// # use crustabri::aa::{AAFramework};
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::io::{AspartixReader, InstanceReader};
     /// fn print_arg_status<T>(reader: &dyn InstanceReader<T>, af: &AAFramework<T>, arg: &str)
     /// where

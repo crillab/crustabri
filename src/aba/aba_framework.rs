@@ -1,6 +1,6 @@
-use crate::aa::LabelType;
 use crate::aba::language::Atom;
 use crate::aba::language::Language;
+use crate::utils::LabelType;
 use anyhow::{anyhow, Context, Result};
 use std::fmt::Debug;
 
@@ -11,7 +11,6 @@ enum AtomType {
 }
 
 /// A rule in an ABA framework.
-#[derive(Debug)]
 pub struct Rule<'a, T>
 where
     T: LabelType,
@@ -76,7 +75,6 @@ where
 ///     aba_framework.new_assumption(assumption, contrary).unwrap();
 /// }
 /// ```
-#[derive(Debug)]
 pub struct ABAFramework<T>
 where
     T: LabelType,
@@ -238,7 +236,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::aba::ABAFramework;
     /// fn debug_assumptions<T: LabelType>(f: &ABAFramework<T>) {
     ///     assert_eq!(f.n_assumptions(), f.iter_assumptions().count())
@@ -255,7 +253,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::aba::ABAFramework;
     /// fn debug_assumptions<T: LabelType>(f: &ABAFramework<T>) {
     ///     for a in f.iter_assumptions() {
@@ -278,7 +276,7 @@ where
     ///
     /// ```
     /// # use crustabri::aba::ABAFramework;
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::utils::LabelType;
     /// fn debug_assumptions<T: LabelType>(f: &ABAFramework<T>) {
     ///     for a in f.iter_assumptions() {
     ///         println!(
@@ -308,7 +306,7 @@ where
     ///
     /// ```
     /// # use crustabri::aba::ABAFramework;
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::utils::LabelType;
     /// fn debug_assumptions<T: LabelType>(f: &ABAFramework<T>) {
     ///     let mut n_assumptions = 0;
     ///     for a in f.iter_assumptions() {
@@ -367,7 +365,7 @@ where
     ///
     /// ```
     /// # use crustabri::aba::ABAFramework;
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::utils::LabelType;
     /// fn debug_rules<T: LabelType>(f: &ABAFramework<T>) {
     ///     assert_eq!(f.n_rules(), f.iter_rules().count());
     /// }
@@ -381,11 +379,16 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aba::ABAFramework;
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::aba::{ABAFramework, Atom};
+    /// # use crustabri::utils::LabelType;
     /// fn debug_rules<T: LabelType>(f: &ABAFramework<T>) {
     ///     for (i,r) in f.iter_rules().enumerate() {
-    ///         println!("rule {}: {:?}", i, r);
+    ///         println!(
+    ///             "rule {}: head={}, body={:?}",
+    ///             i,
+    ///             r.head(),
+    ///             r.iter_body().collect::<Vec<&Atom<T>>>(),
+    ///         );
     ///     }
     /// }
     /// ```
@@ -399,7 +402,7 @@ where
     ///
     /// ```
     /// # use crustabri::aba::ABAFramework;
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::utils::LabelType;
     /// fn debug_arguments<T: LabelType>(f: &ABAFramework<T>) {
     ///     for (i,a) in f.iter_arguments().enumerate() {
     ///         println!("arg {}: {:?}", i, a);
@@ -631,18 +634,5 @@ mod tests {
             format!("{:?}", framework.rules[0]),
             format!("{:?}", framework.rules[1])
         );
-    }
-
-    #[test]
-    pub fn test_framework_debug() {
-        let atoms = vec!["a", "b", "c"];
-        let l1 = Language::new_with_labels(&atoms);
-        let mut framework1 = ABAFramework::new_with_language(l1);
-        framework1.new_rule(&"a", &[&"b"]).unwrap();
-        let l2 = Language::new_with_labels(&atoms);
-        let mut framework2 = ABAFramework::new_with_language(l2);
-        framework2.new_rule(&"a", &[&"c"]).unwrap();
-        assert_eq!(format!("{:?}", framework1), format!("{:?}", framework1));
-        assert_ne!(format!("{:?}", framework1), format!("{:?}", framework2));
     }
 }

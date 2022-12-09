@@ -1,5 +1,8 @@
 use super::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer};
-use crate::aa::{AAFramework, Argument, LabelType};
+use crate::{
+    aa::{AAFramework, Argument},
+    utils::LabelType,
+};
 
 /// A solver used to solve queries for the grounded semantics.
 ///
@@ -26,7 +29,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework, LabelType};
+    /// # use crustabri::aa::{AAFramework};
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::solvers::{SingleExtensionComputer, GroundedSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = GroundedSemanticsSolver::new(af);

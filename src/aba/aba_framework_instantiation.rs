@@ -1,5 +1,8 @@
 use super::{atom_support_computer::AtomSupport, ABAFramework, Atom};
-use crate::aa::{AAFramework, Argument, ArgumentSet, LabelType};
+use crate::{
+    aa::{AAFramework, Argument, ArgumentSet},
+    utils::LabelType,
+};
 use std::{fmt::Display, rc::Rc};
 
 /// An ABA framework instantiation to an AA framework.
@@ -10,7 +13,7 @@ use std::{fmt::Display, rc::Rc};
 /// # Example
 ///
 /// ```
-/// # use crustabri::aa::LabelType;
+/// # use crustabri::utils::LabelType;
 /// # use crustabri::aba::{ABAFramework, ABAFrameworkInstantiation, Atom};
 /// # use crustabri::solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, StableSemanticsSolver};
 /// fn compute_stable_extension_in_term_of_assumptions<T>(aba: &ABAFramework<T>)
@@ -80,7 +83,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::aba::{ABAFrameworkInstantiation, ABAFramework};
     /// fn instantiation_data<T>(aba: &ABAFramework<T>)
     /// where T: LabelType
@@ -116,7 +119,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::aba::{ABAFrameworkInstantiation, ABAFramework};
     /// fn instantiation_data<T>(aba: &ABAFramework<T>)
     /// where T: LabelType
@@ -140,7 +143,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::aba::{ABAFramework, ABAFrameworkInstantiation};
     /// # use crustabri::solvers::{SingleExtensionComputer, StableSemanticsSolver};
     /// fn compute_stable_extension_in_term_of_assumptions<T>(aba: &ABAFramework<T>)
@@ -186,7 +189,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::LabelType;
+    /// # use crustabri::utils::LabelType;
     /// # use crustabri::aba::{ABAFramework, ABAFrameworkInstantiation, Atom};
     /// # use crustabri::solvers::{CredulousAcceptanceComputer, StableSemanticsSolver};
     /// fn check_stable_assumption_cred_acceptance<T>(aba: &ABAFramework<T>, assumption: &Atom<T>)
