@@ -268,21 +268,27 @@ where
             computer.compute_next();
             match computer.state() {
                 MaximalExtensionComputerState::Maximal => {
-                    let mut stop_enum = false;
-                    enumerate_extensions_for_range(
+                    let stop_enum_reason = enumerate_extensions_for_range(
                         &mut computer.state_data(),
                         first_range_var,
-                        &mut |ext| {
+                        &|ext| {
                             if ext.contains(&cc_arg) == is_credulous_acceptance {
-                                stop_enum = true;
-                                false
+                                Some(ext.iter().map(|a| a.id()).collect())
                             } else {
-                                true
+                                None
                             }
                         },
                     );
-                    if stop_enum {
-                        return (is_credulous_acceptance, Some(computer.take_current()));
+                    if let Some(reason) = stop_enum_reason {
+                        return (
+                            is_credulous_acceptance,
+                            Some(
+                                reason
+                                    .iter()
+                                    .map(|id| cc_af.argument_set().get_argument_by_id(*id))
+                                    .collect(),
+                            ),
+                        );
                     }
                 }
                 MaximalExtensionComputerState::None => return (!is_credulous_acceptance, None),
@@ -350,13 +356,18 @@ where
 }
 
 // The callback function is called for all extension matching the range.
-// This function returns a Boolean indicating if the enumeration must continue.
-fn enumerate_extensions_for_range<T>(
+//
+// This function returns `None` if the enumeration must continue.
+// Otherwise, it returns a value indicating why the enumeration should stop.
+// This value is computed and returned by the callback function.
+fn enumerate_extensions_for_range<F, T>(
     fn_data: &mut MaximalExtensionComputerStateData<T>,
     first_range_var: usize,
-    callback: &mut dyn FnMut(&[&Argument<T>]) -> bool,
-) where
+    callback: &F,
+) -> Option<Vec<usize>>
+where
     T: LabelType,
+    F: Fn(&[&Argument<T>]) -> Option<Vec<usize>>,
 {
     let enum_selector = Literal::from(1 + fn_data.sat_solver.n_vars() as isize);
     let (mut in_range, mut not_in_range) = split_in_range(fn_data, first_range_var);
@@ -369,9 +380,9 @@ fn enumerate_extensions_for_range<T>(
     let mut current_extension_vec = None;
     let mut current_extension = fn_data.current_arg_set;
     loop {
-        let must_continue = (callback)(current_extension);
-        if !must_continue {
-            break;
+        let must_stop = (callback)(current_extension);
+        if must_stop.is_some() {
+            return must_stop;
         }
         let mut in_current = vec![false; fn_data.af.n_arguments()];
         current_extension
@@ -408,6 +419,7 @@ fn enumerate_extensions_for_range<T>(
         }
     }
     fn_data.sat_solver.add_clause(clause!(enum_selector));
+    None
 }
 
 fn split_in_range<T>(
@@ -859,5 +871,26 @@ mod tests {
         let mut solver = StageSemanticsSolver::new(&af);
         assert!(!solver
             .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
+    }
+
+    #[test]
+    fn test_semi_stable_check_certificate_involve_var() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        att(a0,a1).
+        att(a1,a0).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = SemiStableSemanticsSolver::new(&af);
+        let a0_label = af.argument_set().get_argument(&"a0".to_string()).unwrap();
+        let (acceptance, certificate) = solver.is_credulously_accepted_with_certificate(a0_label);
+        assert!(acceptance);
+        assert!(certificate.unwrap().contains(&a0_label));
+        let a1_label = af.argument_set().get_argument(&"a1".to_string()).unwrap();
+        let (acceptance, certificate) = solver.is_credulously_accepted_with_certificate(a1_label);
+        assert!(acceptance);
+        assert!(certificate.unwrap().contains(&a1_label));
     }
 }
