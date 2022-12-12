@@ -16,12 +16,8 @@ use crate::{
 /// of an argument as it can be computed in a more efficient way by a [CompleteSemanticsSolver](super::CompleteSemanticsSolver).
 ///
 /// Concerning the skeptical acceptance and the extension computation, this solver relies on successive calls to a SAT solver making the computation reach the second level of the polynomial hierarchy.
-///
-/// The certificates for the skeptical acceptance may be of two kinds:
-///   * a preferred extension that does not contain the argument under consideration;
-///   * or an admissible set of argument that attacks the argument under consideration.
-///
-/// In order to know which kind of certificate is provided, the caller must check if any of the attacks to the argument under consideration comes from an argument in the certificate.
+/// 
+/// The certificate provided in case an argument is not skeptically accepted is a preferred extension that does not the argument.
 pub struct PreferredSemanticsSolver<'a, T>
 where
     T: LabelType,
@@ -87,6 +83,7 @@ where
         &self,
         cc_af: &'b AAFramework<T>,
         arg: &'a Argument<T>,
+        allow_shortcut: bool,
     ) -> (bool, Option<Vec<&'b Argument<T>>>) {
         let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
         let mut solver = (self.solver_factory)();
@@ -104,9 +101,10 @@ where
                     let current = computer.current();
                     if current.contains(&cc_arg) {
                         computer.discard_current_search();
-                    } else if cc_af
-                        .iter_attacks_to(cc_arg)
-                        .any(|att| current.contains(&att.attacker()))
+                    } else if allow_shortcut
+                        && cc_af
+                            .iter_attacks_to(cc_arg)
+                            .any(|att| current.contains(&att.attacker()))
                     {
                         return (false, Some(computer.take_current()));
                     }
@@ -219,7 +217,7 @@ where
     fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let cc_af = cc_computer.connected_component_of(arg);
-        self.is_skeptically_accepted_in_cc(&cc_af, arg).0
+        self.is_skeptically_accepted_in_cc(&cc_af, arg, true).0
     }
 
     fn is_skeptically_accepted_with_certificate(
@@ -229,7 +227,8 @@ where
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let cc_af = cc_computer.connected_component_of(arg);
         let mut merged = Vec::new();
-        match self.is_skeptically_accepted_in_cc(&cc_af, arg) {
+        let is_accepted_in_cc = self.is_skeptically_accepted_in_cc(&cc_af, arg, false);
+        match is_accepted_in_cc {
             (true, None) => return (true, None),
             (false, Some(cc_ext)) => {
                 cc_ext
@@ -509,5 +508,28 @@ mod tests {
             true
         });
         assert_eq!(2, n_exts)
+    }
+
+    #[test]
+    fn test_allow_ds_shortcut() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        att(a0,a1).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a3).
+        att(a3,a2).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = PreferredSemanticsSolver::new(&af);
+        let arg1 = af.argument_set().get_argument(&"a1".to_string()).unwrap();
+        let (result, certificate) = solver.is_skeptically_accepted_with_certificate(arg1);
+        assert!(!result);
+        println!("{:?}", certificate.as_ref().unwrap());
+        assert_eq!(2, certificate.unwrap().len());
     }
 }
