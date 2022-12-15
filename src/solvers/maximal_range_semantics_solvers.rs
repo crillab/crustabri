@@ -1,12 +1,12 @@
 use super::{
-    complete_semantics_solver,
     maximal_extension_computer::{
         MaximalExtensionComputer, MaximalExtensionComputerState, MaximalExtensionComputerStateData,
     },
-    utils, CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer,
+    CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer,
 };
 use crate::{
     aa::{AAFramework, Argument},
+    encodings::ConstraintsEncoder,
     sat::{self, clause, Literal, SatSolver, SatSolverFactoryFn},
     utils::{ConnectedComponentsComputer, LabelType},
 };
@@ -137,36 +137,14 @@ macro_rules! maximal_range_solver {
 maximal_range_solver!(
     SemiStableSemanticsSolver,
     "semi-stable",
-    Box::new(|af, solver| {
-        complete_semantics_solver::encode_complete_semantics_constraints(af, solver)
-    })
+    Box::new(crate::encodings::DefaultCompleteConstraintsEncoder::default())
 );
 
 maximal_range_solver!(
     StageSemanticsSolver,
     "stage",
-    Box::new(|af, solver| { encode_conflict_freeness_constraints(af, solver) })
+    Box::new(crate::encodings::DefaultConflictFreenessConstraintsEncoder::default())
 );
-
-fn encode_conflict_freeness_constraints<T>(af: &AAFramework<T>, solver: &mut dyn SatSolver)
-where
-    T: LabelType,
-{
-    complete_semantics_solver::encode_disjunction_vars(af, solver);
-    af.argument_set().iter().for_each(|arg| {
-        let attacked_id = arg.id();
-        let attacked_solver_var =
-            complete_semantics_solver::arg_id_to_solver_var(attacked_id) as isize;
-        af.iter_attacks_to(arg).for_each(|att| {
-            let attacker_id = att.attacker().id();
-            let attacker_solver_var =
-                complete_semantics_solver::arg_id_to_solver_var(attacker_id) as isize;
-            solver.add_clause(clause![-attacked_solver_var, -attacker_solver_var,]);
-        });
-    });
-}
-
-pub(crate) type ConstraintsEncoder<T> = dyn Fn(&AAFramework<T>, &mut dyn SatSolver);
 
 pub(crate) struct MaximalRangeSemanticsHelper<'a, T>
 where
@@ -174,7 +152,7 @@ where
 {
     af: &'a AAFramework<T>,
     solver_factory: Box<SatSolverFactoryFn>,
-    constraints_encoder: Box<ConstraintsEncoder<T>>,
+    constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
 }
 
 impl<'a, T> MaximalRangeSemanticsHelper<'a, T>
@@ -184,7 +162,7 @@ where
     pub fn new(
         af: &'a AAFramework<T>,
         solver_factory: Box<SatSolverFactoryFn>,
-        constraints_encoder: Box<ConstraintsEncoder<T>>,
+        constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
     ) -> Self {
         MaximalRangeSemanticsHelper {
             af,
@@ -197,8 +175,13 @@ where
         let mut merged = Vec::new();
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
             let mut solver = (self.solver_factory)();
-            (self.constraints_encoder)(&cc_af, solver.as_mut());
-            let (computer, _) = new_maximal_extension_computer(&cc_af, solver.as_mut());
+            self.constraints_encoder
+                .encode_constraints(&cc_af, solver.as_mut());
+            let (computer, _) = new_maximal_extension_computer(
+                &cc_af,
+                solver.as_mut(),
+                self.constraints_encoder.as_ref(),
+            );
             for cc_arg in computer.compute_maximal() {
                 merged.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
             }
@@ -245,7 +228,7 @@ where
             (_, Some(cc_ext)) => {
                 cc_ext
                     .iter()
-                    .map(|a| utils::cc_arg_to_init_af_arg(a, self.af))
+                    .map(|a| self.af.argument_set().get_argument(a.label()).unwrap())
                     .for_each(|a| merged.push(a));
             }
         }
@@ -261,9 +244,13 @@ where
     ) -> (bool, Option<Vec<&'b Argument<T>>>) {
         let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
         let mut solver = (self.solver_factory)();
-        (self.constraints_encoder)(cc_af, solver.as_mut());
-        let (mut computer, first_range_var) =
-            new_maximal_extension_computer(cc_af, solver.as_mut());
+        self.constraints_encoder
+            .encode_constraints(cc_af, solver.as_mut());
+        let (mut computer, first_range_var) = new_maximal_extension_computer(
+            cc_af,
+            solver.as_mut(),
+            self.constraints_encoder.as_ref(),
+        );
         loop {
             computer.compute_next();
             match computer.state() {
@@ -271,6 +258,7 @@ where
                     let stop_enum_reason = enumerate_extensions_for_range(
                         &mut computer.state_data(),
                         first_range_var,
+                        self.constraints_encoder.as_ref(),
                         &|ext| {
                             if ext.contains(&cc_arg) == is_credulous_acceptance {
                                 Some(ext.iter().map(|a| a.id()).collect())
@@ -306,8 +294,13 @@ where
     {
         while let Some(other_cc_af) = cc_computer.next_connected_component() {
             let mut solver = (self.solver_factory)();
-            (self.constraints_encoder)(&other_cc_af, solver.as_mut());
-            let (computer, _) = new_maximal_extension_computer(&other_cc_af, solver.as_mut());
+            self.constraints_encoder
+                .encode_constraints(&other_cc_af, solver.as_mut());
+            let (computer, _) = new_maximal_extension_computer(
+                &other_cc_af,
+                solver.as_mut(),
+                self.constraints_encoder.as_ref(),
+            );
             for cc_arg in computer.compute_maximal() {
                 ext.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
             }
@@ -318,12 +311,13 @@ where
 fn new_maximal_extension_computer<'a, 'b, T>(
     af: &'a AAFramework<T>,
     solver: &'b mut dyn SatSolver,
+    constraints_encoder: &'b dyn ConstraintsEncoder<T>,
 ) -> (MaximalExtensionComputer<'a, 'b, T>, usize)
 where
     T: LabelType,
 {
-    let first_range_var = encode_range_constraints(af, solver);
-    let mut computer = MaximalExtensionComputer::new(af, solver);
+    let first_range_var = constraints_encoder.encode_range_constraints(af, solver);
+    let mut computer = MaximalExtensionComputer::new(af, solver, constraints_encoder);
     computer.set_increase_current_fn(Box::new(move |fn_data| {
         let (mut in_range, mut not_in_range) = split_in_range(&fn_data, first_range_var);
         not_in_range.push(fn_data.selector);
@@ -339,22 +333,6 @@ where
     (computer, first_range_var)
 }
 
-fn encode_range_constraints<T>(af: &AAFramework<T>, solver: &mut dyn SatSolver) -> usize
-where
-    T: LabelType,
-{
-    af.argument_set().iter().for_each(|a| {
-        let range_var = 1 + solver.n_vars() as isize;
-        let arg_var = complete_semantics_solver::arg_id_to_solver_var(a.id()) as isize;
-        let att_disj_var =
-            complete_semantics_solver::arg_id_to_solver_disjunction_var(a.id()) as isize;
-        solver.add_clause(clause!(-arg_var, range_var));
-        solver.add_clause(clause!(-att_disj_var, range_var));
-        solver.add_clause(clause!(-range_var, arg_var, att_disj_var));
-    });
-    solver.n_vars() + 1 - af.n_arguments()
-}
-
 // The callback function is called for all extension matching the range.
 //
 // This function returns `None` if the enumeration must continue.
@@ -363,6 +341,7 @@ where
 fn enumerate_extensions_for_range<F, T>(
     fn_data: &mut MaximalExtensionComputerStateData<T>,
     first_range_var: usize,
+    constraints_encoder: &dyn ConstraintsEncoder<T>,
     callback: &F,
 ) -> Option<Vec<usize>>
 where
@@ -395,9 +374,10 @@ where
                 if *b {
                     None
                 } else {
-                    Some(Literal::from(
-                        complete_semantics_solver::arg_id_to_solver_var(i) as isize,
-                    ))
+                    Some(
+                        constraints_encoder
+                            .arg_to_lit(fn_data.af.argument_set().get_argument_by_id(i)),
+                    )
                 }
             })
             .chain(std::iter::once(enum_selector))
@@ -409,10 +389,8 @@ where
             .unwrap_model()
         {
             Some(assignment) => {
-                current_extension_vec = Some(utils::assignment_to_complete_extension(
-                    &assignment,
-                    fn_data.af,
-                ));
+                current_extension_vec =
+                    Some(constraints_encoder.assignment_to_extension(&assignment, fn_data.af));
                 current_extension = current_extension_vec.as_ref().unwrap();
             }
             None => break,

@@ -1,10 +1,10 @@
-use super::{
-    specs::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
-    utils::cc_assignment_to_init_af_extension,
+use super::specs::{
+    CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer,
 };
 use crate::{
     aa::{AAFramework, Argument},
-    sat::{self, clause, Literal, SatSolver, SatSolverFactoryFn},
+    encodings::{ConstraintsEncoder, DefaultStableConstraintsEncoder},
+    sat::{self, SatSolverFactoryFn},
     utils::{ConnectedComponentsComputer, LabelType},
 };
 
@@ -24,6 +24,7 @@ where
 {
     af: &'a AAFramework<T>,
     solver_factory: Box<SatSolverFactoryFn>,
+    constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
 }
 
 impl<'a, T> StableSemanticsSolver<'a, T>
@@ -84,7 +85,11 @@ where
         af: &'a AAFramework<T>,
         solver_factory: Box<SatSolverFactoryFn>,
     ) -> Self {
-        Self { af, solver_factory }
+        Self {
+            af,
+            solver_factory,
+            constraints_encoder: Box::new(DefaultStableConstraintsEncoder::default()),
+        }
     }
 
     fn acceptance_with_model(
@@ -96,11 +101,11 @@ where
         let mut merged = Vec::new();
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
             let mut solver = (self.solver_factory)();
-            encode(&cc_af, solver.as_mut());
+            self.constraints_encoder
+                .encode_constraints(&cc_af, solver.as_mut());
             match cc_af.argument_set().get_argument(arg.label()) {
                 Ok(cc_arg) => {
-                    let mut assumption_lit =
-                        Literal::from(arg_id_to_solver_var(cc_arg.id()) as isize);
+                    let mut assumption_lit = self.constraints_encoder.arg_to_lit(cc_arg);
                     if !assumption_polarity {
                         assumption_lit = assumption_lit.negate()
                     }
@@ -109,25 +114,34 @@ where
                         .unwrap_model()
                     {
                         Some(assignment) => {
-                            let mut local_ext = cc_assignment_to_init_af_extension(
-                                assignment,
-                                &cc_af,
-                                self.af,
-                                |i| Some(arg_id_from_solver_var(i)),
+                            let cc_ext = self
+                                .constraints_encoder
+                                .assignment_to_extension(&assignment, &cc_af);
+                            merged.append(
+                                &mut cc_ext
+                                    .iter()
+                                    .map(|cc_arg| {
+                                        self.af.argument_set().get_argument(cc_arg.label()).unwrap()
+                                    })
+                                    .collect::<Vec<&Argument<T>>>(),
                             );
-                            merged.append(&mut local_ext)
                         }
                         None => return (status_on_unsat, None),
                     }
                 }
                 Err(_) => match solver.solve().unwrap_model() {
                     Some(assignment) => {
-                        merged.append(&mut cc_assignment_to_init_af_extension(
-                            assignment,
-                            &cc_af,
-                            self.af,
-                            |i| Some(arg_id_from_solver_var(i)),
-                        ));
+                        let cc_ext = self
+                            .constraints_encoder
+                            .assignment_to_extension(&assignment, &cc_af);
+                        merged.append(
+                            &mut cc_ext
+                                .iter()
+                                .map(|cc_arg| {
+                                    self.af.argument_set().get_argument(cc_arg.label()).unwrap()
+                                })
+                                .collect::<Vec<&Argument<T>>>(),
+                        );
                     }
                     None => return (status_on_unsat, None),
                 },
@@ -135,28 +149,6 @@ where
         }
         (!status_on_unsat, Some(merged))
     }
-}
-
-fn encode<T>(af: &AAFramework<T>, solver: &mut dyn SatSolver)
-where
-    T: LabelType,
-{
-    af.argument_set().iter().for_each(|arg| {
-        let attacked_id = arg.id();
-        let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;
-        let mut full_cl = clause![attacked_solver_var];
-        af.iter_attacks_to(arg).for_each(|att| {
-            let attacker_id = att.attacker().id();
-            if attacked_id == attacker_id {
-                solver.add_clause(clause![-attacked_solver_var])
-            } else {
-                let attacker_solver_var = arg_id_to_solver_var(attacker_id) as isize;
-                solver.add_clause(clause![-attacked_solver_var, -attacker_solver_var]);
-                full_cl.push(attacker_solver_var.into());
-            }
-        });
-        solver.add_clause(full_cl);
-    });
 }
 
 impl<T> SingleExtensionComputer<T> for StableSemanticsSolver<'_, T>
@@ -167,15 +159,21 @@ where
         let mut merged = Vec::new();
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
             let mut solver = (self.solver_factory)();
-            encode(&cc_af, solver.as_mut());
+            self.constraints_encoder
+                .encode_constraints(&cc_af, solver.as_mut());
             match solver.solve().unwrap_model() {
                 Some(assignment) => {
-                    merged.append(&mut cc_assignment_to_init_af_extension(
-                        assignment,
-                        &cc_af,
-                        self.af,
-                        |i| Some(arg_id_from_solver_var(i)),
-                    ));
+                    let cc_ext = self
+                        .constraints_encoder
+                        .assignment_to_extension(&assignment, &cc_af);
+                    merged.append(
+                        &mut cc_ext
+                            .iter()
+                            .map(|cc_arg| {
+                                self.af.argument_set().get_argument(cc_arg.label()).unwrap()
+                            })
+                            .collect::<Vec<&Argument<T>>>(),
+                    );
                 }
                 None => return None,
             }
@@ -214,14 +212,6 @@ where
     ) -> (bool, Option<Vec<&Argument<T>>>) {
         self.acceptance_with_model(arg, false, true)
     }
-}
-
-fn arg_id_to_solver_var(id: usize) -> usize {
-    id + 1
-}
-
-fn arg_id_from_solver_var(var: usize) -> usize {
-    var - 1
 }
 
 #[cfg(test)]

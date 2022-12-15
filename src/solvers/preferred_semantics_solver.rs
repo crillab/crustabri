@@ -1,11 +1,10 @@
 use super::{
-    complete_semantics_solver,
     maximal_extension_computer::{MaximalExtensionComputer, MaximalExtensionComputerState},
-    utils::{self},
     SingleExtensionComputer, SkepticalAcceptanceComputer,
 };
 use crate::{
     aa::{AAFramework, Argument},
+    encodings::{ConstraintsEncoder, DefaultCompleteConstraintsEncoder},
     sat::{self, Literal, SatSolver, SatSolverFactoryFn},
     utils::{ConnectedComponentsComputer, LabelType},
 };
@@ -16,7 +15,7 @@ use crate::{
 /// of an argument as it can be computed in a more efficient way by a [CompleteSemanticsSolver](super::CompleteSemanticsSolver).
 ///
 /// Concerning the skeptical acceptance and the extension computation, this solver relies on successive calls to a SAT solver making the computation reach the second level of the polynomial hierarchy.
-/// 
+///
 /// The certificate provided in case an argument is not skeptically accepted is a preferred extension that does not the argument.
 pub struct PreferredSemanticsSolver<'a, T>
 where
@@ -24,6 +23,7 @@ where
 {
     af: &'a AAFramework<T>,
     solver_factory: Box<SatSolverFactoryFn>,
+    constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
 }
 
 impl<'a, T> PreferredSemanticsSolver<'a, T>
@@ -76,7 +76,11 @@ where
         af: &'a AAFramework<T>,
         solver_factory: Box<SatSolverFactoryFn>,
     ) -> Self {
-        Self { af, solver_factory }
+        Self {
+            af,
+            solver_factory,
+            constraints_encoder: Box::new(DefaultCompleteConstraintsEncoder::default()),
+        }
     }
 
     fn is_skeptically_accepted_in_cc<'b>(
@@ -87,8 +91,13 @@ where
     ) -> (bool, Option<Vec<&'b Argument<T>>>) {
         let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
         let mut solver = (self.solver_factory)();
-        complete_semantics_solver::encode_complete_semantics_constraints(cc_af, solver.as_mut());
-        let mut computer = new_maximal_extension_computer(cc_af, solver.as_mut());
+        self.constraints_encoder
+            .encode_constraints(cc_af, solver.as_mut());
+        let mut computer = new_maximal_extension_computer(
+            cc_af,
+            solver.as_mut(),
+            self.constraints_encoder.as_ref(),
+        );
         loop {
             computer.compute_next();
             match computer.state() {
@@ -118,10 +127,11 @@ where
     pub(crate) fn enumerate_extensions(
         af: &AAFramework<T>,
         solver: &mut dyn SatSolver,
+        constraints_encoder: &dyn ConstraintsEncoder<T>,
         callback: &mut dyn FnMut(&[&Argument<T>]) -> bool,
     ) {
-        complete_semantics_solver::encode_complete_semantics_constraints(af, solver);
-        let mut computer = new_maximal_extension_computer(af, solver);
+        constraints_encoder.encode_constraints(af, solver);
+        let mut computer = new_maximal_extension_computer(af, solver, constraints_encoder);
         loop {
             computer.compute_next();
             match computer.state() {
@@ -134,34 +144,49 @@ where
                 _ => {}
             }
         }
+        std::mem::drop(computer);
     }
 }
 
 fn new_maximal_extension_computer<'a, 'b, T>(
     cc_af: &'a AAFramework<T>,
     solver: &'b mut dyn SatSolver,
+    constraints_encoder: &'b dyn ConstraintsEncoder<T>,
 ) -> MaximalExtensionComputer<'a, 'b, T>
 where
     T: LabelType,
 {
-    let mut computer = MaximalExtensionComputer::new(cc_af, solver);
+    let mut computer = MaximalExtensionComputer::new(cc_af, solver, constraints_encoder);
     computer.set_increase_current_fn(Box::new(|fn_data| {
-        let (mut in_ext, mut not_in_ext) =
-            split_in_extension(fn_data.current_arg_set, fn_data.af.n_arguments());
+        let (mut in_ext, mut not_in_ext) = split_in_extension(
+            fn_data.af,
+            fn_data.current_arg_set,
+            fn_data.af.n_arguments(),
+            fn_data.constraints_encoder,
+        );
         not_in_ext.push(fn_data.selector);
         in_ext.push(fn_data.selector.negate());
         fn_data.sat_solver.add_clause(not_in_ext);
         in_ext
     }));
     computer.set_discard_current_fn(Box::new(|fn_data| {
-        let (mut in_ext, _) = split_in_extension(fn_data.current_arg_set, fn_data.af.n_arguments());
+        let (mut in_ext, _) = split_in_extension(
+            fn_data.af,
+            fn_data.current_arg_set,
+            fn_data.af.n_arguments(),
+            fn_data.constraints_encoder,
+        );
         in_ext.iter_mut().for_each(|l| *l = l.negate());
         in_ext.push(fn_data.selector);
         fn_data.sat_solver.add_clause(in_ext);
     }));
     computer.set_discard_maximal_fn(Box::new(|fn_data| {
-        let (_, mut not_in_ext) =
-            split_in_extension(fn_data.current_arg_set, fn_data.af.n_arguments());
+        let (_, mut not_in_ext) = split_in_extension(
+            fn_data.af,
+            fn_data.current_arg_set,
+            fn_data.af.n_arguments(),
+            fn_data.constraints_encoder,
+        );
         not_in_ext.push(fn_data.selector);
         fn_data.sat_solver.add_clause(not_in_ext);
     }));
@@ -169,8 +194,10 @@ where
 }
 
 pub(crate) fn split_in_extension<T>(
+    af: &AAFramework<T>,
     current: &[&Argument<T>],
     n_args: usize,
+    constraints_encoder: &dyn ConstraintsEncoder<T>,
 ) -> (Vec<Literal>, Vec<Literal>)
 where
     T: LabelType,
@@ -180,7 +207,7 @@ where
     let mut not_in_ext = Vec::with_capacity(n_args);
     let mut in_ext = Vec::with_capacity(n_args);
     in_ext_bool.iter().enumerate().for_each(|(i, b)| {
-        let lit = Literal::from(complete_semantics_solver::arg_id_to_solver_var(i) as isize);
+        let lit = constraints_encoder.arg_to_lit(af.argument_set().get_argument_by_id(i));
         match *b {
             true => in_ext.push(lit),
             false => not_in_ext.push(lit),
@@ -197,11 +224,13 @@ where
         let mut merged = Vec::new();
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
             let mut solver = (self.solver_factory)();
-            complete_semantics_solver::encode_complete_semantics_constraints(
+            self.constraints_encoder
+                .encode_constraints(&cc_af, solver.as_mut());
+            let computer = new_maximal_extension_computer(
                 &cc_af,
                 solver.as_mut(),
+                self.constraints_encoder.as_ref(),
             );
-            let computer = new_maximal_extension_computer(&cc_af, solver.as_mut());
             for cc_arg in computer.compute_maximal() {
                 merged.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
             }
@@ -233,18 +262,20 @@ where
             (false, Some(cc_ext)) => {
                 cc_ext
                     .iter()
-                    .map(|a| utils::cc_arg_to_init_af_arg(a, self.af))
+                    .map(|a| self.af.argument_set().get_argument(a.label()).unwrap())
                     .for_each(|a| merged.push(a));
             }
             _ => unreachable!(),
         }
         while let Some(other_cc_af) = cc_computer.next_connected_component() {
             let mut solver = (self.solver_factory)();
-            complete_semantics_solver::encode_complete_semantics_constraints(
+            self.constraints_encoder
+                .encode_constraints(&other_cc_af, solver.as_mut());
+            let computer = new_maximal_extension_computer(
                 &other_cc_af,
                 solver.as_mut(),
+                self.constraints_encoder.as_ref(),
             );
-            let computer = new_maximal_extension_computer(&other_cc_af, solver.as_mut());
             for cc_arg in computer.compute_maximal() {
                 merged.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
             }
@@ -499,14 +530,20 @@ mod tests {
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = sat::default_solver();
         let mut n_exts = 0;
-        PreferredSemanticsSolver::enumerate_extensions(&af, solver.as_mut(), &mut |ext| {
-            n_exts += 1;
-            let args = ext.iter().map(|a| a.label()).collect::<Vec<&String>>();
-            assert!(args.contains(&&"a0".to_string()) ^ args.contains(&&"a1".to_string()));
-            assert!(!args.contains(&&"a2".to_string()));
-            assert!(args.contains(&&"a3".to_string()));
-            true
-        });
+        let constraints_encoder = DefaultCompleteConstraintsEncoder::default();
+        PreferredSemanticsSolver::enumerate_extensions(
+            &af,
+            solver.as_mut(),
+            &constraints_encoder,
+            &mut |ext| {
+                n_exts += 1;
+                let args = ext.iter().map(|a| a.label()).collect::<Vec<&String>>();
+                assert!(args.contains(&&"a0".to_string()) ^ args.contains(&&"a1".to_string()));
+                assert!(!args.contains(&&"a2".to_string()));
+                assert!(args.contains(&&"a3".to_string()));
+                true
+            },
+        );
         assert_eq!(2, n_exts)
     }
 

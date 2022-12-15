@@ -25,5 +25,3 @@ pub use specs::SkepticalAcceptanceComputer;
 
 mod stable_semantics_solver;
 pub use stable_semantics_solver::StableSemanticsSolver;
-
-mod utils;

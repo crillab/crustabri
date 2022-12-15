@@ -128,7 +128,7 @@ macro_rules! clause {
         vec![] as Vec<Literal>
     );
     ($($x:expr),+ $(,)?) => (
-        [$($x),+].into_iter().map(Literal::from).collect::<Vec<Literal>>()
+        [$($x),+].into_iter().map(crate::sat::Literal::from).collect::<Vec<crate::sat::Literal>>()
     );
 }
 

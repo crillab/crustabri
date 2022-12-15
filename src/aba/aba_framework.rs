@@ -582,7 +582,7 @@ mod tests {
     }
 
     fn check_rule(
-        rule: &Rule<&str>,
+        rule: &Rule<&'static str>,
         expected_head: &'static str,
         expected_body: &[&'static str],
     ) -> bool {

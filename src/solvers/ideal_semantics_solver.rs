@@ -1,10 +1,11 @@
 use super::{
-    complete_semantics_solver, maximal_extension_computer::MaximalExtensionComputer,
-    preferred_semantics_solver, CredulousAcceptanceComputer, PreferredSemanticsSolver,
-    SingleExtensionComputer, SkepticalAcceptanceComputer,
+    maximal_extension_computer::MaximalExtensionComputer, preferred_semantics_solver,
+    CredulousAcceptanceComputer, PreferredSemanticsSolver, SingleExtensionComputer,
+    SkepticalAcceptanceComputer,
 };
 use crate::{
     aa::{AAFramework, Argument},
+    encodings::{ConstraintsEncoder, DefaultCompleteConstraintsEncoder},
     sat,
     sat::{Literal, SatSolver, SatSolverFactoryFn},
     utils::{self, ConnectedComponentsComputer, LabelType},
@@ -23,6 +24,7 @@ where
 {
     af: &'a AAFramework<T>,
     solver_factory: Box<SatSolverFactoryFn>,
+    constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
 }
 
 impl<'a, T> IdealSemanticsSolver<'a, T>
@@ -75,7 +77,11 @@ where
         af: &'a AAFramework<T>,
         solver_factory: Box<SatSolverFactoryFn>,
     ) -> Self {
-        Self { af, solver_factory }
+        Self {
+            af,
+            solver_factory,
+            constraints_encoder: Box::new(DefaultCompleteConstraintsEncoder::default()),
+        }
     }
 
     fn compute_one_extension_for_cc<'b>(&self, cc_af: &'b AAFramework<T>) -> Vec<&'b Argument<T>> {
@@ -84,26 +90,36 @@ where
         let mut n_in_all = 0;
         let mut n_preferred = 0;
         let mut solver = (self.solver_factory)();
-        PreferredSemanticsSolver::enumerate_extensions(cc_af, solver.as_mut(), &mut |ext| {
-            n_preferred += 1;
-            let mut new_in_all = vec![false; cc_af.n_arguments()];
-            n_in_all = 0;
-            ext.iter().for_each(|a| {
-                if in_all[a.id()] {
-                    new_in_all[a.id()] = true;
-                    n_in_all += 1;
-                }
-            });
-            in_all = new_in_all;
-            n_in_all != grounded.len()
-        });
+        PreferredSemanticsSolver::enumerate_extensions(
+            cc_af,
+            solver.as_mut(),
+            self.constraints_encoder.as_ref(),
+            &mut |ext| {
+                n_preferred += 1;
+                let mut new_in_all = vec![false; cc_af.n_arguments()];
+                n_in_all = 0;
+                ext.iter().for_each(|a| {
+                    if in_all[a.id()] {
+                        new_in_all[a.id()] = true;
+                        n_in_all += 1;
+                    }
+                });
+                in_all = new_in_all;
+                n_in_all != grounded.len()
+            },
+        );
         if n_in_all == grounded.len() {
             return grounded;
         }
         if n_preferred == 1 {
             return single_preferred(cc_af, in_all);
         }
-        compute_maximal_with_allowed(cc_af, solver.as_mut(), in_all)
+        compute_maximal_with_allowed(
+            cc_af,
+            solver.as_mut(),
+            in_all,
+            self.constraints_encoder.as_ref(),
+        )
     }
 
     fn check_credulous_acceptance_for_cc<'b>(
@@ -116,19 +132,24 @@ where
         let mut n_in_all = 0;
         let mut n_preferred = 0;
         let mut solver = (self.solver_factory)();
-        PreferredSemanticsSolver::enumerate_extensions(cc_af, solver.as_mut(), &mut |ext| {
-            n_preferred += 1;
-            let mut new_in_all = vec![false; cc_af.n_arguments()];
-            n_in_all = 0;
-            ext.iter().for_each(|a| {
-                if in_all[a.id()] {
-                    new_in_all[a.id()] = true;
-                    n_in_all += 1;
-                }
-            });
-            in_all = new_in_all;
-            n_in_all != grounded.len() && in_all[cc_arg.id()]
-        });
+        PreferredSemanticsSolver::enumerate_extensions(
+            cc_af,
+            solver.as_mut(),
+            self.constraints_encoder.as_ref(),
+            &mut |ext| {
+                n_preferred += 1;
+                let mut new_in_all = vec![false; cc_af.n_arguments()];
+                n_in_all = 0;
+                ext.iter().for_each(|a| {
+                    if in_all[a.id()] {
+                        new_in_all[a.id()] = true;
+                        n_in_all += 1;
+                    }
+                });
+                in_all = new_in_all;
+                n_in_all != grounded.len() && in_all[cc_arg.id()]
+            },
+        );
         if !in_all[cc_arg.id()] {
             return (false, None);
         }
@@ -146,7 +167,12 @@ where
             let ext = single_preferred(cc_af, in_all);
             return result(ext);
         }
-        let ideal_ext = compute_maximal_with_allowed(cc_af, solver.as_mut(), in_all);
+        let ideal_ext = compute_maximal_with_allowed(
+            cc_af,
+            solver.as_mut(),
+            in_all,
+            self.constraints_encoder.as_ref(),
+        );
         result(ideal_ext)
     }
 }
@@ -155,6 +181,7 @@ fn compute_maximal_with_allowed<'a, T>(
     cc_af: &'a AAFramework<T>,
     solver: &mut dyn SatSolver,
     in_all_preferred: Vec<bool>,
+    constraints_encoder: &dyn ConstraintsEncoder<T>,
 ) -> Vec<&'a Argument<T>>
 where
     T: LabelType,
@@ -165,15 +192,19 @@ where
         .filter_map(|(i, b)| match *b {
             true => None,
             false => Some(
-                Literal::from(complete_semantics_solver::arg_id_to_solver_var(i) as isize).negate(),
+                constraints_encoder
+                    .arg_to_lit(cc_af.argument_set().get_argument_by_id(i))
+                    .negate(),
             ),
         })
         .collect::<Vec<Literal>>();
-    let mut computer = MaximalExtensionComputer::new(cc_af, solver);
+    let mut computer = MaximalExtensionComputer::new(cc_af, solver, constraints_encoder);
     computer.set_increase_current_fn(Box::new(move |fn_data| {
         let (mut in_ext, mut not_in_ext) = preferred_semantics_solver::split_in_extension(
+            fn_data.af,
             fn_data.current_arg_set,
             fn_data.af.n_arguments(),
+            fn_data.constraints_encoder,
         );
         not_in_ext.push(fn_data.selector);
         in_ext.push(fn_data.selector.negate());
@@ -209,10 +240,8 @@ where
         let mut merged = Vec::new();
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
             let mut solver = (self.solver_factory)();
-            complete_semantics_solver::encode_complete_semantics_constraints(
-                &cc_af,
-                solver.as_mut(),
-            );
+            self.constraints_encoder
+                .encode_constraints(&cc_af, solver.as_mut());
             let local_ext = self.compute_one_extension_for_cc(&cc_af);
             for cc_arg in local_ext {
                 merged.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
@@ -247,7 +276,7 @@ where
         let mut merged = Vec::new();
         cc_ext
             .iter()
-            .map(|a| super::utils::cc_arg_to_init_af_arg(a, self.af))
+            .map(|a| self.af.argument_set().get_argument(a.label()).unwrap())
             .for_each(|a| merged.push(a));
         while let Some(other_cc_af) = cc_computer.next_connected_component() {
             for cc_arg in self.compute_one_extension_for_cc(&other_cc_af) {

@@ -1,6 +1,6 @@
-use super::utils;
 use crate::{
     aa::{AAFramework, Argument},
+    encodings::ConstraintsEncoder,
     sat::{Assignment, Literal, SatSolver},
     utils::LabelType,
 };
@@ -21,6 +21,7 @@ where
     pub(crate) af: &'a AAFramework<T>,
     pub(crate) current_arg_set: &'a [&'a Argument<T>],
     pub(crate) sat_solver: &'a mut dyn SatSolver,
+    pub(crate) constraints_encoder: &'a dyn ConstraintsEncoder<T>,
     pub(crate) current_model: Option<&'a Assignment>,
     pub(crate) selector: Literal,
 }
@@ -48,6 +49,7 @@ where
 {
     af: &'a AAFramework<T>,
     solver: &'b mut dyn SatSolver,
+    constraints_encoder: &'b dyn ConstraintsEncoder<T>,
     current_extension: Option<Vec<&'a Argument<T>>>,
     current_model: Option<Assignment>,
     state: MaximalExtensionComputerState,
@@ -61,11 +63,16 @@ impl<'a, 'b, T> MaximalExtensionComputer<'a, 'b, T>
 where
     T: LabelType,
 {
-    pub fn new(af: &'a AAFramework<T>, solver: &'b mut dyn SatSolver) -> Self {
+    pub fn new(
+        af: &'a AAFramework<T>,
+        solver: &'b mut dyn SatSolver,
+        constraints_encoder: &'b dyn ConstraintsEncoder<T>,
+    ) -> Self {
         let selector = Literal::from(1 + solver.n_vars() as isize);
         Self {
             af,
             solver,
+            constraints_encoder,
             current_extension: None,
             current_model: None,
             state: MaximalExtensionComputerState::Init,
@@ -120,6 +127,7 @@ where
                 af: self.af,
                 current_arg_set: self.current_extension.as_ref().unwrap(),
                 sat_solver: self.solver,
+                constraints_encoder: self.constraints_encoder,
                 current_model: self.current_model.as_ref(),
                 selector: self.selector,
             });
@@ -138,6 +146,7 @@ where
             af: self.af,
             current_arg_set: self.current_extension.as_ref().unwrap(),
             sat_solver: self.solver,
+            constraints_encoder: self.constraints_encoder,
             current_model: self.current_model.as_ref(),
             selector: self.selector,
         });
@@ -149,6 +158,7 @@ where
             af: self.af,
             current_arg_set: self.current_extension.as_ref().unwrap(),
             sat_solver: self.solver,
+            constraints_encoder: self.constraints_encoder,
             current_model: self.current_model.as_ref(),
             selector: self.selector,
         });
@@ -160,6 +170,7 @@ where
             af: self.af,
             current_arg_set: self.current_extension.as_ref().unwrap(),
             sat_solver: self.solver,
+            constraints_encoder: self.constraints_encoder,
             current_model: self.current_model.as_ref(),
             selector: self.selector,
         }
@@ -182,7 +193,9 @@ where
             .solve_under_assumptions(assumptions)
             .unwrap_model()
             .map(|new_ext_assignment| {
-                let ext = utils::assignment_to_complete_extension(&new_ext_assignment, self.af);
+                let ext = self
+                    .constraints_encoder
+                    .assignment_to_extension(&new_ext_assignment, self.af);
                 (new_ext_assignment, ext)
             })
     }

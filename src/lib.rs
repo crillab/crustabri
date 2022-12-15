@@ -6,6 +6,8 @@ pub mod aa;
 
 pub mod aba;
 
+pub mod encodings;
+
 pub mod io;
 
 pub mod solvers;

@@ -1,10 +1,9 @@
 use super::specs::CredulousAcceptanceComputer;
-use super::utils::{cc_arg_to_init_af_arg, cc_assignment_to_init_af_extension};
 use crate::aa::{AAFramework, Argument};
-use crate::sat::clause;
+use crate::encodings::{ConstraintsEncoder, DefaultCompleteConstraintsEncoder};
 use crate::utils::LabelType;
 use crate::{
-    sat::{self, Literal, SatSolver, SatSolverFactoryFn},
+    sat::{self, SatSolverFactoryFn},
     utils::ConnectedComponentsComputer,
 };
 
@@ -24,6 +23,7 @@ where
 {
     af: &'a AAFramework<T>,
     solver_factory: Box<SatSolverFactoryFn>,
+    constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
 }
 
 impl<'a, T> CompleteSemanticsSolver<'a, T>
@@ -92,60 +92,12 @@ where
     where
         T: LabelType,
     {
-        Self { af, solver_factory }
+        Self {
+            af,
+            solver_factory,
+            constraints_encoder: Box::new(DefaultCompleteConstraintsEncoder::default()),
+        }
     }
-}
-
-pub(crate) fn encode_disjunction_vars<T>(af: &AAFramework<T>, solver: &mut dyn SatSolver)
-where
-    T: LabelType,
-{
-    af.argument_set().iter().for_each(|arg| {
-        let attacked_id = arg.id();
-        let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;
-        let attacked_disjunction_solver_var =
-            arg_id_to_solver_disjunction_var(attacked_id) as isize;
-        solver.add_clause(clause![
-            -attacked_solver_var,
-            -attacked_disjunction_solver_var
-        ]);
-        let mut full_cl = clause![-attacked_disjunction_solver_var];
-        af.iter_attacks_to(arg).for_each(|att| {
-            let attacker_id = att.attacker().id();
-            let attacker_solver_var = arg_id_to_solver_var(attacker_id) as isize;
-            solver.add_clause(clause![
-                attacked_disjunction_solver_var,
-                -attacker_solver_var
-            ]);
-            full_cl.push(attacker_solver_var.into());
-        });
-        solver.add_clause(full_cl)
-    });
-}
-
-pub(crate) fn encode_complete_semantics_constraints<T>(
-    af: &AAFramework<T>,
-    solver: &mut dyn SatSolver,
-) where
-    T: LabelType,
-{
-    encode_disjunction_vars(af, solver);
-    af.argument_set().iter().for_each(|arg| {
-        let attacked_id = arg.id();
-        let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;
-        let mut full_cl = clause![attacked_solver_var];
-        af.iter_attacks_to(arg).for_each(|att| {
-            let attacker_id = att.attacker().id();
-            let attacker_disjunction_solver_var =
-                arg_id_to_solver_disjunction_var(attacker_id) as isize;
-            solver.add_clause(clause![
-                -attacked_solver_var,
-                attacker_disjunction_solver_var
-            ]);
-            full_cl.push((-attacker_disjunction_solver_var).into());
-        });
-        solver.add_clause(full_cl)
-    });
 }
 
 impl<T> CredulousAcceptanceComputer<T> for CompleteSemanticsSolver<'_, T>
@@ -156,12 +108,11 @@ where
         let mut solver = (self.solver_factory)();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let reduced_af = cc_computer.connected_component_of(arg);
-        encode_complete_semantics_constraints(&reduced_af, solver.as_mut());
+        self.constraints_encoder
+            .encode_constraints(&reduced_af, solver.as_mut());
         let arg_in_reduced_af = reduced_af.argument_set().get_argument(arg.label()).unwrap();
         solver
-            .solve_under_assumptions(&[Literal::from(
-                arg_id_to_solver_var(arg_in_reduced_af.id()) as isize
-            )])
+            .solve_under_assumptions(&[self.constraints_encoder.arg_to_lit(arg_in_reduced_af)])
             .unwrap_model()
             .is_some()
     }
@@ -173,26 +124,26 @@ where
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let reduced_af = cc_computer.connected_component_of(arg);
         let mut solver = (self.solver_factory)();
-        encode_complete_semantics_constraints(&reduced_af, solver.as_mut());
+        self.constraints_encoder
+            .encode_constraints(&reduced_af, solver.as_mut());
         let arg_in_reduced_af = reduced_af.argument_set().get_argument(arg.label()).unwrap();
         match solver
-            .solve_under_assumptions(&[Literal::from(
-                arg_id_to_solver_var(arg_in_reduced_af.id()) as isize
-            )])
+            .solve_under_assumptions(&[self.constraints_encoder.arg_to_lit(arg_in_reduced_af)])
             .unwrap_model()
         {
             Some(model) => {
-                let mut merged = cc_assignment_to_init_af_extension(
-                    model,
-                    &reduced_af,
-                    self.af,
-                    arg_id_from_solver_var,
-                );
+                let cc_ext = self
+                    .constraints_encoder
+                    .assignment_to_extension(&model, &reduced_af);
+                let mut merged = cc_ext
+                    .iter()
+                    .map(|cc_arg| self.af.argument_set().get_argument(cc_arg.label()).unwrap())
+                    .collect::<Vec<&Argument<T>>>();
                 while let Some(other_cc_af) = cc_computer.next_connected_component() {
                     let other_cc_grounded = other_cc_af.grounded_extension();
                     other_cc_grounded
                         .iter()
-                        .map(|a| cc_arg_to_init_af_arg(a, self.af))
+                        .map(|a| self.af.argument_set().get_argument(a.label()).unwrap())
                         .for_each(|a| merged.push(a));
                 }
                 (true, Some(merged))
@@ -200,22 +151,6 @@ where
             None => (false, None),
         }
     }
-}
-
-pub(crate) fn arg_id_to_solver_var(id: usize) -> usize {
-    (id + 1) << 1
-}
-
-pub(crate) fn arg_id_from_solver_var(v: usize) -> Option<usize> {
-    if v & 1 == 1 {
-        None
-    } else {
-        Some((v >> 1) - 1)
-    }
-}
-
-pub(crate) fn arg_id_to_solver_disjunction_var(id: usize) -> usize {
-    arg_id_to_solver_var(id) - 1
 }
 
 #[cfg(test)]
@@ -275,14 +210,6 @@ mod tests {
             .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
         assert!(solver
             .is_credulously_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
-    }
-
-    #[test]
-    fn test_id_to_var() {
-        assert_eq!(0, arg_id_from_solver_var(arg_id_to_solver_var(0)).unwrap());
-        assert_eq!(1, arg_id_from_solver_var(arg_id_to_solver_var(1)).unwrap());
-        assert_eq!(2, arg_id_to_solver_var(arg_id_from_solver_var(2).unwrap()));
-        assert_eq!(4, arg_id_to_solver_var(arg_id_from_solver_var(4).unwrap()));
     }
 
     #[test]
