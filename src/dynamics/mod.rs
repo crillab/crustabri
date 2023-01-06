@@ -9,3 +9,6 @@ pub use dynamic_preferred_semantics_solver::DynamicPreferredSemanticsSolver;
 
 mod dynamic_solver;
 pub use dynamic_solver::DynamicSolver;
+
+mod dynamic_stable_semantics_solver;
+pub use dynamic_stable_semantics_solver::DynamicStableSemanticsSolver;
