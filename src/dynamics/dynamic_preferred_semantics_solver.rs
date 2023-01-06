@@ -1,11 +1,14 @@
-use super::{DynamicCompleteConstraintsEncoder, DynamicSolver};
+use super::{
+    dynamic_constraints_encoder::{self, DynamicConstraintsEncoder},
+    DynamicSolver,
+};
 use crate::{
     aa::{AAFramework, Argument},
     encodings::ConstraintsEncoder,
     sat::{self, Assignment, Literal, SatSolver, SatSolverFactoryFn},
     solvers::{
         maximal_extension_computer::{self, MaximalExtensionComputerState},
-        SkepticalAcceptanceComputer,
+        CredulousAcceptanceComputer, SkepticalAcceptanceComputer,
     },
     utils::LabelType,
 };
@@ -17,7 +20,7 @@ pub struct DynamicPreferredSemanticsSolver<T>
 where
     T: LabelType,
 {
-    encoder: DynamicCompleteConstraintsEncoder<T>,
+    encoder: DynamicConstraintsEncoder<T>,
     solver: Rc<RefCell<Box<dyn SatSolver>>>,
 }
 
@@ -44,7 +47,7 @@ where
     {
         let solver = Rc::new(RefCell::new((solver_factory)()));
         Self {
-            encoder: DynamicCompleteConstraintsEncoder::new(Rc::clone(&solver)),
+            encoder: dynamic_constraints_encoder::new_for_complete_semantics(Rc::clone(&solver)),
             solver,
         }
     }
@@ -77,6 +80,22 @@ where
 
     fn remove_attack(&mut self, from: &T, to: &T) -> Result<()> {
         self.encoder.remove_attack(from, to)
+    }
+}
+
+impl<T> CredulousAcceptanceComputer<T> for DynamicPreferredSemanticsSolver<T>
+where
+    T: LabelType,
+{
+    fn is_credulously_accepted(&mut self, _arg: &T) -> bool {
+        unimplemented!()
+    }
+
+    fn is_credulously_accepted_with_certificate(
+        &mut self,
+        _arg: &T,
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
+        unimplemented!()
     }
 }
 
@@ -134,7 +153,7 @@ struct LocalConstraintsEncoder<'a, T>
 where
     T: LabelType,
 {
-    encoder: &'a DynamicCompleteConstraintsEncoder<T>,
+    encoder: &'a DynamicConstraintsEncoder<T>,
 }
 
 impl<T> ConstraintsEncoder<T> for LocalConstraintsEncoder<'_, T>
