@@ -186,14 +186,15 @@ impl<T> CredulousAcceptanceComputer<T> for StableSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
+    fn is_credulously_accepted(&mut self, arg: &T) -> bool {
         self.is_credulously_accepted_with_certificate(arg).0
     }
 
     fn is_credulously_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         self.acceptance_with_model(arg, true, false)
     }
 }
@@ -202,14 +203,15 @@ impl<T> SkepticalAcceptanceComputer<T> for StableSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
+    fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
         self.is_skeptically_accepted_with_certificate(arg).0
     }
 
     fn is_skeptically_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         self.acceptance_with_model(arg, false, true)
     }
 }
@@ -280,14 +282,10 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = StableSemanticsSolver::new(&af);
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        assert!(solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
     }
 
     #[test]
@@ -303,9 +301,7 @@ mod tests {
         assert_eq!(
             &["a0"],
             solver
-                .is_credulously_accepted_with_certificate(
-                    af.argument_set().get_argument(&"a0".to_string()).unwrap()
-                )
+                .is_credulously_accepted_with_certificate(&"a0".to_string())
                 .1
                 .unwrap()
                 .iter()
@@ -317,9 +313,7 @@ mod tests {
         assert_eq!(
             &["a0"],
             solver
-                .is_skeptically_accepted_with_certificate(
-                    af.argument_set().get_argument(&"a1".to_string()).unwrap()
-                )
+                .is_skeptically_accepted_with_certificate(&"a1".to_string())
                 .1
                 .unwrap()
                 .iter()
@@ -344,9 +338,7 @@ mod tests {
         assert_eq!(
             &["a0", "a2"],
             solver
-                .is_credulously_accepted_with_certificate(
-                    af.argument_set().get_argument(&"a0".to_string()).unwrap()
-                )
+                .is_credulously_accepted_with_certificate(&"a0".to_string())
                 .1
                 .unwrap()
                 .iter()
@@ -358,9 +350,7 @@ mod tests {
         assert_eq!(
             &["a0", "a2"],
             solver
-                .is_skeptically_accepted_with_certificate(
-                    af.argument_set().get_argument(&"a1".to_string()).unwrap()
-                )
+                .is_skeptically_accepted_with_certificate(&"a1".to_string())
                 .1
                 .unwrap()
                 .iter()
@@ -382,14 +372,10 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = StableSemanticsSolver::new(&af);
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        assert!(solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
     }
 
     #[test]
@@ -405,13 +391,9 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = StableSemanticsSolver::new(&af);
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        assert!(!solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a1".to_string()));
     }
 }

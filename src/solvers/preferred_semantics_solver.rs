@@ -1,11 +1,13 @@
+use std::{cell::RefCell, rc::Rc};
+
 use super::{
-    maximal_extension_computer::{MaximalExtensionComputer, MaximalExtensionComputerState},
+    maximal_extension_computer::{self, MaximalExtensionComputerState},
     SingleExtensionComputer, SkepticalAcceptanceComputer,
 };
 use crate::{
     aa::{AAFramework, Argument},
     encodings::{ConstraintsEncoder, DefaultCompleteConstraintsEncoder},
-    sat::{self, Literal, SatSolver, SatSolverFactoryFn},
+    sat::{self, SatSolver, SatSolverFactoryFn},
     utils::{ConnectedComponentsComputer, LabelType},
 };
 
@@ -90,12 +92,12 @@ where
         allow_shortcut: bool,
     ) -> (bool, Option<Vec<&'b Argument<T>>>) {
         let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
-        let mut solver = (self.solver_factory)();
+        let solver = Rc::new(RefCell::new((self.solver_factory)()));
         self.constraints_encoder
-            .encode_constraints(cc_af, solver.as_mut());
-        let mut computer = new_maximal_extension_computer(
+            .encode_constraints(cc_af, solver.borrow_mut().as_mut());
+        let mut computer = maximal_extension_computer::new_for_preferred_semantics(
             cc_af,
-            solver.as_mut(),
+            solver,
             self.constraints_encoder.as_ref(),
         );
         loop {
@@ -126,12 +128,16 @@ where
 
     pub(crate) fn enumerate_extensions(
         af: &AAFramework<T>,
-        solver: &mut dyn SatSolver,
+        solver: Rc<RefCell<Box<dyn SatSolver>>>,
         constraints_encoder: &dyn ConstraintsEncoder<T>,
         callback: &mut dyn FnMut(&[&Argument<T>]) -> bool,
     ) {
-        constraints_encoder.encode_constraints(af, solver);
-        let mut computer = new_maximal_extension_computer(af, solver, constraints_encoder);
+        constraints_encoder.encode_constraints(af, solver.borrow_mut().as_mut());
+        let mut computer = maximal_extension_computer::new_for_preferred_semantics(
+            af,
+            solver,
+            constraints_encoder,
+        );
         loop {
             computer.compute_next();
             match computer.state() {
@@ -148,74 +154,6 @@ where
     }
 }
 
-fn new_maximal_extension_computer<'a, 'b, T>(
-    cc_af: &'a AAFramework<T>,
-    solver: &'b mut dyn SatSolver,
-    constraints_encoder: &'b dyn ConstraintsEncoder<T>,
-) -> MaximalExtensionComputer<'a, 'b, T>
-where
-    T: LabelType,
-{
-    let mut computer = MaximalExtensionComputer::new(cc_af, solver, constraints_encoder);
-    computer.set_increase_current_fn(Box::new(|fn_data| {
-        let (mut in_ext, mut not_in_ext) = split_in_extension(
-            fn_data.af,
-            fn_data.current_arg_set,
-            fn_data.af.n_arguments(),
-            fn_data.constraints_encoder,
-        );
-        not_in_ext.push(fn_data.selector);
-        in_ext.push(fn_data.selector.negate());
-        fn_data.sat_solver.add_clause(not_in_ext);
-        in_ext
-    }));
-    computer.set_discard_current_fn(Box::new(|fn_data| {
-        let (mut in_ext, _) = split_in_extension(
-            fn_data.af,
-            fn_data.current_arg_set,
-            fn_data.af.n_arguments(),
-            fn_data.constraints_encoder,
-        );
-        in_ext.iter_mut().for_each(|l| *l = l.negate());
-        in_ext.push(fn_data.selector);
-        fn_data.sat_solver.add_clause(in_ext);
-    }));
-    computer.set_discard_maximal_fn(Box::new(|fn_data| {
-        let (_, mut not_in_ext) = split_in_extension(
-            fn_data.af,
-            fn_data.current_arg_set,
-            fn_data.af.n_arguments(),
-            fn_data.constraints_encoder,
-        );
-        not_in_ext.push(fn_data.selector);
-        fn_data.sat_solver.add_clause(not_in_ext);
-    }));
-    computer
-}
-
-pub(crate) fn split_in_extension<T>(
-    af: &AAFramework<T>,
-    current: &[&Argument<T>],
-    n_args: usize,
-    constraints_encoder: &dyn ConstraintsEncoder<T>,
-) -> (Vec<Literal>, Vec<Literal>)
-where
-    T: LabelType,
-{
-    let mut in_ext_bool = vec![false; n_args];
-    current.iter().for_each(|a| in_ext_bool[a.id()] = true);
-    let mut not_in_ext = Vec::with_capacity(n_args);
-    let mut in_ext = Vec::with_capacity(n_args);
-    in_ext_bool.iter().enumerate().for_each(|(i, b)| {
-        let lit = constraints_encoder.arg_to_lit(af.argument_set().get_argument_by_id(i));
-        match *b {
-            true => in_ext.push(lit),
-            false => not_in_ext.push(lit),
-        }
-    });
-    (in_ext, not_in_ext)
-}
-
 impl<T> SingleExtensionComputer<T> for PreferredSemanticsSolver<'_, T>
 where
     T: LabelType,
@@ -223,12 +161,12 @@ where
     fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
         let mut merged = Vec::new();
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
-            let mut solver = (self.solver_factory)();
+            let solver = Rc::new(RefCell::new((self.solver_factory)()));
             self.constraints_encoder
-                .encode_constraints(&cc_af, solver.as_mut());
-            let computer = new_maximal_extension_computer(
+                .encode_constraints(&cc_af, solver.borrow_mut().as_mut());
+            let computer = maximal_extension_computer::new_for_preferred_semantics(
                 &cc_af,
-                solver.as_mut(),
+                solver,
                 self.constraints_encoder.as_ref(),
             );
             for cc_arg in computer.compute_maximal() {
@@ -243,7 +181,8 @@ impl<T> SkepticalAcceptanceComputer<T> for PreferredSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
+    fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let cc_af = cc_computer.connected_component_of(arg);
         self.is_skeptically_accepted_in_cc(&cc_af, arg, true).0
@@ -251,8 +190,9 @@ where
 
     fn is_skeptically_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let cc_af = cc_computer.connected_component_of(arg);
         let mut merged = Vec::new();
@@ -268,12 +208,12 @@ where
             _ => unreachable!(),
         }
         while let Some(other_cc_af) = cc_computer.next_connected_component() {
-            let mut solver = (self.solver_factory)();
+            let solver = Rc::new(RefCell::new((self.solver_factory)()));
             self.constraints_encoder
-                .encode_constraints(&other_cc_af, solver.as_mut());
-            let computer = new_maximal_extension_computer(
+                .encode_constraints(&other_cc_af, solver.borrow_mut().as_mut());
+            let computer = maximal_extension_computer::new_for_preferred_semantics(
                 &other_cc_af,
-                solver.as_mut(),
+                solver,
                 self.constraints_encoder.as_ref(),
             );
             for cc_arg in computer.compute_maximal() {
@@ -381,9 +321,7 @@ mod tests {
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = PreferredSemanticsSolver::new(&af);
         let mut cert = solver
-            .is_skeptically_accepted_with_certificate(
-                af.argument_set().get_argument(&"a2".to_string()).unwrap(),
-            )
+            .is_skeptically_accepted_with_certificate(&"a2".to_string())
             .1
             .unwrap()
             .iter()
@@ -412,9 +350,7 @@ mod tests {
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = PreferredSemanticsSolver::new(&af);
         let mut cert = solver
-            .is_skeptically_accepted_with_certificate(
-                af.argument_set().get_argument(&"a2".to_string()).unwrap(),
-            )
+            .is_skeptically_accepted_with_certificate(&"a2".to_string())
             .1
             .unwrap()
             .iter()
@@ -425,9 +361,7 @@ mod tests {
         assert!(["a0", "a2", "a5"] == cert.as_slice() || ["a0", "a3", "a5"] == cert.as_slice());
         assert_eq!(
             (true, None),
-            solver.is_skeptically_accepted_with_certificate(
-                af.argument_set().get_argument(&"a0".to_string()).unwrap(),
-            )
+            solver.is_skeptically_accepted_with_certificate(&"a0".to_string(),)
         );
     }
 
@@ -452,18 +386,12 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = PreferredSemanticsSolver::new(&af);
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a3".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a5".to_string()).unwrap()));
+        assert!(solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a4".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a5".to_string()));
     }
 
     #[test]
@@ -489,14 +417,10 @@ mod tests {
         af.remove_argument(&"a2".to_string()).unwrap();
         af.remove_argument(&"a3".to_string()).unwrap();
         let mut solver = PreferredSemanticsSolver::new(&af);
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a5".to_string()).unwrap()));
+        assert!(solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a4".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a5".to_string()));
     }
 
     #[test]
@@ -508,8 +432,7 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = PreferredSemanticsSolver::new(&af);
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
+        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
     }
 
     #[test]
@@ -528,12 +451,12 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = sat::default_solver();
+        let solver = Rc::new(RefCell::new(sat::default_solver()));
         let mut n_exts = 0;
         let constraints_encoder = DefaultCompleteConstraintsEncoder::default();
         PreferredSemanticsSolver::enumerate_extensions(
             &af,
-            solver.as_mut(),
+            solver,
             &constraints_encoder,
             &mut |ext| {
                 n_exts += 1;
@@ -563,10 +486,9 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = PreferredSemanticsSolver::new(&af);
-        let arg1 = af.argument_set().get_argument(&"a1".to_string()).unwrap();
+        let arg1 = &"a1".to_string();
         let (result, certificate) = solver.is_skeptically_accepted_with_certificate(arg1);
         assert!(!result);
-        println!("{:?}", certificate.as_ref().unwrap());
         assert_eq!(2, certificate.unwrap().len());
     }
 }

@@ -10,7 +10,7 @@ use crate::{
 pub struct DefaultCompleteConstraintsEncoder;
 
 impl DefaultCompleteConstraintsEncoder {
-    fn encode_disjunction_vars<T>(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver)
+    pub(crate) fn encode_disjunction_vars<T>(af: &AAFramework<T>, solver: &mut dyn SatSolver)
     where
         T: LabelType,
     {
@@ -18,7 +18,7 @@ impl DefaultCompleteConstraintsEncoder {
             let attacked_id = arg.id();
             let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;
             let attacked_disjunction_solver_var =
-                self.arg_id_to_solver_disjunction_var(attacked_id) as isize;
+                Self::arg_id_to_solver_disjunction_var(attacked_id) as isize;
             solver.add_clause(clause![
                 -attacked_solver_var,
                 -attacked_disjunction_solver_var
@@ -37,7 +37,7 @@ impl DefaultCompleteConstraintsEncoder {
         });
     }
 
-    fn arg_id_to_solver_disjunction_var(&self, id: usize) -> usize {
+    fn arg_id_to_solver_disjunction_var(id: usize) -> usize {
         arg_id_to_solver_var(id) - 1
     }
 
@@ -55,7 +55,7 @@ where
     T: LabelType,
 {
     fn encode_constraints(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver) {
-        self.encode_disjunction_vars(af, solver);
+        Self::encode_disjunction_vars(af, solver);
         af.argument_set().iter().for_each(|arg| {
             let attacked_id = arg.id();
             let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;
@@ -63,7 +63,7 @@ where
             af.iter_attacks_to(arg).for_each(|att| {
                 let attacker_id = att.attacker().id();
                 let attacker_disjunction_solver_var =
-                    self.arg_id_to_solver_disjunction_var(attacker_id) as isize;
+                    Self::arg_id_to_solver_disjunction_var(attacker_id) as isize;
                 solver.add_clause(clause![
                     -attacked_solver_var,
                     attacker_disjunction_solver_var
@@ -78,7 +78,7 @@ where
         af.argument_set().iter().for_each(|a| {
             let range_var = 1 + solver.n_vars() as isize;
             let arg_var = arg_id_to_solver_var(a.id()) as isize;
-            let att_disj_var = self.arg_id_to_solver_disjunction_var(a.id()) as isize;
+            let att_disj_var = Self::arg_id_to_solver_disjunction_var(a.id()) as isize;
             solver.add_clause(clause!(-arg_var, range_var));
             solver.add_clause(clause!(-att_disj_var, range_var));
             solver.add_clause(clause!(-range_var, arg_var, att_disj_var));

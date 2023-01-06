@@ -40,18 +40,17 @@ where
     /// # use crustabri::aa::{AAFramework, Argument, ArgumentSet};
     /// # use crustabri::utils::LabelType;
     /// # use crustabri::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
-    /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &Argument<T>) where T: LabelType {
+    /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &T) where T: LabelType {
     ///     let mut solver = CompleteSemanticsSolver::new(af);
     ///     if solver.is_credulously_accepted(arg) {
-    ///         println!("there exists complete extension(s) with {}", arg.label())
+    ///         println!("there exists complete extension(s) with {}", arg)
     ///     } else {
-    ///         println!("there is no complete extension with {}", arg.label())
+    ///         println!("there is no complete extension with {}", arg)
     ///     }
     /// }
     /// # let arg_set = ArgumentSet::new_with_labels(&["a"]);
     /// # let af = AAFramework::new_with_argument_set(arg_set);
-    /// # let arg = af.argument_set().get_argument(&"a").unwrap();
-    /// # check_credulous_acceptance(&af, &arg);
+    /// # check_credulous_acceptance(&af, &"a");
     pub fn new(af: &'a AAFramework<T>) -> Self
     where
         T: LabelType,
@@ -70,21 +69,20 @@ where
     /// # use crustabri::utils::LabelType;
     /// # use crustabri::sat::CadicalSolver;
     /// # use crustabri::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
-    /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &Argument<T>) where T: LabelType {
+    /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &T) where T: LabelType {
     ///     let mut solver = CompleteSemanticsSolver::new_with_sat_solver_factory(
     ///         af,
     ///         Box::new(|| Box::new(CadicalSolver::default())),
     ///     );
     ///     if solver.is_credulously_accepted(arg) {
-    ///         println!("there exists complete extension(s) with {}", arg.label())
+    ///         println!("there exists complete extension(s) with {}", arg)
     ///     } else {
-    ///         println!("there is no complete extension with {}", arg.label())
+    ///         println!("there is no complete extension with {}", arg)
     ///     }
     /// }
     /// # let arg_set = ArgumentSet::new_with_labels(&["a"]);
     /// # let af = AAFramework::new_with_argument_set(arg_set);
-    /// # let arg = af.argument_set().get_argument(&"a").unwrap();
-    /// # check_credulous_acceptance(&af, &arg);
+    /// # check_credulous_acceptance(&af, &"a");
     pub fn new_with_sat_solver_factory(
         af: &'a AAFramework<T>,
         solver_factory: Box<SatSolverFactoryFn>,
@@ -104,7 +102,8 @@ impl<T> CredulousAcceptanceComputer<T> for CompleteSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
+    fn is_credulously_accepted(&mut self, arg: &T) -> bool {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let mut solver = (self.solver_factory)();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let reduced_af = cc_computer.connected_component_of(arg);
@@ -119,8 +118,9 @@ where
 
     fn is_credulously_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let reduced_af = cc_computer.connected_component_of(arg);
         let mut solver = (self.solver_factory)();
@@ -168,10 +168,8 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = CompleteSemanticsSolver::new(&af);
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        assert!(solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a1".to_string()));
     }
 
     #[test]
@@ -185,10 +183,8 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = CompleteSemanticsSolver::new(&af);
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        assert!(solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(solver.is_credulously_accepted(&"a1".to_string()));
     }
 
     #[test]
@@ -204,12 +200,9 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = CompleteSemanticsSolver::new(&af);
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
+        assert!(solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(solver.is_credulously_accepted(&"a2".to_string()));
     }
 
     #[test]
@@ -225,12 +218,10 @@ mod tests {
         let reader = AspartixReader::default();
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver_before = CompleteSemanticsSolver::new(&af);
-        assert!(!solver_before
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        assert!(!solver_before.is_credulously_accepted(&"a1".to_string()));
         af.remove_argument(&"a0".to_string()).unwrap();
         let mut solver_after = CompleteSemanticsSolver::new(&af);
-        assert!(solver_after
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        assert!(solver_after.is_credulously_accepted(&"a1".to_string()));
     }
 
     #[test]
@@ -247,9 +238,7 @@ mod tests {
         assert_eq!(
             &["a0", "a2"],
             solver
-                .is_credulously_accepted_with_certificate(
-                    af.argument_set().get_argument(&"a0".to_string()).unwrap()
-                )
+                .is_credulously_accepted_with_certificate(&"a0".to_string())
                 .1
                 .unwrap()
                 .iter()
@@ -260,9 +249,7 @@ mod tests {
         );
         assert_eq!(
             (false, None),
-            solver.is_credulously_accepted_with_certificate(
-                af.argument_set().get_argument(&"a1".to_string()).unwrap()
-            )
+            solver.is_credulously_accepted_with_certificate(&"a1".to_string())
         )
     }
 }

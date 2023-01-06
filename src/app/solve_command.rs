@@ -299,10 +299,11 @@ where
     };
     let with_certificate = arg_matches.is_present(ARG_CERTIFICATE);
     if with_certificate {
-        let (acceptance_status, certificate) = solver.is_credulously_accepted_with_certificate(arg);
+        let (acceptance_status, certificate) =
+            solver.is_credulously_accepted_with_certificate(arg.label());
         (writing_fn)(acceptance_status, certificate)
     } else {
-        let acceptance_status = solver.is_credulously_accepted(arg);
+        let acceptance_status = solver.is_credulously_accepted(arg.label());
         (writing_fn)(acceptance_status, None)
     }
 }
@@ -343,10 +344,11 @@ where
     };
     let with_certificate = arg_matches.is_present(ARG_CERTIFICATE);
     if with_certificate {
-        let (acceptance_status, certificate) = solver.is_skeptically_accepted_with_certificate(arg);
+        let (acceptance_status, certificate) =
+            solver.is_skeptically_accepted_with_certificate(arg.label());
         (writing_fn)(acceptance_status, certificate)
     } else {
-        let acceptance_status = solver.is_skeptically_accepted(arg);
+        let acceptance_status = solver.is_skeptically_accepted(arg.label());
         (writing_fn)(acceptance_status, None)
     }
 }

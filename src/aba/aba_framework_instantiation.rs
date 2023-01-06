@@ -35,7 +35,7 @@ use std::{fmt::Display, rc::Rc};
 ///     let instantiation = ABAFrameworkInstantiation::instantiate(aba);
 ///     let mut acceptance_checker = StableSemanticsSolver::new(instantiation.instantiated());
 ///     let assumption_arg = instantiation.aba_assumption_to_instantiated_arg(assumption);
-///     if acceptance_checker.is_credulously_accepted(assumption_arg) {
+///     if acceptance_checker.is_credulously_accepted(assumption_arg.label()) {
 ///         println!("the argument is credulously accepted");
 ///     } else {
 ///         println!("the argument is not credulously accepted");
@@ -198,7 +198,7 @@ where
     ///     let instantiation = ABAFrameworkInstantiation::instantiate(aba);
     ///     let mut acceptance_checker = StableSemanticsSolver::new(instantiation.instantiated());
     ///     let assumption_arg = instantiation.aba_assumption_to_instantiated_arg(assumption);
-    ///     if acceptance_checker.is_credulously_accepted(assumption_arg) {
+    ///     if acceptance_checker.is_credulously_accepted(assumption_arg.label()) {
     ///         println!("the argument is credulously accepted");
     ///     } else {
     ///         println!("the argument is not credulously accepted");

@@ -1,4 +1,4 @@
-use super::ConstraintsEncoder;
+use super::{ConstraintsEncoder, DefaultCompleteConstraintsEncoder};
 use crate::{
     aa::{AAFramework, Argument},
     sat::{clause, Assignment, Literal, SatSolver},
@@ -10,33 +10,6 @@ use crate::{
 pub struct DefaultConflictFreenessConstraintsEncoder;
 
 impl DefaultConflictFreenessConstraintsEncoder {
-    fn encode_disjunction_vars<T>(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver)
-    where
-        T: LabelType,
-    {
-        af.argument_set().iter().for_each(|arg| {
-            let attacked_id = arg.id();
-            let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;
-            let attacked_disjunction_solver_var =
-                self.arg_id_to_solver_disjunction_var(attacked_id) as isize;
-            solver.add_clause(clause![
-                -attacked_solver_var,
-                -attacked_disjunction_solver_var
-            ]);
-            let mut full_cl = clause![-attacked_disjunction_solver_var];
-            af.iter_attacks_to(arg).for_each(|att| {
-                let attacker_id = att.attacker().id();
-                let attacker_solver_var = arg_id_to_solver_var(attacker_id) as isize;
-                solver.add_clause(clause![
-                    attacked_disjunction_solver_var,
-                    -attacker_solver_var
-                ]);
-                full_cl.push(attacker_solver_var.into());
-            });
-            solver.add_clause(full_cl)
-        });
-    }
-
     fn arg_id_to_solver_disjunction_var(&self, id: usize) -> usize {
         arg_id_to_solver_var(id) - 1
     }
@@ -55,7 +28,7 @@ where
     T: LabelType,
 {
     fn encode_constraints(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver) {
-        self.encode_disjunction_vars(af, solver);
+        DefaultCompleteConstraintsEncoder::encode_disjunction_vars(af, solver);
         af.argument_set().iter().for_each(|arg| {
             let attacked_id = arg.id();
             let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;

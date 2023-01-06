@@ -22,6 +22,6 @@ where
         af: &'a AAFramework<T>,
     ) -> Vec<&'a Argument<T>>;
 
-    /// Tranlates an argument into the literal that represent it.
+    /// Translates an argument into the literal that represent it.
     fn arg_to_lit(&self, arg: &Argument<T>) -> Literal;
 }

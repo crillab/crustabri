@@ -9,7 +9,7 @@ pub use grounded_semantics_solver::GroundedSemanticsSolver;
 mod ideal_semantics_solver;
 pub use ideal_semantics_solver::IdealSemanticsSolver;
 
-mod maximal_extension_computer;
+pub(crate) mod maximal_extension_computer;
 
 mod maximal_range_semantics_solvers;
 pub use maximal_range_semantics_solvers::SemiStableSemanticsSolver;

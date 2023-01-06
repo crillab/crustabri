@@ -57,14 +57,15 @@ impl<T> CredulousAcceptanceComputer<T> for GroundedSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
+    fn is_credulously_accepted(&mut self, arg: &T) -> bool {
         self.is_credulously_accepted_with_certificate(arg).0
     }
 
     fn is_credulously_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let ext = self.af.grounded_extension();
         if ext.contains(&arg) {
             (true, Some(ext))
@@ -78,14 +79,16 @@ impl<T> SkepticalAcceptanceComputer<T> for GroundedSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
+    fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         self.af.grounded_extension().contains(&arg)
     }
 
     fn is_skeptically_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let ext = self.af.grounded_extension();
         if ext.contains(&arg) {
             (true, None)
@@ -113,14 +116,10 @@ mod tests {
         let ext = solver.compute_one_extension().unwrap();
         assert_eq!(1, ext.len());
         assert_eq!("a0", ext[0].label());
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
+        assert!(solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
     }
 
     #[test]
@@ -136,9 +135,7 @@ mod tests {
         assert_eq!(
             &["a0"],
             solver
-                .is_credulously_accepted_with_certificate(
-                    af.argument_set().get_argument(&"a0".to_string()).unwrap()
-                )
+                .is_credulously_accepted_with_certificate(&"a0".to_string())
                 .1
                 .unwrap()
                 .iter()
@@ -150,9 +147,7 @@ mod tests {
         assert_eq!(
             &["a0"],
             solver
-                .is_skeptically_accepted_with_certificate(
-                    af.argument_set().get_argument(&"a1".to_string()).unwrap()
-                )
+                .is_skeptically_accepted_with_certificate(&"a1".to_string())
                 .1
                 .unwrap()
                 .iter()
@@ -163,9 +158,7 @@ mod tests {
         );
         assert_eq!(
             (true, None),
-            solver.is_skeptically_accepted_with_certificate(
-                af.argument_set().get_argument(&"a0".to_string()).unwrap()
-            )
+            solver.is_skeptically_accepted_with_certificate(&"a0".to_string())
         );
     }
 }

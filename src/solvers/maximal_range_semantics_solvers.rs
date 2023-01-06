@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use super::{
     maximal_extension_computer::{
         MaximalExtensionComputer, MaximalExtensionComputerState, MaximalExtensionComputerStateData,
@@ -104,13 +106,13 @@ macro_rules! maximal_range_solver {
         where
             T: LabelType,
         {
-            fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
+            fn is_credulously_accepted(&mut self, arg: &T,) -> bool {
                 self.helper.is_credulously_accepted(arg)
             }
 
             fn is_credulously_accepted_with_certificate(
                 &mut self,
-                arg: &Argument<T>,
+                arg: &T,
             ) -> (bool, Option<Vec<&Argument<T>>>) {
                 self.helper.is_credulously_accepted_with_certificate(arg)
             }
@@ -120,13 +122,13 @@ macro_rules! maximal_range_solver {
         where
             T: LabelType,
         {
-            fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
+            fn is_skeptically_accepted(&mut self, arg: &T,) -> bool {
                 self.helper.is_skeptically_accepted(arg)
             }
 
             fn is_skeptically_accepted_with_certificate(
                 &mut self,
-                arg: &Argument<T>,
+                arg: &T,
             ) -> (bool, Option<Vec<&Argument<T>>>) {
                 self.helper.is_skeptically_accepted_with_certificate(arg)
             }
@@ -174,14 +176,11 @@ where
     pub fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
         let mut merged = Vec::new();
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
-            let mut solver = (self.solver_factory)();
+            let solver = Rc::new(RefCell::new((self.solver_factory)()));
             self.constraints_encoder
-                .encode_constraints(&cc_af, solver.as_mut());
-            let (computer, _) = new_maximal_extension_computer(
-                &cc_af,
-                solver.as_mut(),
-                self.constraints_encoder.as_ref(),
-            );
+                .encode_constraints(&cc_af, solver.borrow_mut().as_mut());
+            let (computer, _) =
+                new_maximal_extension_computer(&cc_af, solver, self.constraints_encoder.as_ref());
             for cc_arg in computer.compute_maximal() {
                 merged.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
             }
@@ -189,7 +188,8 @@ where
         Some(merged)
     }
 
-    pub fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
+    pub fn is_credulously_accepted(&mut self, arg: &T) -> bool {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let cc_af = cc_computer.connected_component_of(arg);
         self.check_acceptance_in_cc(&cc_af, arg, true).0
@@ -197,12 +197,14 @@ where
 
     pub fn is_credulously_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         self.check_acceptance_with_certificate(arg, true)
     }
 
-    pub fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
+    pub fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let cc_af = cc_computer.connected_component_of(arg);
         self.check_acceptance_in_cc(&cc_af, arg, false).0
@@ -210,8 +212,9 @@ where
 
     pub fn is_skeptically_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         self.check_acceptance_with_certificate(arg, false)
     }
 
@@ -243,12 +246,12 @@ where
         is_credulous_acceptance: bool,
     ) -> (bool, Option<Vec<&'b Argument<T>>>) {
         let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
-        let mut solver = (self.solver_factory)();
+        let solver = Rc::new(RefCell::new((self.solver_factory)()));
         self.constraints_encoder
-            .encode_constraints(cc_af, solver.as_mut());
+            .encode_constraints(cc_af, solver.borrow_mut().as_mut());
         let (mut computer, first_range_var) = new_maximal_extension_computer(
             cc_af,
-            solver.as_mut(),
+            Rc::clone(&solver),
             self.constraints_encoder.as_ref(),
         );
         loop {
@@ -256,6 +259,7 @@ where
             match computer.state() {
                 MaximalExtensionComputerState::Maximal => {
                     let stop_enum_reason = enumerate_extensions_for_range(
+                        Rc::clone(&solver),
                         &mut computer.state_data(),
                         first_range_var,
                         self.constraints_encoder.as_ref(),
@@ -293,12 +297,12 @@ where
         T: LabelType,
     {
         while let Some(other_cc_af) = cc_computer.next_connected_component() {
-            let mut solver = (self.solver_factory)();
+            let solver = Rc::new(RefCell::new((self.solver_factory)()));
             self.constraints_encoder
-                .encode_constraints(&other_cc_af, solver.as_mut());
+                .encode_constraints(&other_cc_af, solver.borrow_mut().as_mut());
             let (computer, _) = new_maximal_extension_computer(
                 &other_cc_af,
-                solver.as_mut(),
+                solver,
                 self.constraints_encoder.as_ref(),
             );
             for cc_arg in computer.compute_maximal() {
@@ -310,25 +314,27 @@ where
 
 fn new_maximal_extension_computer<'a, 'b, T>(
     af: &'a AAFramework<T>,
-    solver: &'b mut dyn SatSolver,
+    solver: Rc<RefCell<Box<dyn SatSolver>>>,
     constraints_encoder: &'b dyn ConstraintsEncoder<T>,
 ) -> (MaximalExtensionComputer<'a, 'b, T>, usize)
 where
     T: LabelType,
 {
-    let first_range_var = constraints_encoder.encode_range_constraints(af, solver);
-    let mut computer = MaximalExtensionComputer::new(af, solver, constraints_encoder);
+    let first_range_var =
+        constraints_encoder.encode_range_constraints(af, solver.borrow_mut().as_mut());
+    let mut computer = MaximalExtensionComputer::new(af, Rc::clone(&solver), constraints_encoder);
+    let solver_clone = Rc::clone(&solver);
     computer.set_increase_current_fn(Box::new(move |fn_data| {
         let (mut in_range, mut not_in_range) = split_in_range(&fn_data, first_range_var);
         not_in_range.push(fn_data.selector);
         in_range.push(fn_data.selector.negate());
-        fn_data.sat_solver.add_clause(not_in_range);
+        solver_clone.borrow_mut().add_clause(not_in_range);
         in_range
     }));
     computer.set_discard_maximal_fn(Box::new(move |fn_data| {
         let (_, mut not_in_range) = split_in_range(&fn_data, first_range_var);
         not_in_range.push(fn_data.selector);
-        fn_data.sat_solver.add_clause(not_in_range);
+        solver.borrow_mut().add_clause(not_in_range);
     }));
     (computer, first_range_var)
 }
@@ -339,6 +345,7 @@ where
 // Otherwise, it returns a value indicating why the enumeration should stop.
 // This value is computed and returned by the callback function.
 fn enumerate_extensions_for_range<F, T>(
+    solver: Rc<RefCell<Box<dyn SatSolver>>>,
     fn_data: &mut MaximalExtensionComputerStateData<T>,
     first_range_var: usize,
     constraints_encoder: &dyn ConstraintsEncoder<T>,
@@ -348,7 +355,7 @@ where
     T: LabelType,
     F: Fn(&[&Argument<T>]) -> Option<Vec<usize>>,
 {
-    let enum_selector = Literal::from(1 + fn_data.sat_solver.n_vars() as isize);
+    let enum_selector = Literal::from(1 + solver.borrow().n_vars() as isize);
     let (mut in_range, mut not_in_range) = split_in_range(fn_data, first_range_var);
     not_in_range.iter_mut().for_each(|l| *l = l.negate());
     let mut assumptions = Vec::with_capacity(fn_data.af.n_arguments() + 1);
@@ -382,9 +389,9 @@ where
             })
             .chain(std::iter::once(enum_selector))
             .collect();
-        fn_data.sat_solver.add_clause(blocking_clause);
-        match fn_data
-            .sat_solver
+        solver.borrow_mut().add_clause(blocking_clause);
+        match solver
+            .borrow_mut()
             .solve_under_assumptions(&assumptions)
             .unwrap_model()
         {
@@ -396,7 +403,7 @@ where
             None => break,
         }
     }
-    fn_data.sat_solver.add_clause(clause!(enum_selector));
+    solver.borrow_mut().add_clause(clause!(enum_selector));
     None
 }
 
@@ -527,16 +534,11 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = SemiStableSemanticsSolver::new(&af);
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a3".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a5".to_string()).unwrap()));
+        assert!(solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a4".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a5".to_string()));
     }
 
     #[test]
@@ -557,14 +559,10 @@ mod tests {
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
         af.remove_argument(&"a0".to_string()).unwrap();
         let mut solver = SemiStableSemanticsSolver::new(&af);
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a3".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a5".to_string()).unwrap()));
+        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a4".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a5".to_string()));
     }
 
     #[test]
@@ -576,8 +574,7 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = SemiStableSemanticsSolver::new(&af);
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
+        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
     }
 
     #[test]
@@ -597,16 +594,11 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = SemiStableSemanticsSolver::new(&af);
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a3".to_string()).unwrap()));
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a5".to_string()).unwrap()));
+        assert!(solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(solver.is_credulously_accepted(&"a2".to_string()));
+        assert!(solver.is_credulously_accepted(&"a3".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a4".to_string()));
+        assert!(solver.is_credulously_accepted(&"a5".to_string()));
     }
 
     #[test]
@@ -627,14 +619,10 @@ mod tests {
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
         af.remove_argument(&"a0".to_string()).unwrap();
         let mut solver = SemiStableSemanticsSolver::new(&af);
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a3".to_string()).unwrap()));
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a5".to_string()).unwrap()));
+        assert!(solver.is_credulously_accepted(&"a2".to_string()));
+        assert!(solver.is_credulously_accepted(&"a3".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a4".to_string()));
+        assert!(solver.is_credulously_accepted(&"a5".to_string()));
     }
 
     #[test]
@@ -646,8 +634,7 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = SemiStableSemanticsSolver::new(&af);
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
+        assert!(!solver.is_credulously_accepted(&"a0".to_string()));
     }
 
     #[test]
@@ -722,16 +709,11 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = StageSemanticsSolver::new(&af);
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a3".to_string()).unwrap()));
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
+        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a4".to_string()));
     }
 
     #[test]
@@ -754,14 +736,10 @@ mod tests {
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
         af.remove_argument(&"a0".to_string()).unwrap();
         let mut solver = StageSemanticsSolver::new(&af);
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a3".to_string()).unwrap()));
-        assert!(solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
+        assert!(solver.is_skeptically_accepted(&"a1".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a4".to_string()));
     }
 
     #[test]
@@ -773,8 +751,7 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = StageSemanticsSolver::new(&af);
-        assert!(!solver
-            .is_skeptically_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
+        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
     }
 
     #[test]
@@ -796,16 +773,11 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = StageSemanticsSolver::new(&af);
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a3".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
+        assert!(solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(solver.is_credulously_accepted(&"a2".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a3".to_string()));
+        assert!(solver.is_credulously_accepted(&"a4".to_string()));
     }
 
     #[test]
@@ -828,14 +800,10 @@ mod tests {
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
         af.remove_argument(&"a0".to_string()).unwrap();
         let mut solver = StageSemanticsSolver::new(&af);
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a3".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a4".to_string()).unwrap()));
+        assert!(solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a2".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a3".to_string()));
+        assert!(solver.is_credulously_accepted(&"a4".to_string()));
     }
 
     #[test]
@@ -847,8 +815,7 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = StageSemanticsSolver::new(&af);
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
+        assert!(!solver.is_credulously_accepted(&"a0".to_string()));
     }
 
     #[test]
@@ -862,13 +829,17 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = SemiStableSemanticsSolver::new(&af);
-        let a0_label = af.argument_set().get_argument(&"a0".to_string()).unwrap();
+        let a0_label = &"a0".to_string();
         let (acceptance, certificate) = solver.is_credulously_accepted_with_certificate(a0_label);
         assert!(acceptance);
-        assert!(certificate.unwrap().contains(&a0_label));
-        let a1_label = af.argument_set().get_argument(&"a1".to_string()).unwrap();
+        assert!(certificate
+            .unwrap()
+            .contains(&af.argument_set().get_argument(a0_label).unwrap()));
+        let a1_label = &"a1".to_string();
         let (acceptance, certificate) = solver.is_credulously_accepted_with_certificate(a1_label);
         assert!(acceptance);
-        assert!(certificate.unwrap().contains(&a1_label));
+        assert!(certificate
+            .unwrap()
+            .contains(&af.argument_set().get_argument(a1_label).unwrap()));
     }
 }

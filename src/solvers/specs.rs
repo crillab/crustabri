@@ -18,16 +18,20 @@ where
     T: LabelType,
 {
     /// Checks the credulous acceptance of an argument.
-    fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool;
+    fn is_credulously_accepted(&mut self, arg: &T) -> bool;
 
     /// Checks the credulous acceptance of an argument, and provide a certificate if it is the case.
     ///
     /// The certificate is set to `None` if the result of the test is `false`.
     /// Otherwise, the certificate is provided as a set of arguments.
     /// The exact nature of this certificate depends on underlying semantics.
+    ///
+    /// # Panic
+    ///
+    /// If the provided argument does not belong to the argument set, this function must panic.
     fn is_credulously_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>);
 }
 
@@ -37,15 +41,19 @@ where
     T: LabelType,
 {
     /// Checks the skeptical acceptance of an argument.
-    fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool;
+    fn is_skeptically_accepted(&mut self, arg: &T) -> bool;
 
     /// Checks the skeptical acceptance of an argument, and provide a certificate if it is the case.
     ///
     /// The certificate is set to `None` if the result of the test is `true`.
     /// Otherwise, the certificate is provided as a set of arguments.
     /// The exact nature of this certificate depends on underlying semantics.
+    ///
+    /// /// # Panic
+    ///
+    /// If the provided argument does not belong to the argument set, this function must panic.
     fn is_skeptically_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>);
 }

@@ -1,5 +1,7 @@
+use std::{cell::RefCell, rc::Rc};
+
 use super::{
-    maximal_extension_computer::MaximalExtensionComputer, preferred_semantics_solver,
+    maximal_extension_computer::{self},
     CredulousAcceptanceComputer, PreferredSemanticsSolver, SingleExtensionComputer,
     SkepticalAcceptanceComputer,
 };
@@ -89,10 +91,10 @@ where
         let mut in_all = vec![true; cc_af.n_arguments()];
         let mut n_in_all = 0;
         let mut n_preferred = 0;
-        let mut solver = (self.solver_factory)();
+        let solver = Rc::new(RefCell::new((self.solver_factory)()));
         PreferredSemanticsSolver::enumerate_extensions(
             cc_af,
-            solver.as_mut(),
+            Rc::clone(&solver),
             self.constraints_encoder.as_ref(),
             &mut |ext| {
                 n_preferred += 1;
@@ -114,12 +116,7 @@ where
         if n_preferred == 1 {
             return single_preferred(cc_af, in_all);
         }
-        compute_maximal_with_allowed(
-            cc_af,
-            solver.as_mut(),
-            in_all,
-            self.constraints_encoder.as_ref(),
-        )
+        compute_maximal_with_allowed(cc_af, solver, in_all, self.constraints_encoder.as_ref())
     }
 
     fn check_credulous_acceptance_for_cc<'b>(
@@ -131,10 +128,10 @@ where
         let mut in_all = vec![true; cc_af.n_arguments()];
         let mut n_in_all = 0;
         let mut n_preferred = 0;
-        let mut solver = (self.solver_factory)();
+        let solver = Rc::new(RefCell::new((self.solver_factory)()));
         PreferredSemanticsSolver::enumerate_extensions(
             cc_af,
-            solver.as_mut(),
+            Rc::clone(&solver),
             self.constraints_encoder.as_ref(),
             &mut |ext| {
                 n_preferred += 1;
@@ -167,19 +164,15 @@ where
             let ext = single_preferred(cc_af, in_all);
             return result(ext);
         }
-        let ideal_ext = compute_maximal_with_allowed(
-            cc_af,
-            solver.as_mut(),
-            in_all,
-            self.constraints_encoder.as_ref(),
-        );
+        let ideal_ext =
+            compute_maximal_with_allowed(cc_af, solver, in_all, self.constraints_encoder.as_ref());
         result(ideal_ext)
     }
 }
 
 fn compute_maximal_with_allowed<'a, T>(
     cc_af: &'a AAFramework<T>,
-    solver: &mut dyn SatSolver,
+    solver: Rc<RefCell<Box<dyn SatSolver>>>,
     in_all_preferred: Vec<bool>,
     constraints_encoder: &dyn ConstraintsEncoder<T>,
 ) -> Vec<&'a Argument<T>>
@@ -198,20 +191,12 @@ where
             ),
         })
         .collect::<Vec<Literal>>();
-    let mut computer = MaximalExtensionComputer::new(cc_af, solver, constraints_encoder);
-    computer.set_increase_current_fn(Box::new(move |fn_data| {
-        let (mut in_ext, mut not_in_ext) = preferred_semantics_solver::split_in_extension(
-            fn_data.af,
-            fn_data.current_arg_set,
-            fn_data.af.n_arguments(),
-            fn_data.constraints_encoder,
-        );
-        not_in_ext.push(fn_data.selector);
-        in_ext.push(fn_data.selector.negate());
-        in_ext.append(&mut assumptions.clone());
-        fn_data.sat_solver.add_clause(not_in_ext);
-        in_ext
-    }));
+    let computer = maximal_extension_computer::new_for_ideal_semantics(
+        cc_af,
+        solver,
+        constraints_encoder,
+        assumptions,
+    );
     computer.compute_maximal()
 }
 
@@ -255,7 +240,8 @@ impl<T> CredulousAcceptanceComputer<T> for IdealSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_credulously_accepted(&mut self, arg: &Argument<T>) -> bool {
+    fn is_credulously_accepted(&mut self, arg: &T) -> bool {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let cc_af = cc_computer.connected_component_of(arg);
         let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
@@ -264,8 +250,9 @@ where
 
     fn is_credulously_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
         let cc_af = cc_computer.connected_component_of(arg);
         let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
@@ -291,14 +278,15 @@ impl<T> SkepticalAcceptanceComputer<T> for IdealSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_skeptically_accepted(&mut self, arg: &Argument<T>) -> bool {
+    fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
         self.is_credulously_accepted(arg)
     }
 
     fn is_skeptically_accepted_with_certificate(
         &mut self,
-        arg: &Argument<T>,
+        arg: &T,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let ext = self.compute_one_extension().unwrap();
         if ext.contains(&arg) {
             (true, None)
@@ -377,13 +365,9 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = IdealSemanticsSolver::new(&af);
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a0".to_string()).unwrap()));
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a1".to_string()).unwrap()));
-        assert!(!solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a2".to_string()).unwrap()));
-        assert!(solver
-            .is_credulously_accepted(af.argument_set().get_argument(&"a3".to_string()).unwrap()));
+        assert!(!solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a2".to_string()));
+        assert!(solver.is_credulously_accepted(&"a3".to_string()));
     }
 }
