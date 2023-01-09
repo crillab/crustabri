@@ -65,13 +65,6 @@ where
         Literal::from(self.arg_id_to_solver_var[arg.id()].unwrap() as isize)
     }
 
-    pub fn arg_id_from_solver_var(&self, solver_var: usize) -> Option<usize> {
-        match self.solver_vars[solver_var] {
-            SolverVarType::Argument(arg) => Some(arg),
-            _ => None,
-        }
-    }
-
     pub fn new_argument(&mut self, label: T) {
         self.af.new_argument(label);
         let arg_id = self.af.max_argument_id().unwrap();

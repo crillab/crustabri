@@ -174,26 +174,10 @@ where
 
     fn assignment_to_extension<'a>(
         &self,
-        assignment: &Assignment,
-        af: &'a AAFramework<T>,
+        _assignment: &Assignment,
+        _af: &'a AAFramework<T>,
     ) -> Vec<&'a Argument<T>> {
-        assignment
-            .iter()
-            .filter_map(|(var, opt_v)| match opt_v {
-                Some(true) => self
-                    .encoder
-                    .arg_id_from_solver_var(var)
-                    .and_then(|id| {
-                        if id < af.n_arguments() {
-                            Some(id)
-                        } else {
-                            None
-                        }
-                    })
-                    .map(|id| af.argument_set().get_argument_by_id(id)),
-                _ => None,
-            })
-            .collect()
+        unimplemented!()
     }
 
     fn arg_to_lit(&self, arg: &Argument<T>) -> Literal {

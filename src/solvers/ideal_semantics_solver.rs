@@ -10,7 +10,7 @@ use crate::{
     encodings::{ConstraintsEncoder, DefaultCompleteConstraintsEncoder},
     sat,
     sat::{Literal, SatSolver, SatSolverFactoryFn},
-    utils::{self, ConnectedComponentsComputer, LabelType},
+    utils::{self, ConnectedComponentsComputer, Label, LabelType},
 };
 
 /// A SAT-based solver for the ideal semantics.
@@ -88,10 +88,28 @@ where
 
     fn compute_one_extension_for_cc<'b>(&self, cc_af: &'b AAFramework<T>) -> Vec<&'b Argument<T>> {
         let grounded = utils::grounded_extension(cc_af);
+        let solver = Rc::new(RefCell::new((self.solver_factory)()));
+        let (in_all, n_in_all, n_preferred) =
+            self.compute_in_all_extensions_for_cc(cc_af, &grounded, Rc::clone(&solver));
+        if n_in_all == grounded.len() {
+            return grounded;
+        }
+        if n_preferred == 1 {
+            return single_preferred(cc_af, in_all);
+        }
+        compute_maximal_with_allowed(cc_af, solver, in_all, self.constraints_encoder.as_ref())
+    }
+
+    // The number of preferred extensions may be incorrect if n_in_all is equal to the size of the grounded extension.
+    fn compute_in_all_extensions_for_cc<'b>(
+        &self,
+        cc_af: &'b AAFramework<T>,
+        grounded: &[&'b Label<T>],
+        solver: Rc<RefCell<Box<dyn SatSolver>>>,
+    ) -> (Vec<bool>, usize, usize) {
         let mut in_all = vec![true; cc_af.n_arguments()];
         let mut n_in_all = 0;
         let mut n_preferred = 0;
-        let solver = Rc::new(RefCell::new((self.solver_factory)()));
         PreferredSemanticsSolver::enumerate_extensions(
             cc_af,
             Rc::clone(&solver),
@@ -110,13 +128,7 @@ where
                 n_in_all != grounded.len()
             },
         );
-        if n_in_all == grounded.len() {
-            return grounded;
-        }
-        if n_preferred == 1 {
-            return single_preferred(cc_af, in_all);
-        }
-        compute_maximal_with_allowed(cc_af, solver, in_all, self.constraints_encoder.as_ref())
+        (in_all, n_in_all, n_preferred)
     }
 
     fn check_credulous_acceptance_for_cc<'b>(
@@ -125,28 +137,9 @@ where
         cc_arg: &'b Argument<T>,
     ) -> (bool, Option<Vec<&'b Argument<T>>>) {
         let grounded = utils::grounded_extension(cc_af);
-        let mut in_all = vec![true; cc_af.n_arguments()];
-        let mut n_in_all = 0;
-        let mut n_preferred = 0;
         let solver = Rc::new(RefCell::new((self.solver_factory)()));
-        PreferredSemanticsSolver::enumerate_extensions(
-            cc_af,
-            Rc::clone(&solver),
-            self.constraints_encoder.as_ref(),
-            &mut |ext| {
-                n_preferred += 1;
-                let mut new_in_all = vec![false; cc_af.n_arguments()];
-                n_in_all = 0;
-                ext.iter().for_each(|a| {
-                    if in_all[a.id()] {
-                        new_in_all[a.id()] = true;
-                        n_in_all += 1;
-                    }
-                });
-                in_all = new_in_all;
-                n_in_all != grounded.len() && in_all[cc_arg.id()]
-            },
-        );
+        let (in_all, n_in_all, n_preferred) =
+            self.compute_in_all_extensions_for_cc(cc_af, &grounded, Rc::clone(&solver));
         if !in_all[cc_arg.id()] {
             return (false, None);
         }
@@ -307,17 +300,38 @@ mod tests {
         arg(a0).
         arg(a1).
         arg(a2).
-        arg(a3).
         att(a0,a1).
         att(a0,a2).
         att(a1,a0).
         att(a1,a2).
-        att(a2,a3).
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = IdealSemanticsSolver::new(&af);
         assert!(solver.compute_one_extension().unwrap().is_empty())
+    }
+
+    #[test]
+    fn test_compute_ideal_ext_is_single_preferred() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        att(a0,a1).
+        att(a1,a0).
+        att(a1,a1).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = IdealSemanticsSolver::new(&af);
+        assert_eq!(
+            vec!["a0"],
+            solver
+                .compute_one_extension()
+                .unwrap()
+                .iter()
+                .map(|arg| arg.label().to_string())
+                .collect::<Vec<String>>()
+        )
     }
 
     #[test]
@@ -369,5 +383,129 @@ mod tests {
         assert!(!solver.is_credulously_accepted(&"a1".to_string()));
         assert!(!solver.is_credulously_accepted(&"a2".to_string()));
         assert!(solver.is_credulously_accepted(&"a3".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a3".to_string()));
+    }
+
+    #[test]
+    fn test_ideal_acceptance_in_all_preferred_but_not_in_ideal() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        att(a0,a1).
+        att(a0,a2).
+        att(a1,a0).
+        att(a1,a2).
+        att(a2,a3).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = IdealSemanticsSolver::new(&af);
+        assert!(!solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a2".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a3".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
+    }
+
+    #[test]
+    fn test_ideal_acceptance_ext_is_grounded() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        att(a0,a1).
+        att(a0,a2).
+        att(a1,a2).
+        att(a2,a1).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = IdealSemanticsSolver::new(&af);
+        assert!(solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a2".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
+    }
+
+    #[test]
+    fn test_ideal_acceptance_ext_is_single_preferred() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        att(a0,a1).
+        att(a1,a0).
+        att(a1,a1).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = IdealSemanticsSolver::new(&af);
+        assert!(solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
+    }
+
+    #[test]
+    fn test_with_certificate() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        att(a0,a1).
+        att(a0,a2).
+        att(a1,a0).
+        att(a1,a2).
+        att(a2,a3).
+        att(a3,a2).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let a3 = af.argument_set().get_argument(&"a3".to_string()).unwrap();
+        let a4 = af.argument_set().get_argument(&"a4".to_string()).unwrap();
+        let mut solver = IdealSemanticsSolver::new(&af);
+        assert_eq!(
+            (false, None),
+            solver.is_credulously_accepted_with_certificate(&"a0".to_string())
+        );
+        assert_eq!(
+            (false, None),
+            solver.is_credulously_accepted_with_certificate(&"a1".to_string())
+        );
+        assert_eq!(
+            (false, None),
+            solver.is_credulously_accepted_with_certificate(&"a2".to_string())
+        );
+        assert_eq!(
+            (true, Some(vec![a3, a4])),
+            solver.is_credulously_accepted_with_certificate(&"a3".to_string())
+        );
+        assert_eq!(
+            (false, Some(vec![a3, a4])),
+            solver.is_skeptically_accepted_with_certificate(&"a0".to_string())
+        );
+        assert_eq!(
+            (false, Some(vec![a3, a4])),
+            solver.is_skeptically_accepted_with_certificate(&"a1".to_string())
+        );
+        assert_eq!(
+            (false, Some(vec![a3, a4])),
+            solver.is_skeptically_accepted_with_certificate(&"a2".to_string())
+        );
+        assert_eq!(
+            (true, None),
+            solver.is_skeptically_accepted_with_certificate(&"a3".to_string())
+        );
     }
 }
