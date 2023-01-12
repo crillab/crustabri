@@ -1,9 +1,8 @@
 use super::{
-    dynamic_constraints_encoder::{self, DynamicConstraintsEncoder},
-    DynamicSolver,
+    buffered_dynamic_constraints_encoder::BufferedDynamicConstraintsEncoder, DynamicSolver,
 };
 use crate::{
-    aa::Argument,
+    aa::{Argument, Semantics},
     sat::{self, SatSolver, SatSolverFactoryFn},
     solvers::{CredulousAcceptanceComputer, SkepticalAcceptanceComputer},
     utils::LabelType,
@@ -16,7 +15,7 @@ pub struct DynamicStableSemanticsSolver<T>
 where
     T: LabelType,
 {
-    encoder: DynamicConstraintsEncoder<T>,
+    buffered_encoder: BufferedDynamicConstraintsEncoder<T>,
     solver: Rc<RefCell<Box<dyn SatSolver>>>,
 }
 
@@ -43,7 +42,10 @@ where
     {
         let solver = Rc::new(RefCell::new((solver_factory)()));
         Self {
-            encoder: dynamic_constraints_encoder::new_for_stable_semantics(Rc::clone(&solver)),
+            buffered_encoder: BufferedDynamicConstraintsEncoder::new(
+                Rc::clone(&solver),
+                Semantics::ST,
+            ),
             solver,
         }
     }
@@ -63,19 +65,19 @@ where
     T: LabelType,
 {
     fn new_argument(&mut self, label: T) {
-        self.encoder.new_argument(label)
+        self.buffered_encoder.buffer_new_argument(label)
     }
 
     fn remove_argument(&mut self, label: &T) -> Result<()> {
-        self.encoder.remove_argument(label)
+        self.buffered_encoder.buffer_remove_argument(label)
     }
 
     fn new_attack(&mut self, from: &T, to: &T) -> Result<()> {
-        self.encoder.new_attack(from, to)
+        self.buffered_encoder.buffer_new_attack(from, to)
     }
 
     fn remove_attack(&mut self, from: &T, to: &T) -> Result<()> {
-        self.encoder.remove_attack(from, to)
+        self.buffered_encoder.buffer_remove_attack(from, to)
     }
 }
 
@@ -84,9 +86,10 @@ where
     T: LabelType,
 {
     fn is_credulously_accepted(&mut self, arg: &T) -> bool {
-        let mut assumptions = Vec::with_capacity(self.encoder.assumptions().len() + 1);
-        assumptions.append(&mut self.encoder.assumptions().to_vec());
-        assumptions.push(self.encoder.arg_to_lit(arg));
+        let encoder_ref = self.buffered_encoder.encoder();
+        let mut assumptions = Vec::with_capacity(encoder_ref.assumptions().len() + 1);
+        assumptions.append(&mut encoder_ref.assumptions().to_vec());
+        assumptions.push(encoder_ref.arg_to_lit(arg));
         self.solver
             .borrow_mut()
             .solve_under_assumptions(&assumptions)
@@ -107,9 +110,10 @@ where
     T: LabelType,
 {
     fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
-        let mut assumptions = Vec::with_capacity(self.encoder.assumptions().len() + 1);
-        assumptions.append(&mut self.encoder.assumptions().to_vec());
-        assumptions.push(self.encoder.arg_to_lit(arg).negate());
+        let encoder_ref = self.buffered_encoder.encoder();
+        let mut assumptions = Vec::with_capacity(encoder_ref.assumptions().len() + 1);
+        assumptions.append(&mut encoder_ref.assumptions().to_vec());
+        assumptions.push(encoder_ref.arg_to_lit(arg).negate());
         self.solver
             .borrow_mut()
             .solve_under_assumptions(&assumptions)

@@ -342,7 +342,14 @@ where
     /// assert_eq!(1, af.iter_attacks_from(af.argument_set().get_argument(&"a").unwrap()).count());
     /// assert_eq!(0, af.iter_attacks_from(af.argument_set().get_argument(&"b").unwrap()).count());
     pub fn iter_attacks_from(&self, arg: &Argument<T>) -> impl Iterator<Item = Attack<'_, T>> + '_ {
-        self.attacks_from[arg.id()]
+        self.iter_attacks_from_id(arg.id())
+    }
+
+    pub(crate) fn iter_attacks_from_id(
+        &self,
+        arg_id: usize,
+    ) -> impl Iterator<Item = Attack<'_, T>> + '_ {
+        self.attacks_from[arg_id]
             .iter()
             .map(|i| &self.attacks[*i])
             .filter_map(|o| o.as_ref())

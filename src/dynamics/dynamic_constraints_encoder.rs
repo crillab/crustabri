@@ -1,5 +1,5 @@
 use crate::{
-    aa::{AAFramework, ArgumentSet},
+    aa::{AAFramework, ArgumentSet, Semantics},
     sat::{Literal, SatSolver},
     utils::LabelType,
 };
@@ -17,6 +17,7 @@ where
     solver_vars: Vec<SolverVarType>,
     solver: Rc<RefCell<Box<dyn SatSolver>>>,
     assumptions: Vec<Literal>,
+    update_attacks_to_constraints: bool,
 }
 
 #[derive(Debug)]
@@ -27,17 +28,11 @@ enum SolverVarType {
     Ignored,
 }
 
-#[derive(PartialEq, Eq)]
-enum Semantics {
-    Complete,
-    Stable,
-}
-
 impl<T> DynamicConstraintsEncoder<T>
 where
     T: LabelType,
 {
-    fn new(solver: Rc<RefCell<Box<dyn SatSolver>>>, semantics: Semantics) -> Self
+    pub fn new(solver: Rc<RefCell<Box<dyn SatSolver>>>, semantics: Semantics) -> Self
     where
         T: LabelType,
     {
@@ -49,6 +44,7 @@ where
             solver_vars: vec![SolverVarType::Ignored],
             solver,
             assumptions: Vec::new(),
+            update_attacks_to_constraints: true,
         }
     }
 
@@ -69,13 +65,16 @@ where
         self.af.new_argument(label);
         let arg_id = self.af.max_argument_id().unwrap();
         let solver_var = self.new_solver_var(SolverVarType::Argument(arg_id));
-        if self.semantics == Semantics::Complete {
-            let attacker_disjunction_var =
-                self.new_solver_var(SolverVarType::AttackerDisjunctionVar(arg_id));
-            self.solver.borrow_mut().add_clause(vec![
-                Literal::from(solver_var as isize).negate(),
-                Literal::from(attacker_disjunction_var as isize).negate(),
-            ]);
+        match self.semantics {
+            Semantics::CO | Semantics::PR => {
+                let attacker_disjunction_var =
+                    self.new_solver_var(SolverVarType::AttackerDisjunctionVar(arg_id));
+                self.solver.borrow_mut().add_clause(vec![
+                    Literal::from(solver_var as isize).negate(),
+                    Literal::from(attacker_disjunction_var as isize).negate(),
+                ]);
+            }
+            _ => {}
         }
         self.arg_id_to_solver_var.push(Some(solver_var));
         self.arg_id_to_attacker_set_selector_var.push(None);
@@ -87,7 +86,14 @@ where
         self.solver_vars.len() - 1
     }
 
-    fn update_attacks_to_constraints(&mut self, to_arg_id: usize) {
+    pub(crate) fn enable_update_attacks_to_constraints(&mut self, v: bool) {
+        self.update_attacks_to_constraints = v;
+    }
+
+    pub(crate) fn update_attacks_to_constraints(&mut self, to_arg_id: usize) {
+        if !self.update_attacks_to_constraints {
+            return;
+        }
         if let Some(s) = self.arg_id_to_attacker_set_selector_var[to_arg_id] {
             self.remove_selector(s);
             self.arg_id_to_attacker_set_selector_var[to_arg_id] = None;
@@ -103,17 +109,19 @@ where
             .map(|att| att.attacker().id())
             .collect::<Vec<usize>>();
         match self.semantics {
-            Semantics::Complete => self.add_attacks_to_constraints_for_complete_semantics(
+            Semantics::CO | Semantics::PR => self
+                .add_attacks_to_constraints_for_complete_semantics(
+                    to_arg_id,
+                    &attackers_ids,
+                    attacker_set_selector_lit,
+                ),
+            Semantics::ST => self.add_attacks_to_constraints_for_stable_semantics(
                 to_arg_id,
                 &attackers_ids,
                 attacker_set_selector_lit,
             ),
-            Semantics::Stable => self.add_attacks_to_constraints_for_stable_semantics(
-                to_arg_id,
-                &attackers_ids,
-                attacker_set_selector_lit,
-            ),
-        };
+            _ => {}
+        }
     }
 
     fn add_attacks_to_constraints_for_complete_semantics(
@@ -231,22 +239,4 @@ where
         self.update_attacks_to_constraints(to_id);
         Ok(())
     }
-}
-
-pub fn new_for_complete_semantics<T>(
-    solver: Rc<RefCell<Box<dyn SatSolver>>>,
-) -> DynamicConstraintsEncoder<T>
-where
-    T: LabelType,
-{
-    DynamicConstraintsEncoder::new(solver, Semantics::Complete)
-}
-
-pub fn new_for_stable_semantics<T>(
-    solver: Rc<RefCell<Box<dyn SatSolver>>>,
-) -> DynamicConstraintsEncoder<T>
-where
-    T: LabelType,
-{
-    DynamicConstraintsEncoder::new(solver, Semantics::Stable)
 }

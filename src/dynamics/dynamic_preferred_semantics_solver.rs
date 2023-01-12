@@ -1,9 +1,9 @@
 use super::{
-    dynamic_constraints_encoder::{self, DynamicConstraintsEncoder},
-    DynamicSolver,
+    buffered_dynamic_constraints_encoder::BufferedDynamicConstraintsEncoder,
+    dynamic_constraints_encoder::DynamicConstraintsEncoder, DynamicSolver,
 };
 use crate::{
-    aa::{AAFramework, Argument},
+    aa::{AAFramework, Argument, Semantics},
     encodings::ConstraintsEncoder,
     sat::{self, Assignment, Literal, SatSolver, SatSolverFactoryFn},
     solvers::{
@@ -20,7 +20,7 @@ pub struct DynamicPreferredSemanticsSolver<T>
 where
     T: LabelType,
 {
-    encoder: DynamicConstraintsEncoder<T>,
+    buffered_encoder: BufferedDynamicConstraintsEncoder<T>,
     solver: Rc<RefCell<Box<dyn SatSolver>>>,
 }
 
@@ -47,7 +47,10 @@ where
     {
         let solver = Rc::new(RefCell::new((solver_factory)()));
         Self {
-            encoder: dynamic_constraints_encoder::new_for_complete_semantics(Rc::clone(&solver)),
+            buffered_encoder: BufferedDynamicConstraintsEncoder::new(
+                Rc::clone(&solver),
+                Semantics::PR,
+            ),
             solver,
         }
     }
@@ -67,19 +70,19 @@ where
     T: LabelType,
 {
     fn new_argument(&mut self, label: T) {
-        self.encoder.new_argument(label)
+        self.buffered_encoder.buffer_new_argument(label)
     }
 
     fn remove_argument(&mut self, label: &T) -> Result<()> {
-        self.encoder.remove_argument(label)
+        self.buffered_encoder.buffer_remove_argument(label)
     }
 
     fn new_attack(&mut self, from: &T, to: &T) -> Result<()> {
-        self.encoder.new_attack(from, to)
+        self.buffered_encoder.buffer_new_attack(from, to)
     }
 
     fn remove_attack(&mut self, from: &T, to: &T) -> Result<()> {
-        self.encoder.remove_attack(from, to)
+        self.buffered_encoder.buffer_remove_attack(from, to)
     }
 }
 
@@ -104,16 +107,17 @@ where
     T: LabelType,
 {
     fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
+        let encoder_ref = self.buffered_encoder.encoder();
         let constraints_encoder = LocalConstraintsEncoder {
-            encoder: &self.encoder,
+            encoder: &encoder_ref,
         };
         let mut computer = maximal_extension_computer::new_for_preferred_semantics(
-            self.encoder.af(),
+            encoder_ref.af(),
             Rc::clone(&self.solver),
             &constraints_encoder,
         );
-        computer.set_additional_assumptions(self.encoder.assumptions().to_vec());
-        let arg = self.encoder.af().argument_set().get_argument(arg).unwrap();
+        computer.set_additional_assumptions(encoder_ref.assumptions().to_vec());
+        let arg = encoder_ref.af().argument_set().get_argument(arg).unwrap();
         loop {
             computer.compute_next();
             match computer.state() {
@@ -126,8 +130,7 @@ where
                     let current = computer.current();
                     if current.contains(&arg) {
                         computer.discard_current_search();
-                    } else if self
-                        .encoder
+                    } else if encoder_ref
                         .af()
                         .iter_attacks_to(arg)
                         .any(|att| current.contains(&att.attacker()))
