@@ -14,6 +14,10 @@ where
     RemoveArgument(T),
     NewAttack(T, T),
     RemoveAttack(T, T),
+    SkepticalAcceptanceComputation {
+        proved_accepted: Vec<T>,
+        proved_refused: Vec<T>,
+    },
 }
 
 pub struct BufferedDynamicConstraintsEncoder<T>
@@ -130,6 +134,7 @@ where
                     self.encoder.borrow_mut().remove_attack(l0, l1).unwrap();
                     must_update_attacks_to(label_to_id(self.encoder.borrow(), l1));
                 }
+                DynamicsEvent::SkepticalAcceptanceComputation { .. } => {}
             });
         self.encoder
             .borrow_mut()
@@ -146,6 +151,34 @@ where
     pub fn encoder(&self) -> Ref<DynamicConstraintsEncoder<T>> {
         self.update_encoding();
         self.encoder.borrow()
+    }
+
+    pub fn add_skeptical_computation(&mut self, proved_accepted: Vec<T>, proved_refused: Vec<T>) {
+        self.buffer
+            .push(DynamicsEvent::SkepticalAcceptanceComputation {
+                proved_accepted,
+                proved_refused,
+            })
+    }
+
+    pub fn is_skeptically_accepted(&mut self, label: &T) -> Option<bool> {
+        for e in self.buffer.iter().rev() {
+            match e {
+                DynamicsEvent::SkepticalAcceptanceComputation {
+                    proved_accepted,
+                    proved_refused,
+                } if proved_accepted.contains(label) => {
+                    if proved_accepted.contains(label) {
+                        return Some(true);
+                    }
+                    if proved_refused.contains(label) {
+                        return Some(false);
+                    }
+                }
+                _ => break,
+            }
+        }
+        None
     }
 }
 
