@@ -86,15 +86,43 @@ where
     T: LabelType,
 {
     fn is_credulously_accepted(&mut self, arg: &T) -> bool {
+        if let Some(b) = self.buffered_encoder.is_credulously_accepted(arg) {
+            return b;
+        }
         let encoder_ref = self.buffered_encoder.encoder();
         let mut assumptions = Vec::with_capacity(encoder_ref.assumptions().len() + 1);
         assumptions.append(&mut encoder_ref.assumptions().to_vec());
         assumptions.push(encoder_ref.arg_to_lit(arg));
-        self.solver
+        match self
+            .solver
             .borrow_mut()
             .solve_under_assumptions(&assumptions)
             .unwrap_model()
-            .is_some()
+        {
+            Some(m) => {
+                let proved_accepted = m
+                    .iter()
+                    .filter_map(|(v, b)| {
+                        if b != Some(false) {
+                            if let Some(arg) = encoder_ref.solver_var_to_arg(v) {
+                                return Some(arg.label().clone());
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+                std::mem::drop(encoder_ref);
+                self.buffered_encoder
+                    .add_credulous_computation(proved_accepted, vec![]);
+                true
+            }
+            None => {
+                std::mem::drop(encoder_ref);
+                self.buffered_encoder
+                    .add_credulous_computation(vec![], vec![arg.clone()]);
+                false
+            }
+        }
     }
 
     fn is_credulously_accepted_with_certificate(

@@ -7,7 +7,9 @@ use crate::{
     encodings::ConstraintsEncoder,
     sat::{self, Assignment, Literal, SatSolver, SatSolverFactoryFn},
     solvers::{
-        maximal_extension_computer::{self, MaximalExtensionComputerState},
+        maximal_extension_computer::{
+            self, MaximalExtensionComputer, MaximalExtensionComputerState,
+        },
         CredulousAcceptanceComputer, SkepticalAcceptanceComputer,
     },
     utils::LabelType,
@@ -144,15 +146,29 @@ where
                 })
                 .collect()
         };
+        let compute_in_current_bool = |c: &MaximalExtensionComputer<T>| {
+            let mut in_current =
+                vec![false; 1 + encoder_ref.af().max_argument_id().unwrap_or_default()];
+            c.current().iter().for_each(|a| {
+                in_current[a.id()] = true;
+            });
+            in_current
+        };
+        let add_defeated_in_current_to_missing =
+            |c: &MaximalExtensionComputer<T>, m: &mut [bool]| {
+                c.current().iter().for_each(|attacker| {
+                    encoder_ref
+                        .af()
+                        .iter_attacks_from_id(attacker.id())
+                        .for_each(|att| m[att.attacked().id()] = true);
+                });
+            };
         let (result, proved_accepted_bool, proved_refused_bool) = loop {
             computer.compute_next();
             match computer.state() {
                 MaximalExtensionComputerState::Maximal => {
-                    let mut in_current =
-                        vec![false; 1 + encoder_ref.af().max_argument_id().unwrap_or_default()];
-                    computer.current().iter().for_each(|a| {
-                        in_current[a.id()] = true;
-                    });
+                    let in_current = compute_in_current_bool(&computer);
+                    add_defeated_in_current_to_missing(&computer, &mut missing_in_one_maximal);
                     let arg_is_missing = !in_current[arg.id()];
                     if first_maximal {
                         in_all_maximal = Some(in_current);
@@ -172,7 +188,13 @@ where
                 }
                 MaximalExtensionComputerState::Intermediate => {
                     let current = computer.current();
+                    add_defeated_in_current_to_missing(&computer, &mut missing_in_one_maximal);
                     if current.contains(&arg) {
+                        if first_maximal {
+                            let in_current = compute_in_current_bool(&computer);
+                            in_all_maximal = Some(in_current);
+                        }
+                        first_maximal = false;
                         computer.discard_current_search();
                     } else if encoder_ref
                         .af()

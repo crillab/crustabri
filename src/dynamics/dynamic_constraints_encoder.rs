@@ -1,5 +1,5 @@
 use crate::{
-    aa::{AAFramework, ArgumentSet, Semantics},
+    aa::{AAFramework, Argument, ArgumentSet, Semantics},
     sat::{Literal, SatSolver},
     utils::LabelType,
 };
@@ -238,5 +238,13 @@ where
         let to_id = self.af.argument_set().get_argument(to).unwrap().id();
         self.update_attacks_to_constraints(to_id);
         Ok(())
+    }
+
+    pub fn solver_var_to_arg(&self, solver_var: usize) -> Option<&Argument<T>> {
+        if let SolverVarType::Argument(arg_id) = self.solver_vars[solver_var] {
+            return Some(self.af().argument_set().get_argument_by_id(arg_id));
+        } else {
+            None
+        }
     }
 }

@@ -14,6 +14,10 @@ where
     RemoveArgument(T),
     NewAttack(T, T),
     RemoveAttack(T, T),
+    CredulousAcceptanceComputation {
+        proved_accepted: Vec<T>,
+        proved_refused: Vec<T>,
+    },
     SkepticalAcceptanceComputation {
         proved_accepted: Vec<T>,
         proved_refused: Vec<T>,
@@ -134,7 +138,8 @@ where
                     self.encoder.borrow_mut().remove_attack(l0, l1).unwrap();
                     must_update_attacks_to(label_to_id(self.encoder.borrow(), l1));
                 }
-                DynamicsEvent::SkepticalAcceptanceComputation { .. } => {}
+                DynamicsEvent::SkepticalAcceptanceComputation { .. }
+                | DynamicsEvent::CredulousAcceptanceComputation { .. } => {}
             });
         self.encoder
             .borrow_mut()
@@ -153,6 +158,41 @@ where
         self.encoder.borrow()
     }
 
+    pub fn add_credulous_computation(&mut self, proved_accepted: Vec<T>, proved_refused: Vec<T>) {
+        self.buffer
+            .push(DynamicsEvent::CredulousAcceptanceComputation {
+                proved_accepted,
+                proved_refused,
+            })
+    }
+
+    pub fn is_credulously_accepted(&mut self, label: &T) -> Option<bool> {
+        for e in self.buffer.iter().rev() {
+            match e {
+                DynamicsEvent::CredulousAcceptanceComputation {
+                    proved_accepted,
+                    proved_refused,
+                } => {
+                    if proved_accepted.contains(label) {
+                        return Some(true);
+                    }
+                    if proved_refused.contains(label) {
+                        return Some(false);
+                    }
+                }
+                DynamicsEvent::SkepticalAcceptanceComputation {
+                    proved_accepted, ..
+                } => {
+                    if proved_accepted.contains(label) {
+                        return Some(true);
+                    }
+                }
+                _ => break,
+            }
+        }
+        None
+    }
+
     pub fn add_skeptical_computation(&mut self, proved_accepted: Vec<T>, proved_refused: Vec<T>) {
         self.buffer
             .push(DynamicsEvent::SkepticalAcceptanceComputation {
@@ -167,10 +207,15 @@ where
                 DynamicsEvent::SkepticalAcceptanceComputation {
                     proved_accepted,
                     proved_refused,
-                } if proved_accepted.contains(label) => {
+                } => {
                     if proved_accepted.contains(label) {
                         return Some(true);
                     }
+                    if proved_refused.contains(label) {
+                        return Some(false);
+                    }
+                }
+                DynamicsEvent::CredulousAcceptanceComputation { proved_refused, .. } => {
                     if proved_refused.contains(label) {
                         return Some(false);
                     }
