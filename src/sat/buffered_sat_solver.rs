@@ -125,7 +125,7 @@ impl SatSolver for BufferedSatSolver {
                             assignment[v] = Some(n > 0);
                         }
                     });
-            } else if !line.starts_with("c ") && !line.is_empty() {
+            } else if !line.starts_with("c ") && line != "c" && line != "v" && !line.is_empty() {
                 panic!(r#"{}: unexpected line "{}""#, context, line)
             }
         }
@@ -177,6 +177,16 @@ mod tests {
     #[test]
     fn test_output_sat_ok() {
         let solver_output = "s SATISFIABLE\nv -1 2 0\n";
+        let mut s = BufferedSatSolver::new(fake_output_solving_fn(solver_output));
+        s.add_clause(clause![-1, 2]);
+        let assignment = s.solve().unwrap_model().unwrap();
+        assert!(!assignment.value_of(1).unwrap());
+        assert!(assignment.value_of(2).unwrap());
+    }
+
+    #[test]
+    fn test_output_sat_ok_with_v_lines_without_lits() {
+        let solver_output = "s SATISFIABLE\nv\nv -1 2 0\nv\n";
         let mut s = BufferedSatSolver::new(fake_output_solving_fn(solver_output));
         s.add_clause(clause![-1, 2]);
         let assignment = s.solve().unwrap_model().unwrap();
@@ -266,6 +276,15 @@ mod tests {
     #[test]
     fn test_output_comment() {
         let solver_output = "c foo\ns UNSATISFIABLE\n";
+        let mut s = BufferedSatSolver::new(fake_output_solving_fn(solver_output));
+        s.add_clause(clause![1]);
+        s.add_clause(clause![-1]);
+        assert!(s.solve().unwrap_model().is_none());
+    }
+
+    #[test]
+    fn test_output_comment_with_no_message() {
+        let solver_output = "c\ns UNSATISFIABLE\n";
         let mut s = BufferedSatSolver::new(fake_output_solving_fn(solver_output));
         s.add_clause(clause![1]);
         s.add_clause(clause![-1]);
