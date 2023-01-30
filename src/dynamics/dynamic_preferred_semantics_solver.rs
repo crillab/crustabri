@@ -246,11 +246,7 @@ where
         unimplemented!()
     }
 
-    fn encode_range_constraints(
-        &self,
-        _af: &AAFramework<T>,
-        _solver: &mut dyn sat::SatSolver,
-    ) -> usize {
+    fn encode_constraints_and_range(&self, _af: &AAFramework<T>, _solver: &mut dyn sat::SatSolver) {
         unimplemented!()
     }
 

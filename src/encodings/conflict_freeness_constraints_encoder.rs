@@ -2,7 +2,7 @@ use super::{ConstraintsEncoder, DefaultCompleteConstraintsEncoder};
 use crate::{
     aa::{AAFramework, Argument},
     sat::{clause, Assignment, Literal, SatSolver},
-    utils::LabelType,
+    utils::{Label, LabelType},
 };
 
 /// The default encoder for the conflict-freeness based semantics.
@@ -10,16 +10,22 @@ use crate::{
 pub struct DefaultConflictFreenessConstraintsEncoder;
 
 impl DefaultConflictFreenessConstraintsEncoder {
-    fn arg_id_to_solver_disjunction_var(&self, id: usize) -> usize {
-        arg_id_to_solver_var(id) - 1
-    }
-
-    fn arg_id_from_solver_var(&self, v: usize) -> Option<usize> {
-        if v & 1 == 1 {
-            None
-        } else {
-            Some((v >> 1) - 1)
-        }
+    fn encode_attack_constraints_for_arg<T>(
+        af: &AAFramework<T>,
+        solver: &mut dyn SatSolver,
+        arg: &Label<T>,
+    ) where
+        T: LabelType,
+    {
+        let attacked_id = arg.id();
+        let attacked_solver_var =
+            DefaultCompleteConstraintsEncoder::arg_id_to_solver_var(attacked_id) as isize;
+        af.iter_attacks_to(arg).for_each(|att| {
+            let attacker_id = att.attacker().id();
+            let attacker_solver_var =
+                DefaultCompleteConstraintsEncoder::arg_id_to_solver_var(attacker_id) as isize;
+            solver.add_clause(clause![-attacked_solver_var, -attacker_solver_var,]);
+        });
     }
 }
 
@@ -28,28 +34,22 @@ where
     T: LabelType,
 {
     fn encode_constraints(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver) {
-        DefaultCompleteConstraintsEncoder::encode_disjunction_vars(af, solver);
         af.argument_set().iter().for_each(|arg| {
-            let attacked_id = arg.id();
-            let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;
-            af.iter_attacks_to(arg).for_each(|att| {
-                let attacker_id = att.attacker().id();
-                let attacker_solver_var = arg_id_to_solver_var(attacker_id) as isize;
-                solver.add_clause(clause![-attacked_solver_var, -attacker_solver_var,]);
-            });
+            Self::encode_attack_constraints_for_arg(af, solver, arg);
+            DefaultCompleteConstraintsEncoder::encode_disjunction_var(af, solver, arg);
         });
     }
 
-    fn encode_range_constraints(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver) -> usize {
-        af.argument_set().iter().for_each(|a| {
-            let range_var = 1 + solver.n_vars() as isize;
-            let arg_var = arg_id_to_solver_var(a.id()) as isize;
-            let att_disj_var = self.arg_id_to_solver_disjunction_var(a.id()) as isize;
-            solver.add_clause(clause!(-arg_var, range_var));
-            solver.add_clause(clause!(-att_disj_var, range_var));
-            solver.add_clause(clause!(-range_var, arg_var, att_disj_var));
+    fn encode_constraints_and_range(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver) {
+        af.argument_set().iter().for_each(|arg| {
+            Self::encode_attack_constraints_for_arg(af, solver, arg);
+            DefaultCompleteConstraintsEncoder::encode_disjunction_var(af, solver, arg);
+            DefaultCompleteConstraintsEncoder::encode_range_constraint(
+                solver,
+                arg,
+                af.n_arguments(),
+            );
         });
-        solver.n_vars() + 1 - af.n_arguments()
     }
 
     fn assignment_to_extension<'a>(
@@ -60,27 +60,21 @@ where
         assignment
             .iter()
             .filter_map(|(var, opt_v)| match opt_v {
-                Some(true) => {
-                    DefaultConflictFreenessConstraintsEncoder::arg_id_from_solver_var(self, var)
-                        .and_then(|id| {
-                            if id < af.n_arguments() {
-                                Some(id)
-                            } else {
-                                None
-                            }
-                        })
-                        .map(|id| af.argument_set().get_argument_by_id(id))
-                }
+                Some(true) => DefaultCompleteConstraintsEncoder::arg_id_from_solver_var(var)
+                    .and_then(|id| {
+                        if id < af.n_arguments() {
+                            Some(id)
+                        } else {
+                            None
+                        }
+                    })
+                    .map(|id| af.argument_set().get_argument_by_id(id)),
                 _ => None,
             })
             .collect()
     }
 
     fn arg_to_lit(&self, arg: &Argument<T>) -> Literal {
-        Literal::from(arg_id_to_solver_var(arg.id()) as isize)
+        Literal::from(DefaultCompleteConstraintsEncoder::arg_id_to_solver_var(arg.id()) as isize)
     }
-}
-
-fn arg_id_to_solver_var(id: usize) -> usize {
-    (id + 1) << 1
 }

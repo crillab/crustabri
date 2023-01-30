@@ -12,8 +12,8 @@ where
     /// Encodes the constraints for the underlying semantics into the SAT solver.
     fn encode_constraints(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver);
 
-    /// Adds some variables and constraints to encode the range of extensions.
-    fn encode_range_constraints(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver) -> usize;
+    /// Encodes the constraints for the underlying semantics into the SAT solver and adds some variables and constraints to encode the range of extensions.
+    fn encode_constraints_and_range(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver);
 
     /// Translates back a SAT assignment into the corresponding set of arguments.
     fn assignment_to_extension<'a>(

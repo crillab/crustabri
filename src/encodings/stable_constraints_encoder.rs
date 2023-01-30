@@ -32,7 +32,7 @@ where
         });
     }
 
-    fn encode_range_constraints(&self, _af: &AAFramework<T>, _solver: &mut dyn SatSolver) -> usize {
+    fn encode_constraints_and_range(&self, _af: &AAFramework<T>, _solver: &mut dyn SatSolver) {
         unimplemented!()
     }
 

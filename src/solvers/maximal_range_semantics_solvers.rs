@@ -178,7 +178,7 @@ where
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
             let solver = Rc::new(RefCell::new((self.solver_factory)()));
             self.constraints_encoder
-                .encode_constraints(&cc_af, solver.borrow_mut().as_mut());
+                .encode_constraints_and_range(&cc_af, solver.borrow_mut().as_mut());
             let (computer, _) =
                 new_maximal_extension_computer(&cc_af, solver, self.constraints_encoder.as_ref());
             for cc_arg in computer.compute_maximal() {
@@ -248,7 +248,7 @@ where
         let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
         let solver = Rc::new(RefCell::new((self.solver_factory)()));
         self.constraints_encoder
-            .encode_constraints(cc_af, solver.borrow_mut().as_mut());
+            .encode_constraints_and_range(cc_af, solver.borrow_mut().as_mut());
         let (mut computer, first_range_var) = new_maximal_extension_computer(
             cc_af,
             Rc::clone(&solver),
@@ -299,7 +299,7 @@ where
         while let Some(other_cc_af) = cc_computer.next_connected_component() {
             let solver = Rc::new(RefCell::new((self.solver_factory)()));
             self.constraints_encoder
-                .encode_constraints(&other_cc_af, solver.borrow_mut().as_mut());
+                .encode_constraints_and_range(&other_cc_af, solver.borrow_mut().as_mut());
             let (computer, _) = new_maximal_extension_computer(
                 &other_cc_af,
                 solver,
@@ -320,8 +320,8 @@ fn new_maximal_extension_computer<'a, 'b, T>(
 where
     T: LabelType,
 {
-    let first_range_var =
-        constraints_encoder.encode_range_constraints(af, solver.borrow_mut().as_mut());
+    // constraints_encoder.encode_range_constraints(af, solver.borrow_mut().as_mut());
+    let first_range_var = solver.borrow().n_vars() + 1 - af.n_arguments();
     let mut computer = MaximalExtensionComputer::new(af, Rc::clone(&solver), constraints_encoder);
     let solver_clone = Rc::clone(&solver);
     computer.set_increase_current_fn(Box::new(move |fn_data| {
