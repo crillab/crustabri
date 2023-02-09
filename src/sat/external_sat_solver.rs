@@ -1,6 +1,6 @@
 use super::{
     buffered_sat_solver::{BufferedSatSolver, DimacsInstanceRead},
-    sat_solver::SolvingResult,
+    sat_solver::{SolvingListener, SolvingResult},
     Literal, SatSolver,
 };
 use std::{
@@ -62,6 +62,10 @@ impl SatSolver for ExternalSatSolver {
 
     fn n_vars(&self) -> usize {
         self.buffered_sat_solver.n_vars()
+    }
+
+    fn add_listener(&mut self, listener: Box<dyn SolvingListener>) {
+        self.buffered_sat_solver.add_listener(listener);
     }
 }
 

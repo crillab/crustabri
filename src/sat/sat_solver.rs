@@ -334,6 +334,18 @@ pub trait SatSolver {
     /// assert_eq!(2, solver.n_vars());
     /// ```
     fn n_vars(&self) -> usize;
+
+    /// Adds a listener to this SAT solver.
+    fn add_listener(&mut self, listener: Box<dyn SolvingListener>);
+}
+
+/// An interface for objects listening SAT solver activity.
+pub trait SolvingListener {
+    /// Advises the listener a SAT solving will start with the count of variables and clauses involved.
+    fn solving_start(&self, n_vars: usize, n_clauses: usize);
+
+    /// Advises the listener the current solving operation ended, providing the result.
+    fn solving_end(&self, result: &SolvingResult);
 }
 
 /// Returns the default SAT solver.

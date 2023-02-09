@@ -7,7 +7,7 @@ use crustabri::{
         AspartixReader, AspartixWriter, Iccma23Reader, Iccma23Writer, InstanceReader,
         ResponseWriter,
     },
-    sat::{self, ExternalSatSolver, SatSolverFactoryFn},
+    sat::{self, ExternalSatSolver, SatSolver, SatSolverFactoryFn, SolvingListener, SolvingResult},
     solvers::{
         CompleteSemanticsSolver, CredulousAcceptanceComputer, GroundedSemanticsSolver,
         IdealSemanticsSolver, PreferredSemanticsSolver, SemiStableSemanticsSolver,
@@ -353,6 +353,27 @@ where
     }
 }
 
+#[derive(Default)]
+struct SatSolvingLogger;
+
+impl SolvingListener for SatSolvingLogger {
+    fn solving_start(&self, n_vars: usize, n_clauses: usize) {
+        info!(
+            "launching SAT solver on an instance with {} variables and {} clauses",
+            n_vars, n_clauses
+        );
+    }
+
+    fn solving_end(&self, result: &SolvingResult) {
+        let r = match result {
+            SolvingResult::Satisfiable(_) => "SAT",
+            SolvingResult::Unsatisfiable => "UNSAT",
+            SolvingResult::Unknown => "UNKNOWN",
+        };
+        info!("SAT solver ended with result {}", r);
+    }
+}
+
 fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Box<SatSolverFactoryFn> {
     let external_solver = arg_matches
         .value_of(ARG_EXTERNAL_SAT_SOLVER)
@@ -364,13 +385,18 @@ fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Box<SatSolverFacto
     if let Some(s) = external_solver {
         info!("using {} for problems requiring a SAT solver", s);
         Box::new(move || {
-            Box::new(ExternalSatSolver::new(
-                s.to_string(),
-                external_solver_options.clone(),
-            ))
+            let mut s = ExternalSatSolver::new(s.to_string(), external_solver_options.clone());
+            s.add_listener(Box::new(SatSolvingLogger::default()));
+            Box::new(s)
         })
     } else {
         info!("using the default SAT solver for problems requiring a SAT solver");
-        Box::new(|| sat::default_solver())
+        Box::new(|| {
+            let mut s = sat::default_solver();
+            s.add_listener(Box::new(SatSolvingLogger::default()));
+            s
+        })
+    }
+}
     }
 }

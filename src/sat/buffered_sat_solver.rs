@@ -1,4 +1,7 @@
-use super::{sat_solver::SolvingResult, Assignment, Literal, SatSolver};
+use super::{
+    sat_solver::{SolvingListener, SolvingResult},
+    Assignment, Literal, SatSolver,
+};
 use std::io::{BufRead, BufReader, Cursor, Read};
 
 type SolvingFn = dyn Fn(DimacsInstanceRead) -> Box<dyn Read>;
@@ -34,6 +37,7 @@ pub struct BufferedSatSolver {
     n_clauses: usize,
     clauses: String,
     solving_fn: Box<SolvingFn>,
+    listeners: Vec<Box<dyn SolvingListener>>,
 }
 
 impl BufferedSatSolver {
@@ -43,6 +47,7 @@ impl BufferedSatSolver {
             n_clauses: 0,
             clauses: String::with_capacity(DEFAULT_BUFFER_CAP),
             solving_fn,
+            listeners: Vec::new(),
         }
     }
 }
@@ -63,6 +68,7 @@ impl SatSolver for BufferedSatSolver {
     }
 
     fn solve_under_assumptions(&mut self, assumptions: &[Literal]) -> SolvingResult {
+        self.listeners.iter().for_each(|l| l.solving_start(self.n_vars(), self.n_clauses));
         let preamble = format!(
             "p cnf {} {}\n",
             self.n_vars,
@@ -129,7 +135,7 @@ impl SatSolver for BufferedSatSolver {
                 panic!(r#"{}: unexpected line "{}""#, context, line)
             }
         }
-        match status {
+        let solving_result = match status {
             Some(true) => {
                 if assignment_line_seen {
                     SolvingResult::Satisfiable(Assignment::new(assignment))
@@ -139,11 +145,17 @@ impl SatSolver for BufferedSatSolver {
             }
             Some(false) => SolvingResult::Unsatisfiable,
             None => SolvingResult::Unknown,
-        }
+        };
+        self.listeners.iter().for_each(|l| l.solving_end(&solving_result));
+        solving_result
     }
 
     fn n_vars(&self) -> usize {
         self.n_vars
+    }
+
+    fn add_listener(&mut self, listener: Box<dyn SolvingListener>) {
+        self.listeners.push(listener);
     }
 }
 
