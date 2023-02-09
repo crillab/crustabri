@@ -96,6 +96,48 @@ where
             constraints_encoder: Box::new(DefaultCompleteConstraintsEncoder::default()),
         }
     }
+
+    /// Builds a new SAT based solver for the complete semantics.
+    ///
+    /// The SAT solver to use in given through the solver factory.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{AAFramework, Argument, ArgumentSet};
+    /// # use crustabri::utils::LabelType;
+    /// # use crustabri::sat;
+    /// # use crustabri::encodings::DefaultCompleteConstraintsEncoder;
+    /// # use crustabri::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
+    /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &T) where T: LabelType {
+    ///     let mut solver = CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+    ///         af,
+    ///         Box::new(|| sat::default_solver()),
+    ///         Box::new(DefaultCompleteConstraintsEncoder::default()),
+    ///     );
+    ///     if solver.is_credulously_accepted(arg) {
+    ///         println!("there exists complete extension(s) with {}", arg)
+    ///     } else {
+    ///         println!("there is no complete extension with {}", arg)
+    ///     }
+    /// }
+    /// # let arg_set = ArgumentSet::new_with_labels(&["a"]);
+    /// # let af = AAFramework::new_with_argument_set(arg_set);
+    /// # check_credulous_acceptance(&af, &"a");
+    pub fn new_with_sat_solver_factory_and_constraints_encoder(
+        af: &'a AAFramework<T>,
+        solver_factory: Box<SatSolverFactoryFn>,
+        constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
+    ) -> Self
+    where
+        T: LabelType,
+    {
+        Self {
+            af,
+            solver_factory,
+            constraints_encoder,
+        }
+    }
 }
 
 impl<T> CredulousAcceptanceComputer<T> for CompleteSemanticsSolver<'_, T>
@@ -156,10 +198,16 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::io::{AspartixReader, InstanceReader};
+    use crate::{
+        encodings::{AuxVarCompleteConstraintsEncoder, ExpCompleteConstraintsEncoder},
+        io::{AspartixReader, InstanceReader},
+    };
 
+    macro_rules! test_for_encoder {
+        ($encoder:expr, $suffix:literal) => {
+            paste::item! {
     #[test]
-    fn test_acceptance_1() {
+    fn [< test_acceptance_1_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -167,13 +215,14 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = CompleteSemanticsSolver::new(&af);
+        let mut solver =
+            CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(solver.is_credulously_accepted(&"a0".to_string()));
         assert!(!solver.is_credulously_accepted(&"a1".to_string()));
     }
 
     #[test]
-    fn test_acceptance_2() {
+    fn [< test_acceptance_2_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -182,13 +231,14 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = CompleteSemanticsSolver::new(&af);
+        let mut solver =
+            CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(solver.is_credulously_accepted(&"a0".to_string()));
         assert!(solver.is_credulously_accepted(&"a1".to_string()));
     }
 
     #[test]
-    fn test_acceptance_3() {
+    fn [< test_acceptance_3_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -199,14 +249,15 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = CompleteSemanticsSolver::new(&af);
+        let mut solver =
+            CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(solver.is_credulously_accepted(&"a0".to_string()));
         assert!(solver.is_credulously_accepted(&"a1".to_string()));
         assert!(solver.is_credulously_accepted(&"a2".to_string()));
     }
 
     #[test]
-    fn test_credulous_acceptance_after_arg_removal() {
+    fn [< test_credulous_acceptance_after_arg_removal_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -217,15 +268,17 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver_before = CompleteSemanticsSolver::new(&af);
+        let mut solver_before =
+            CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(!solver_before.is_credulously_accepted(&"a1".to_string()));
         af.remove_argument(&"a0".to_string()).unwrap();
-        let mut solver_after = CompleteSemanticsSolver::new(&af);
+        let mut solver_after =
+            CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(solver_after.is_credulously_accepted(&"a1".to_string()));
     }
 
     #[test]
-    fn test_certificates() {
+    fn [< test_certificates_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -234,7 +287,8 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = CompleteSemanticsSolver::new(&af);
+        let mut solver =
+            CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert_eq!(
             &["a0", "a2"],
             solver
@@ -252,4 +306,10 @@ mod tests {
             solver.is_credulously_accepted_with_certificate(&"a1".to_string())
         )
     }
+    }
+    };
+    }
+
+    test_for_encoder!(AuxVarCompleteConstraintsEncoder, "auxvar");
+    test_for_encoder!(ExpCompleteConstraintsEncoder, "exp");
 }

@@ -91,6 +91,45 @@ macro_rules! maximal_range_solver {
                     ),
                 }
             }
+
+            /// Builds a new SAT based solver for the this semantics.
+            ///
+            /// The SAT solver to use in given through the solver factory.
+            ///
+            /// # Example
+            ///
+            /// ```
+            /// # use crustabri::aa::{AAFramework};
+            /// # use crustabri::utils::LabelType;
+            /// # use crustabri::sat;
+            /// # use crustabri::encodings::DefaultCompleteConstraintsEncoder;
+            #[doc = concat!(" # use crustabri::solvers::{SingleExtensionComputer, ", stringify!($solver_ident), "};")]
+            /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
+            #[doc = concat!("     let mut solver = ", stringify!($solver_ident), "::new_with_sat_solver_factory_and_constraints_encoder(")]
+            ///         af,
+            ///         Box::new(|| sat::default_solver()),
+            ///         Box::new(DefaultCompleteConstraintsEncoder::default()),
+            ///     );
+            ///     let ext = solver.compute_one_extension().unwrap();
+            ///     println!("found a semi-stable extension: {:?}", ext);
+            /// }
+            /// # search_one_extension::<usize>(&AAFramework::default());
+            pub fn new_with_sat_solver_factory_and_constraints_encoder(
+                af: &'a AAFramework<T>,
+                solver_factory: Box<SatSolverFactoryFn>,
+                constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
+            ) -> Self
+            where
+                T: LabelType,
+            {
+                Self {
+                    helper: MaximalRangeSemanticsHelper::new(
+                        af,
+                        solver_factory,
+                        constraints_encoder,
+                    ),
+                }
+            }
         }
 
         impl<T> SingleExtensionComputer<T> for $solver_ident<'_, T>
@@ -179,7 +218,7 @@ where
             let solver = Rc::new(RefCell::new((self.solver_factory)()));
             self.constraints_encoder
                 .encode_constraints_and_range(&cc_af, solver.borrow_mut().as_mut());
-            let (computer, _) =
+            let computer =
                 new_maximal_extension_computer(&cc_af, solver, self.constraints_encoder.as_ref());
             for cc_arg in computer.compute_maximal() {
                 merged.push(self.af.argument_set().get_argument(cc_arg.label()).unwrap())
@@ -249,7 +288,7 @@ where
         let solver = Rc::new(RefCell::new((self.solver_factory)()));
         self.constraints_encoder
             .encode_constraints_and_range(cc_af, solver.borrow_mut().as_mut());
-        let (mut computer, first_range_var) = new_maximal_extension_computer(
+        let mut computer = new_maximal_extension_computer(
             cc_af,
             Rc::clone(&solver),
             self.constraints_encoder.as_ref(),
@@ -261,7 +300,6 @@ where
                     let stop_enum_reason = enumerate_extensions_for_range(
                         Rc::clone(&solver),
                         &mut computer.state_data(),
-                        first_range_var,
                         self.constraints_encoder.as_ref(),
                         &|ext| {
                             if ext.contains(&cc_arg) == is_credulous_acceptance {
@@ -300,7 +338,7 @@ where
             let solver = Rc::new(RefCell::new((self.solver_factory)()));
             self.constraints_encoder
                 .encode_constraints_and_range(&other_cc_af, solver.borrow_mut().as_mut());
-            let (computer, _) = new_maximal_extension_computer(
+            let computer = new_maximal_extension_computer(
                 &other_cc_af,
                 solver,
                 self.constraints_encoder.as_ref(),
@@ -316,27 +354,25 @@ fn new_maximal_extension_computer<'a, 'b, T>(
     af: &'a AAFramework<T>,
     solver: Rc<RefCell<Box<dyn SatSolver>>>,
     constraints_encoder: &'b dyn ConstraintsEncoder<T>,
-) -> (MaximalExtensionComputer<'a, 'b, T>, usize)
+) -> MaximalExtensionComputer<'a, 'b, T>
 where
     T: LabelType,
 {
-    // constraints_encoder.encode_range_constraints(af, solver.borrow_mut().as_mut());
-    let first_range_var = solver.borrow().n_vars() + 1 - af.n_arguments();
     let mut computer = MaximalExtensionComputer::new(af, Rc::clone(&solver), constraints_encoder);
     let solver_clone = Rc::clone(&solver);
     computer.set_increase_current_fn(Box::new(move |fn_data| {
-        let (mut in_range, mut not_in_range) = split_in_range(&fn_data, first_range_var);
+        let (mut in_range, mut not_in_range) = split_in_range(&fn_data);
         not_in_range.push(fn_data.selector);
         in_range.push(fn_data.selector.negate());
         solver_clone.borrow_mut().add_clause(not_in_range);
         in_range
     }));
     computer.set_discard_maximal_fn(Box::new(move |fn_data| {
-        let (_, mut not_in_range) = split_in_range(&fn_data, first_range_var);
+        let (_, mut not_in_range) = split_in_range(&fn_data);
         not_in_range.push(fn_data.selector);
         solver.borrow_mut().add_clause(not_in_range);
     }));
-    (computer, first_range_var)
+    computer
 }
 
 // The callback function is called for all extension matching the range.
@@ -347,7 +383,6 @@ where
 fn enumerate_extensions_for_range<F, T>(
     solver: Rc<RefCell<Box<dyn SatSolver>>>,
     fn_data: &mut MaximalExtensionComputerStateData<T>,
-    first_range_var: usize,
     constraints_encoder: &dyn ConstraintsEncoder<T>,
     callback: &F,
 ) -> Option<Vec<usize>>
@@ -356,7 +391,7 @@ where
     F: Fn(&[&Argument<T>]) -> Option<Vec<usize>>,
 {
     let enum_selector = Literal::from(1 + solver.borrow().n_vars() as isize);
-    let (mut in_range, mut not_in_range) = split_in_range(fn_data, first_range_var);
+    let (mut in_range, mut not_in_range) = split_in_range(fn_data);
     not_in_range.iter_mut().for_each(|l| *l = l.negate());
     let mut assumptions = Vec::with_capacity(fn_data.af.n_arguments() + 1);
     assumptions.append(&mut in_range);
@@ -407,13 +442,13 @@ where
     None
 }
 
-fn split_in_range<T>(
-    fn_data: &MaximalExtensionComputerStateData<T>,
-    first_range_var: usize,
-) -> (Vec<Literal>, Vec<Literal>)
+fn split_in_range<T>(fn_data: &MaximalExtensionComputerStateData<T>) -> (Vec<Literal>, Vec<Literal>)
 where
     T: LabelType,
 {
+    let first_range_var = fn_data
+        .constraints_encoder
+        .first_range_var(fn_data.af.n_arguments());
     let mut in_range = Vec::with_capacity(1 + fn_data.af.n_arguments());
     let mut not_in_range = Vec::with_capacity(1 + fn_data.af.n_arguments());
     if let Some(m) = fn_data.current_model {
@@ -448,10 +483,19 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::io::{AspartixReader, InstanceReader};
+    use crate::{
+        encodings::{
+            AuxVarCompleteConstraintsEncoder, AuxVarConflictFreenessConstraintsEncoder,
+            ExpCompleteConstraintsEncoder, ExpConflictFreenessConstraintsEncoder,
+        },
+        io::{AspartixReader, InstanceReader},
+    };
 
+    macro_rules! test_for_encoder_semi_stable {
+        ($encoder:expr, $suffix:literal) => {
+            paste::item! {
     #[test]
-    fn test_compute_one_semi_stable_ext_is_grounded() {
+    fn [< test_compute_one_semi_stable_ext_is_grounded_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -459,7 +503,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = SemiStableSemanticsSolver::new(&af);
+        let mut solver = SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert_eq!(
             vec!["a0"],
             solver
@@ -472,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_one_semi_stable_ext_is_not_grounded() {
+    fn [< test_compute_one_semi_stable_ext_is_not_grounded_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -488,7 +532,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = SemiStableSemanticsSolver::new(&af);
+        let mut solver = SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         let args = solver
             .compute_one_extension()
             .unwrap()
@@ -503,7 +547,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_one_semi_stable_after_arg_removal() {
+    fn [< test_compute_one_semi_stable_after_arg_removal_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -511,14 +555,14 @@ mod tests {
         let reader = AspartixReader::default();
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
         af.remove_argument(&"a0".to_string()).unwrap();
-        let mut solver = SemiStableSemanticsSolver::new(&af);
+        let mut solver = SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         let ext = solver.compute_one_extension().unwrap();
         assert_eq!(1, ext.len());
         assert_eq!("a1", ext[0].label());
     }
 
     #[test]
-    fn test_semi_stable_skeptical_acceptance() {
+    fn [< test_semi_stable_skeptical_acceptance_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a2).
@@ -533,7 +577,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = SemiStableSemanticsSolver::new(&af);
+        let mut solver = SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(solver.is_skeptically_accepted(&"a0".to_string()));
         assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
         assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
@@ -542,7 +586,7 @@ mod tests {
     }
 
     #[test]
-    fn test_semi_stable_skeptical_acceptance_after_arg_removal() {
+    fn [< test_semi_stable_skeptical_acceptance_after_arg_removal_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a2).
@@ -558,7 +602,7 @@ mod tests {
         let reader = AspartixReader::default();
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
         af.remove_argument(&"a0".to_string()).unwrap();
-        let mut solver = SemiStableSemanticsSolver::new(&af);
+        let mut solver = SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
         assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
         assert!(!solver.is_skeptically_accepted(&"a4".to_string()));
@@ -566,19 +610,19 @@ mod tests {
     }
 
     #[test]
-    fn test_semi_stable_skeptical_acceptance_auto_attack() {
+    fn [< test_semi_stable_skeptical_acceptance_auto_attack_ $suffix >] () {
         let instance = r#"
         arg(a0).
         att(a0,a0).
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = SemiStableSemanticsSolver::new(&af);
+        let mut solver = SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
     }
 
     #[test]
-    fn test_semi_stable_credulous_acceptance() {
+    fn [< test_semi_stable_credulous_acceptance_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a2).
@@ -593,7 +637,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = SemiStableSemanticsSolver::new(&af);
+        let mut solver = SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(solver.is_credulously_accepted(&"a0".to_string()));
         assert!(solver.is_credulously_accepted(&"a2".to_string()));
         assert!(solver.is_credulously_accepted(&"a3".to_string()));
@@ -602,7 +646,7 @@ mod tests {
     }
 
     #[test]
-    fn test_semi_stable_credulous_acceptance_after_arg_removal() {
+    fn [< test_semi_stable_credulous_acceptance_after_arg_removal_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a2).
@@ -618,7 +662,7 @@ mod tests {
         let reader = AspartixReader::default();
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
         af.remove_argument(&"a0".to_string()).unwrap();
-        let mut solver = SemiStableSemanticsSolver::new(&af);
+        let mut solver = SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(solver.is_credulously_accepted(&"a2".to_string()));
         assert!(solver.is_credulously_accepted(&"a3".to_string()));
         assert!(!solver.is_credulously_accepted(&"a4".to_string()));
@@ -626,200 +670,19 @@ mod tests {
     }
 
     #[test]
-    fn test_semi_stable_credulous_acceptance_auto_attack() {
+    fn [< test_semi_stable_credulous_acceptance_auto_attack_ $suffix >] () {
         let instance = r#"
         arg(a0).
         att(a0,a0).
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = SemiStableSemanticsSolver::new(&af);
+        let mut solver = SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(!solver.is_credulously_accepted(&"a0".to_string()));
     }
 
     #[test]
-    fn test_compute_one_stage_ext_is_grounded() {
-        let instance = r#"
-        arg(a0).
-        arg(a1).
-        att(a0,a1).
-        "#;
-        let reader = AspartixReader::default();
-        let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = StageSemanticsSolver::new(&af);
-        assert_eq!(
-            vec!["a0"],
-            solver
-                .compute_one_extension()
-                .unwrap()
-                .iter()
-                .map(|arg| arg.label().to_string())
-                .collect::<Vec<String>>()
-        )
-    }
-
-    #[test]
-    fn test_compute_one_stage_ext_is_not_grounded() {
-        let instance = r#"
-        arg(a0).
-        arg(a1).
-        arg(a2).
-        att(a0,a1).
-        att(a1,a2).
-        att(a2,a0).
-        "#;
-        let reader = AspartixReader::default();
-        let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = StageSemanticsSolver::new(&af);
-        let n_args = solver.compute_one_extension().unwrap().len();
-        assert_eq!(1, n_args);
-    }
-
-    #[test]
-    fn test_compute_one_stage_after_arg_removal() {
-        let instance = r#"
-        arg(a0).
-        arg(a1).
-        "#;
-        let reader = AspartixReader::default();
-        let mut af = reader.read(&mut instance.as_bytes()).unwrap();
-        af.remove_argument(&"a0".to_string()).unwrap();
-        let mut solver = StageSemanticsSolver::new(&af);
-        let ext = solver.compute_one_extension().unwrap();
-        assert_eq!(1, ext.len());
-        assert_eq!("a1", ext[0].label());
-    }
-
-    #[test]
-    fn test_stage_skeptical_acceptance() {
-        let instance = r#"
-        arg(a0).
-        arg(a1).
-        arg(a2).
-        arg(a3).
-        arg(a4).
-        att(a0,a1).
-        att(a0,a3).
-        att(a1,a2).
-        att(a1,a3).
-        att(a2,a0).
-        att(a2,a3).
-        att(a3,a4).
-        "#;
-        let reader = AspartixReader::default();
-        let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = StageSemanticsSolver::new(&af);
-        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
-        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
-        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
-        assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
-        assert!(solver.is_skeptically_accepted(&"a4".to_string()));
-    }
-
-    #[test]
-    fn test_stage_skeptical_acceptance_after_arg_removal() {
-        let instance = r#"
-        arg(a0).
-        arg(a1).
-        arg(a2).
-        arg(a3).
-        arg(a4).
-        att(a0,a1).
-        att(a0,a3).
-        att(a1,a2).
-        att(a1,a3).
-        att(a2,a0).
-        att(a2,a3).
-        att(a3,a4).
-        "#;
-        let reader = AspartixReader::default();
-        let mut af = reader.read(&mut instance.as_bytes()).unwrap();
-        af.remove_argument(&"a0".to_string()).unwrap();
-        let mut solver = StageSemanticsSolver::new(&af);
-        assert!(solver.is_skeptically_accepted(&"a1".to_string()));
-        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
-        assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
-        assert!(solver.is_skeptically_accepted(&"a4".to_string()));
-    }
-
-    #[test]
-    fn test_stage_skeptical_acceptance_auto_attack() {
-        let instance = r#"
-        arg(a0).
-        att(a0,a0).
-        "#;
-        let reader = AspartixReader::default();
-        let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = StageSemanticsSolver::new(&af);
-        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
-    }
-
-    #[test]
-    fn test_stage_credulous_acceptance() {
-        let instance = r#"
-        arg(a0).
-        arg(a1).
-        arg(a2).
-        arg(a3).
-        arg(a4).
-        att(a0,a1).
-        att(a0,a3).
-        att(a1,a2).
-        att(a1,a3).
-        att(a2,a0).
-        att(a2,a3).
-        att(a3,a4).
-        "#;
-        let reader = AspartixReader::default();
-        let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = StageSemanticsSolver::new(&af);
-        assert!(solver.is_credulously_accepted(&"a0".to_string()));
-        assert!(solver.is_credulously_accepted(&"a1".to_string()));
-        assert!(solver.is_credulously_accepted(&"a2".to_string()));
-        assert!(!solver.is_credulously_accepted(&"a3".to_string()));
-        assert!(solver.is_credulously_accepted(&"a4".to_string()));
-    }
-
-    #[test]
-    fn test_stage_credulous_acceptance_after_arg_removal() {
-        let instance = r#"
-        arg(a0).
-        arg(a1).
-        arg(a2).
-        arg(a3).
-        arg(a4).
-        att(a0,a1).
-        att(a0,a3).
-        att(a1,a2).
-        att(a1,a3).
-        att(a2,a0).
-        att(a2,a3).
-        att(a3,a4).
-        "#;
-        let reader = AspartixReader::default();
-        let mut af = reader.read(&mut instance.as_bytes()).unwrap();
-        af.remove_argument(&"a0".to_string()).unwrap();
-        let mut solver = StageSemanticsSolver::new(&af);
-        assert!(solver.is_credulously_accepted(&"a1".to_string()));
-        assert!(!solver.is_credulously_accepted(&"a2".to_string()));
-        assert!(!solver.is_credulously_accepted(&"a3".to_string()));
-        assert!(solver.is_credulously_accepted(&"a4".to_string()));
-    }
-
-    #[test]
-    fn test_stage_credulous_acceptance_auto_attack() {
-        let instance = r#"
-        arg(a0).
-        att(a0,a0).
-        "#;
-        let reader = AspartixReader::default();
-        let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = StageSemanticsSolver::new(&af);
-        assert!(!solver.is_credulously_accepted(&"a0".to_string()));
-    }
-
-    #[test]
-    fn test_semi_stable_check_certificate_involve_var() {
+    fn [< test_semi_stable_check_certificate_involve_var_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -828,7 +691,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = SemiStableSemanticsSolver::new(&af);
+        let mut solver = SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         let a0_label = &"a0".to_string();
         let (acceptance, certificate) = solver.is_credulously_accepted_with_certificate(a0_label);
         assert!(acceptance);
@@ -842,4 +705,200 @@ mod tests {
             .unwrap()
             .contains(&af.argument_set().get_argument(a1_label).unwrap()));
     }
+    }
+    };
+    }
+
+    test_for_encoder_semi_stable!(AuxVarCompleteConstraintsEncoder, "auxvar");
+    test_for_encoder_semi_stable!(ExpCompleteConstraintsEncoder, "exp");
+
+    macro_rules! test_for_encoder_stage {
+        ($encoder:expr, $suffix:literal) => {
+            paste::item! {
+    #[test]
+    fn [< test_compute_one_stage_ext_is_grounded_ $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        att(a0,a1).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+        assert_eq!(
+            vec!["a0"],
+            solver
+                .compute_one_extension()
+                .unwrap()
+                .iter()
+                .map(|arg| arg.label().to_string())
+                .collect::<Vec<String>>()
+        )
+    }
+
+    #[test]
+    fn [< test_compute_one_stage_ext_is_not_grounded_ $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        att(a0,a1).
+        att(a1,a2).
+        att(a2,a0).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+        let n_args = solver.compute_one_extension().unwrap().len();
+        assert_eq!(1, n_args);
+    }
+
+    #[test]
+    fn [< test_compute_one_stage_after_arg_removal_ $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        "#;
+        let reader = AspartixReader::default();
+        let mut af = reader.read(&mut instance.as_bytes()).unwrap();
+        af.remove_argument(&"a0".to_string()).unwrap();
+        let mut solver = StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+        let ext = solver.compute_one_extension().unwrap();
+        assert_eq!(1, ext.len());
+        assert_eq!("a1", ext[0].label());
+    }
+
+    #[test]
+    fn [< test_stage_skeptical_acceptance_ $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        att(a0,a1).
+        att(a0,a3).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a0).
+        att(a2,a3).
+        att(a3,a4).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a4".to_string()));
+    }
+
+    #[test]
+    fn [< test_stage_skeptical_acceptance_after_arg_removal_ $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        att(a0,a1).
+        att(a0,a3).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a0).
+        att(a2,a3).
+        att(a3,a4).
+        "#;
+        let reader = AspartixReader::default();
+        let mut af = reader.read(&mut instance.as_bytes()).unwrap();
+        af.remove_argument(&"a0".to_string()).unwrap();
+        let mut solver = StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+        assert!(solver.is_skeptically_accepted(&"a1".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a4".to_string()));
+    }
+
+    #[test]
+    fn [< test_stage_skeptical_acceptance_auto_attack $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        att(a0,a0).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
+    }
+
+    #[test]
+    fn [< test_stage_credulous_acceptance_ $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        att(a0,a1).
+        att(a0,a3).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a0).
+        att(a2,a3).
+        att(a3,a4).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+        assert!(solver.is_credulously_accepted(&"a0".to_string()));
+        assert!(solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(solver.is_credulously_accepted(&"a2".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a3".to_string()));
+        assert!(solver.is_credulously_accepted(&"a4".to_string()));
+    }
+
+    #[test]
+    fn [< test_stage_credulous_acceptance_after_arg_removal_ $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        att(a0,a1).
+        att(a0,a3).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a0).
+        att(a2,a3).
+        att(a3,a4).
+        "#;
+        let reader = AspartixReader::default();
+        let mut af = reader.read(&mut instance.as_bytes()).unwrap();
+        af.remove_argument(&"a0".to_string()).unwrap();
+        let mut solver = StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+        assert!(solver.is_credulously_accepted(&"a1".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a2".to_string()));
+        assert!(!solver.is_credulously_accepted(&"a3".to_string()));
+        assert!(solver.is_credulously_accepted(&"a4".to_string()));
+    }
+
+    #[test]
+    fn [< test_stage_credulous_acceptance_auto_attack_ $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        att(a0,a0).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+        assert!(!solver.is_credulously_accepted(&"a0".to_string()));
+    }
+    }
+    };
+    }
+
+    test_for_encoder_stage!(AuxVarConflictFreenessConstraintsEncoder, "auxvar");
+    test_for_encoder_stage!(ExpConflictFreenessConstraintsEncoder, "exp");
 }

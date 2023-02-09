@@ -24,4 +24,7 @@ where
 
     /// Translates an argument into the literal that represent it.
     fn arg_to_lit(&self, arg: &Argument<T>) -> Literal;
+
+    /// Gives the variable used to express the range of the first argument.
+    fn first_range_var(&self, n_args: usize) -> usize;
 }

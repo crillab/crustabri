@@ -85,6 +85,44 @@ where
         }
     }
 
+    /// Builds a new SAT based solver for the preferred semantics.
+    ///
+    /// The SAT solver to use in given through the solver factory.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use crustabri::aa::{AAFramework};
+    /// # use crustabri::utils::LabelType;
+    /// # use crustabri::sat;
+    /// # use crustabri::encodings::DefaultCompleteConstraintsEncoder;
+    /// # use crustabri::solvers::{SingleExtensionComputer, PreferredSemanticsSolver};
+    /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
+    ///     let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+    ///         af,
+    ///         Box::new(|| sat::default_solver()),
+    ///         Box::new(DefaultCompleteConstraintsEncoder::default()),
+    ///     );
+    ///     let ext = solver.compute_one_extension().unwrap();
+    ///     println!("found a preferred extension: {:?}", ext);
+    /// }
+    /// # search_one_extension::<usize>(&AAFramework::default());
+    /// ```
+    pub fn new_with_sat_solver_factory_and_constraints_encoder(
+        af: &'a AAFramework<T>,
+        solver_factory: Box<SatSolverFactoryFn>,
+        constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
+    ) -> Self
+    where
+        T: LabelType,
+    {
+        Self {
+            af,
+            solver_factory,
+            constraints_encoder,
+        }
+    }
+
     fn is_skeptically_accepted_in_cc<'b>(
         &self,
         cc_af: &'b AAFramework<T>,
@@ -227,10 +265,16 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::io::{AspartixReader, InstanceReader};
+    use crate::{
+        encodings::{AuxVarCompleteConstraintsEncoder, ExpCompleteConstraintsEncoder},
+        io::{AspartixReader, InstanceReader},
+    };
 
+    macro_rules! test_for_encoder {
+        ($encoder:expr, $suffix:literal) => {
+            paste::item! {
     #[test]
-    fn test_compute_one_preferred_ext_is_grounded() {
+    fn [< test_compute_one_preferred_ext_is_grounded_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -238,7 +282,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = PreferredSemanticsSolver::new(&af);
+        let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert_eq!(
             vec!["a0"],
             solver
@@ -251,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_one_preferred_ext_is_not_grounded() {
+    fn [< test_compute_one_preferred_ext_is_not_grounded_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -270,7 +314,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = PreferredSemanticsSolver::new(&af);
+        let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         let args = solver
             .compute_one_extension()
             .unwrap()
@@ -285,7 +329,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_one_preferred_after_arg_removal() {
+    fn [< test_compute_one_preferred_after_arg_removal_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -293,14 +337,14 @@ mod tests {
         let reader = AspartixReader::default();
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
         af.remove_argument(&"a0".to_string()).unwrap();
-        let mut solver = PreferredSemanticsSolver::new(&af);
+        let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         let ext = solver.compute_one_extension().unwrap();
         assert_eq!(1, ext.len());
         assert_eq!("a1", ext[0].label());
     }
 
     #[test]
-    fn test_certificates() {
+    fn [< test_certificates_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -319,7 +363,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = PreferredSemanticsSolver::new(&af);
+        let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         let mut cert = solver
             .is_skeptically_accepted_with_certificate(&"a2".to_string())
             .1
@@ -333,7 +377,7 @@ mod tests {
     }
 
     #[test]
-    fn test_certificates_connected_components() {
+    fn [< test_certificates_connected_components_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a2).
@@ -348,7 +392,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = PreferredSemanticsSolver::new(&af);
+        let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         let mut cert = solver
             .is_skeptically_accepted_with_certificate(&"a2".to_string())
             .1
@@ -366,7 +410,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skeptical_acceptance() {
+    fn [< test_skeptical_acceptance_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -385,7 +429,7 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = PreferredSemanticsSolver::new(&af);
+        let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(solver.is_skeptically_accepted(&"a0".to_string()));
         assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
         assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
@@ -395,7 +439,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skeptical_acceptance_after_arg_removal() {
+    fn [< test_skeptical_acceptance_after_arg_removal_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -416,7 +460,7 @@ mod tests {
         let mut af = reader.read(&mut instance.as_bytes()).unwrap();
         af.remove_argument(&"a2".to_string()).unwrap();
         af.remove_argument(&"a3".to_string()).unwrap();
-        let mut solver = PreferredSemanticsSolver::new(&af);
+        let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(solver.is_skeptically_accepted(&"a0".to_string()));
         assert!(!solver.is_skeptically_accepted(&"a1".to_string()));
         assert!(solver.is_skeptically_accepted(&"a4".to_string()));
@@ -424,19 +468,19 @@ mod tests {
     }
 
     #[test]
-    fn test_skeptical_acceptance_auto_attack() {
+    fn [< test_skeptical_acceptance_auto_attack_ $suffix >] () {
         let instance = r#"
         arg(a0).
         att(a0,a0).
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = PreferredSemanticsSolver::new(&af);
+        let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
     }
 
     #[test]
-    fn test_enumerate_extensions() {
+    fn [< test_enumerate_extensions_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -453,7 +497,7 @@ mod tests {
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let solver = Rc::new(RefCell::new(sat::default_solver()));
         let mut n_exts = 0;
-        let constraints_encoder = DefaultCompleteConstraintsEncoder::default();
+        let constraints_encoder = $encoder::default();
         PreferredSemanticsSolver::enumerate_extensions(
             &af,
             solver,
@@ -471,7 +515,7 @@ mod tests {
     }
 
     #[test]
-    fn test_allow_ds_shortcut() {
+    fn [< test_allow_ds_shortcut_ $suffix >] () {
         let instance = r#"
         arg(a0).
         arg(a1).
@@ -485,10 +529,16 @@ mod tests {
         "#;
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
-        let mut solver = PreferredSemanticsSolver::new(&af);
+        let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
         let arg1 = &"a1".to_string();
         let (result, certificate) = solver.is_skeptically_accepted_with_certificate(arg1);
         assert!(!result);
         assert_eq!(2, certificate.unwrap().len());
     }
+    }
+    };
+    }
+
+    test_for_encoder!(AuxVarCompleteConstraintsEncoder, "auxvar");
+    test_for_encoder!(ExpCompleteConstraintsEncoder, "exp");
 }

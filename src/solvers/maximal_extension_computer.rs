@@ -1,11 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
-
 use crate::{
     aa::{AAFramework, Argument},
     encodings::ConstraintsEncoder,
     sat::{Assignment, Literal, SatSolver},
     utils::LabelType,
 };
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum MaximalExtensionComputerState {

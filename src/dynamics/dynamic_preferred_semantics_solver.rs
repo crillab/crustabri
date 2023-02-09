@@ -250,6 +250,10 @@ where
         unimplemented!()
     }
 
+    fn first_range_var(&self, _n_args: usize) -> usize {
+        unimplemented!()
+    }
+
     fn assignment_to_extension<'a>(
         &self,
         _assignment: &Assignment,

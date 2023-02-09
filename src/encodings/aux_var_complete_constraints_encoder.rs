@@ -5,11 +5,11 @@ use crate::{
     utils::{Label, LabelType},
 };
 
-/// The default encoder for the complete semantics.
+/// An encoder for the complete semantics adding auxiliary variables to make it polynomial.
 #[derive(Default)]
-pub struct DefaultCompleteConstraintsEncoder;
+pub struct AuxVarCompleteConstraintsEncoder;
 
-impl DefaultCompleteConstraintsEncoder {
+impl AuxVarCompleteConstraintsEncoder {
     pub(crate) fn encode_disjunction_var<T>(
         af: &AAFramework<T>,
         solver: &mut dyn SatSolver,
@@ -97,7 +97,7 @@ impl DefaultCompleteConstraintsEncoder {
     }
 }
 
-impl<T> ConstraintsEncoder<T> for DefaultCompleteConstraintsEncoder
+impl<T> ConstraintsEncoder<T> for AuxVarCompleteConstraintsEncoder
 where
     T: LabelType,
 {
@@ -116,6 +116,10 @@ where
         });
     }
 
+    fn first_range_var(&self, n_args: usize) -> usize {
+        Self::arg_id_to_range_var(n_args, 0)
+    }
+
     fn assignment_to_extension<'a>(
         &self,
         assignment: &Assignment,
@@ -124,7 +128,7 @@ where
         assignment
             .iter()
             .filter_map(|(var, opt_v)| match opt_v {
-                Some(true) => DefaultCompleteConstraintsEncoder::arg_id_from_solver_var(var)
+                Some(true) => Self::arg_id_from_solver_var(var)
                     .and_then(|id| {
                         if id < af.n_arguments() {
                             Some(id)
