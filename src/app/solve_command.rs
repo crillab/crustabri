@@ -3,6 +3,10 @@ use anyhow::{anyhow, Context, Result};
 use crustabri::{
     aa::{AAFramework, Argument, Query, Semantics},
     aba::{ABAFrameworkInstantiation, Iccma23ABAReader, Iccma23ABAWriter},
+    encodings::{
+        AuxVarCompleteConstraintsEncoder, AuxVarConflictFreenessConstraintsEncoder,
+        ConstraintsEncoder, ExpCompleteConstraintsEncoder, ExpConflictFreenessConstraintsEncoder,
+    },
     io::{
         AspartixReader, AspartixWriter, Iccma23Reader, Iccma23Writer, InstanceReader,
         ResponseWriter,
@@ -24,6 +28,8 @@ const ARG_EXTERNAL_SAT_SOLVER: &str = "EXTERNAL_SAT_SOLVER";
 const ARG_EXTERNAL_SAT_SOLVER_OPTIONS: &str = "EXTERNAL_SAT_SOLVER_OPTIONS";
 
 const ARG_CERTIFICATE: &str = "CERTIFICATE";
+
+const ARG_ENCODING: &str = "ENCODING";
 
 pub(crate) struct SolveCommand;
 
@@ -53,6 +59,15 @@ impl<'a> Command<'a> for SolveCommand {
                     .long("with-certificate")
                     .takes_value(false)
                     .help("generate a certificate when possible")
+                    .required(false),
+            )
+            .arg(
+                Arg::with_name(ARG_ENCODING)
+                    .long("encoding")
+                    .empty_values(false)
+                    .multiple(false)
+                    .possible_values(&["aux_var", "exp"])
+                    .help("the SAT encoding to use (not relevant for ST semantics)")
                     .required(false),
             )
     }
@@ -235,28 +250,41 @@ where
     T: LabelType,
     F: FnMut(Option<Vec<&Argument<T>>>) -> Result<()>,
 {
+    let encoder = create_encoder(arg_matches, semantics);
     let mut solver: Box<dyn SingleExtensionComputer<T>> = match semantics {
         Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
-        Semantics::PR => Box::new(PreferredSemanticsSolver::new_with_sat_solver_factory(
-            af,
-            create_sat_solver_factory(arg_matches),
-        )),
+        Semantics::PR => Box::new(
+            PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+                af,
+                create_sat_solver_factory(arg_matches),
+                encoder.unwrap(),
+            ),
+        ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
             create_sat_solver_factory(arg_matches),
         )),
-        Semantics::SST => Box::new(SemiStableSemanticsSolver::new_with_sat_solver_factory(
-            af,
-            create_sat_solver_factory(arg_matches),
-        )),
-        Semantics::STG => Box::new(StageSemanticsSolver::new_with_sat_solver_factory(
-            af,
-            create_sat_solver_factory(arg_matches),
-        )),
-        Semantics::ID => Box::new(IdealSemanticsSolver::new_with_sat_solver_factory(
-            af,
-            create_sat_solver_factory(arg_matches),
-        )),
+        Semantics::SST => Box::new(
+            SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+                af,
+                create_sat_solver_factory(arg_matches),
+                encoder.unwrap(),
+            ),
+        ),
+        Semantics::STG => Box::new(
+            StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+                af,
+                create_sat_solver_factory(arg_matches),
+                encoder.unwrap(),
+            ),
+        ),
+        Semantics::ID => Box::new(
+            IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+                af,
+                create_sat_solver_factory(arg_matches),
+                encoder.unwrap(),
+            ),
+        ),
     };
     (writing_fn)(solver.compute_one_extension())
 }
@@ -272,30 +300,41 @@ where
     T: LabelType,
     F: FnMut(bool, Option<Vec<&Argument<T>>>) -> Result<()>,
 {
+    let encoder = create_encoder(arg_matches, semantics);
     let mut solver: Box<dyn CredulousAcceptanceComputer<T>> = match semantics {
         Semantics::GR => Box::new(GroundedSemanticsSolver::new(af)),
-        Semantics::CO | Semantics::PR => {
-            Box::new(CompleteSemanticsSolver::new_with_sat_solver_factory(
+        Semantics::CO | Semantics::PR => Box::new(
+            CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-            ))
-        }
+                encoder.unwrap(),
+            ),
+        ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
             create_sat_solver_factory(arg_matches),
         )),
-        Semantics::SST => Box::new(SemiStableSemanticsSolver::new_with_sat_solver_factory(
-            af,
-            create_sat_solver_factory(arg_matches),
-        )),
-        Semantics::STG => Box::new(StageSemanticsSolver::new_with_sat_solver_factory(
-            af,
-            create_sat_solver_factory(arg_matches),
-        )),
-        Semantics::ID => Box::new(IdealSemanticsSolver::new_with_sat_solver_factory(
-            af,
-            create_sat_solver_factory(arg_matches),
-        )),
+        Semantics::SST => Box::new(
+            SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+                af,
+                create_sat_solver_factory(arg_matches),
+                encoder.unwrap(),
+            ),
+        ),
+        Semantics::STG => Box::new(
+            StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+                af,
+                create_sat_solver_factory(arg_matches),
+                encoder.unwrap(),
+            ),
+        ),
+        Semantics::ID => Box::new(
+            IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+                af,
+                create_sat_solver_factory(arg_matches),
+                encoder.unwrap(),
+            ),
+        ),
     };
     let with_certificate = arg_matches.is_present(ARG_CERTIFICATE);
     if with_certificate {
@@ -319,28 +358,41 @@ where
     T: LabelType,
     F: FnMut(bool, Option<Vec<&Argument<T>>>) -> Result<()>,
 {
+    let encoder = create_encoder(arg_matches, semantics);
     let mut solver: Box<dyn SkepticalAcceptanceComputer<T>> = match semantics {
         Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
-        Semantics::PR => Box::new(PreferredSemanticsSolver::new_with_sat_solver_factory(
-            af,
-            create_sat_solver_factory(arg_matches),
-        )),
+        Semantics::PR => Box::new(
+            PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+                af,
+                create_sat_solver_factory(arg_matches),
+                encoder.unwrap(),
+            ),
+        ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
             create_sat_solver_factory(arg_matches),
         )),
-        Semantics::SST => Box::new(SemiStableSemanticsSolver::new_with_sat_solver_factory(
-            af,
-            create_sat_solver_factory(arg_matches),
-        )),
-        Semantics::STG => Box::new(StageSemanticsSolver::new_with_sat_solver_factory(
-            af,
-            create_sat_solver_factory(arg_matches),
-        )),
-        Semantics::ID => Box::new(IdealSemanticsSolver::new_with_sat_solver_factory(
-            af,
-            create_sat_solver_factory(arg_matches),
-        )),
+        Semantics::SST => Box::new(
+            SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+                af,
+                create_sat_solver_factory(arg_matches),
+                encoder.unwrap(),
+            ),
+        ),
+        Semantics::STG => Box::new(
+            StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+                af,
+                create_sat_solver_factory(arg_matches),
+                encoder.unwrap(),
+            ),
+        ),
+        Semantics::ID => Box::new(
+            IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
+                af,
+                create_sat_solver_factory(arg_matches),
+                encoder.unwrap(),
+            ),
+        ),
     };
     let with_certificate = arg_matches.is_present(ARG_CERTIFICATE);
     if with_certificate {
@@ -398,5 +450,30 @@ fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Box<SatSolverFacto
         })
     }
 }
+
+fn create_encoder<T>(
+    arg_matches: &ArgMatches<'_>,
+    sem: Semantics,
+) -> Option<Box<dyn ConstraintsEncoder<T>>>
+where
+    T: LabelType,
+{
+    match sem {
+        Semantics::GR | Semantics::ST => {
+            if arg_matches.value_of(ARG_ENCODING).is_some() {
+                warn!("irrelevant encoding parameter for ST semantics; ignoring it")
+            }
+            None
+        }
+        Semantics::STG => match arg_matches.value_of(ARG_ENCODING) {
+            Some("aux_var") => Some(Box::new(AuxVarConflictFreenessConstraintsEncoder)),
+            Some("exp") => Some(Box::new(ExpConflictFreenessConstraintsEncoder)),
+            _ => Some(Box::new(AuxVarConflictFreenessConstraintsEncoder)),
+        },
+        _ => match arg_matches.value_of(ARG_ENCODING) {
+            Some("aux_var") => Some(Box::new(AuxVarCompleteConstraintsEncoder)),
+            Some("exp") => Some(Box::new(ExpCompleteConstraintsEncoder)),
+            _ => Some(Box::new(AuxVarCompleteConstraintsEncoder)),
+        },
     }
 }
