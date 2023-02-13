@@ -23,12 +23,14 @@ impl ExpCompleteConstraintsEncoder {
         let mut defender_sets = vec![];
         let mut iter_attacks_to_it = af.iter_attacks_to(arg).peekable();
         if iter_attacks_to_it.peek().is_none() {
-            solver.add_clause(clause![attacked_solver_var])
+            solver.add_clause(clause![attacked_solver_var]);
+            return;
         }
-        iter_attacks_to_it.for_each(|att| {
+        let mut clause_buffer = Vec::new();
+        for att in iter_attacks_to_it {
             let attacker_id = att.attacker().id();
             let attacker_solver_var = Self::arg_id_to_solver_var(attacker_id) as isize;
-            solver.add_clause(clause![-attacked_solver_var, -attacker_solver_var]);
+            clause_buffer.push(clause![-attacked_solver_var, -attacker_solver_var]);
             let defenders = af
                 .iter_attacks_to(att.attacker())
                 .map(|def| {
@@ -36,28 +38,31 @@ impl ExpCompleteConstraintsEncoder {
                         as Literal
                 })
                 .collect::<Vec<Literal>>();
-            if !defenders.is_empty() {
-                defender_sets.push(defenders);
+            if defenders.is_empty() {
+                solver.add_clause(clause![-attacked_solver_var]);
+                return;
             }
-        });
-        if !defender_sets.is_empty() {
-            defender_sets.iter().for_each(|d| {
-                let mut cl = Vec::with_capacity(d.len() + 1);
-                cl.push(Literal::from(attacked_solver_var).negate());
-                cl.append(&mut d.clone());
-                solver.add_clause(cl);
-            });
-            let defender_sets_refs = defender_sets
-                .iter()
-                .map(|v| v.as_slice())
-                .collect::<Vec<&[Literal]>>();
-            defender_sets_refs.cart_prod().for_each(|p| {
-                let mut cl = Vec::with_capacity(p.len() + 1);
-                cl.push(Literal::from(attacked_solver_var));
-                p.iter().for_each(|l| cl.push(l.negate()));
-                solver.add_clause(cl);
-            });
+            defender_sets.push(defenders);
         }
+        clause_buffer
+            .into_iter()
+            .for_each(|cl| solver.add_clause(cl));
+        defender_sets.iter().for_each(|d| {
+            let mut cl = Vec::with_capacity(d.len() + 1);
+            cl.push(Literal::from(attacked_solver_var).negate());
+            cl.append(&mut d.clone());
+            solver.add_clause(cl);
+        });
+        let defender_sets_refs = defender_sets
+            .iter()
+            .map(|v| v.as_slice())
+            .collect::<Vec<&[Literal]>>();
+        defender_sets_refs.cart_prod().for_each(|p| {
+            let mut cl = Vec::with_capacity(p.len() + 1);
+            cl.push(Literal::from(attacked_solver_var));
+            p.iter().for_each(|l| cl.push(l.negate()));
+            solver.add_clause(cl);
+        });
     }
 
     pub(crate) fn encode_range_constraint<T>(
