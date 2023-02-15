@@ -68,7 +68,9 @@ impl SatSolver for BufferedSatSolver {
     }
 
     fn solve_under_assumptions(&mut self, assumptions: &[Literal]) -> SolvingResult {
-        self.listeners.iter().for_each(|l| l.solving_start(self.n_vars(), self.n_clauses));
+        self.listeners
+            .iter()
+            .for_each(|l| l.solving_start(self.n_vars(), self.n_clauses));
         let preamble = format!(
             "p cnf {} {}\n",
             self.n_vars,
@@ -146,7 +148,9 @@ impl SatSolver for BufferedSatSolver {
             Some(false) => SolvingResult::Unsatisfiable,
             None => SolvingResult::Unknown,
         };
-        self.listeners.iter().for_each(|l| l.solving_end(&solving_result));
+        self.listeners
+            .iter()
+            .for_each(|l| l.solving_end(&solving_result));
         solving_result
     }
 

@@ -24,7 +24,9 @@ impl SatSolver for CadicalSolver {
     }
 
     fn solve_under_assumptions(&mut self, assumptions: &[Literal]) -> SolvingResult {
-        self.listeners.iter().for_each(|l| l.solving_start(self.n_vars(), self.solver.num_clauses()));
+        self.listeners
+            .iter()
+            .for_each(|l| l.solving_start(self.n_vars(), self.solver.num_clauses()));
         let solving_result = match self
             .solver
             .solve_with(assumptions.iter().map(|l| isize::from(*l) as i32))
@@ -40,7 +42,9 @@ impl SatSolver for CadicalSolver {
             Some(false) => SolvingResult::Unsatisfiable,
             None => SolvingResult::Unknown,
         };
-        self.listeners.iter().for_each(|l| l.solving_end(&solving_result));
+        self.listeners
+            .iter()
+            .for_each(|l| l.solving_end(&solving_result));
         solving_result
     }
 
