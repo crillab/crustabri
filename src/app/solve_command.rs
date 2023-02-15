@@ -250,14 +250,16 @@ where
     T: LabelType,
     F: FnMut(Option<Vec<&Argument<T>>>) -> Result<()>,
 {
-    let encoder = create_encoder(arg_matches, semantics);
     let mut solver: Box<dyn SingleExtensionComputer<T>> = match semantics {
-        Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
+        Semantics::GR | Semantics::CO => {
+            warn_on_unexpected_encoding(arg_matches);
+            Box::new(GroundedSemanticsSolver::new(af))
+        }
         Semantics::PR => Box::new(
             PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
@@ -268,21 +270,21 @@ where
             SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::STG => Box::new(
             StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ID => Box::new(
             IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
     };
@@ -300,14 +302,16 @@ where
     T: LabelType,
     F: FnMut(bool, Option<Vec<&Argument<T>>>) -> Result<()>,
 {
-    let encoder = create_encoder(arg_matches, semantics);
     let mut solver: Box<dyn CredulousAcceptanceComputer<T>> = match semantics {
-        Semantics::GR => Box::new(GroundedSemanticsSolver::new(af)),
+        Semantics::GR => {
+            warn_on_unexpected_encoding(arg_matches);
+            Box::new(GroundedSemanticsSolver::new(af))
+        }
         Semantics::CO | Semantics::PR => Box::new(
             CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
@@ -318,21 +322,21 @@ where
             SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::STG => Box::new(
             StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ID => Box::new(
             IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
     };
@@ -358,14 +362,16 @@ where
     T: LabelType,
     F: FnMut(bool, Option<Vec<&Argument<T>>>) -> Result<()>,
 {
-    let encoder = create_encoder(arg_matches, semantics);
     let mut solver: Box<dyn SkepticalAcceptanceComputer<T>> = match semantics {
-        Semantics::GR | Semantics::CO => Box::new(GroundedSemanticsSolver::new(af)),
+        Semantics::GR | Semantics::CO => {
+            warn_on_unexpected_encoding(arg_matches);
+            Box::new(GroundedSemanticsSolver::new(af))
+        }
         Semantics::PR => Box::new(
             PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
@@ -376,21 +382,21 @@ where
             SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::STG => Box::new(
             StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ID => Box::new(
             IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
                 create_sat_solver_factory(arg_matches),
-                encoder.unwrap(),
+                create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
     };
@@ -458,22 +464,28 @@ fn create_encoder<T>(
 where
     T: LabelType,
 {
+    let encoding_as_str = || {
+        let str_encoding = arg_matches.value_of(ARG_ENCODING).unwrap_or("aux_var");
+        info!(r#"encoding strategy is "{}""#, str_encoding);
+        str_encoding
+    };
     match sem {
-        Semantics::GR | Semantics::ST => {
-            if arg_matches.value_of(ARG_ENCODING).is_some() {
-                warn!("irrelevant encoding parameter for ST semantics; ignoring it")
-            }
-            None
-        }
-        Semantics::STG => match arg_matches.value_of(ARG_ENCODING) {
-            Some("aux_var") => Some(Box::new(AuxVarConflictFreenessConstraintsEncoder)),
-            Some("exp") => Some(Box::new(ExpConflictFreenessConstraintsEncoder)),
-            _ => Some(Box::new(AuxVarConflictFreenessConstraintsEncoder)),
+        Semantics::GR | Semantics::ST => None,
+        Semantics::STG => match encoding_as_str() {
+            "aux_var" => Some(Box::new(AuxVarConflictFreenessConstraintsEncoder)),
+            "exp" => Some(Box::new(ExpConflictFreenessConstraintsEncoder)),
+            _ => unreachable!(),
         },
-        _ => match arg_matches.value_of(ARG_ENCODING) {
-            Some("aux_var") => Some(Box::new(AuxVarCompleteConstraintsEncoder)),
-            Some("exp") => Some(Box::new(ExpCompleteConstraintsEncoder)),
-            _ => Some(Box::new(AuxVarCompleteConstraintsEncoder)),
+        _ => match encoding_as_str() {
+            "aux_var" => Some(Box::new(AuxVarCompleteConstraintsEncoder)),
+            "exp" => Some(Box::new(ExpCompleteConstraintsEncoder)),
+            _ => unreachable!(),
         },
+    }
+}
+
+fn warn_on_unexpected_encoding(arg_matches: &ArgMatches<'_>) {
+    if arg_matches.value_of(ARG_ENCODING).is_some() {
+        warn!("irrelevant encoding parameter for problem; ignoring it")
     }
 }
