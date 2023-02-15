@@ -6,6 +6,9 @@ pub use aux_var_complete_constraints_encoder::AuxVarCompleteConstraintsEncoder;
 mod exp_complete_constraints_encoder;
 pub use exp_complete_constraints_encoder::ExpCompleteConstraintsEncoder;
 
+mod hybrid_complete_constraints_encoder;
+pub use hybrid_complete_constraints_encoder::HybridCompleteConstraintsEncoder;
+
 mod aux_var_conflict_freeness_constraints_encoder;
 pub use aux_var_conflict_freeness_constraints_encoder::AuxVarConflictFreenessConstraintsEncoder;
 

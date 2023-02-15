@@ -20,31 +20,58 @@ impl ExpCompleteConstraintsEncoder {
     {
         let attacked_id = arg.id();
         let attacked_solver_var = Self::arg_id_to_solver_var(attacked_id) as isize;
-        let mut defender_sets = vec![];
-        let mut iter_attacks_to_it = af.iter_attacks_to(arg).peekable();
-        if iter_attacks_to_it.peek().is_none() {
+        let (defender_sets, conflict_freeness_clauses) = Self::compute_defender_sets(af, arg);
+        if defender_sets.is_empty() {
             solver.add_clause(clause![attacked_solver_var]);
             return;
         }
-        let mut clause_buffer = Vec::new();
-        for att in iter_attacks_to_it {
+        if defender_sets.iter().any(|s| s.is_empty()) {
+            solver.add_clause(clause![-attacked_solver_var]);
+            return;
+        }
+        Self::encode_nontrivial_attack_constraints_for_arg(
+            arg,
+            solver,
+            defender_sets,
+            conflict_freeness_clauses,
+        );
+    }
+
+    pub(crate) fn compute_defender_sets<T>(
+        af: &AAFramework<T>,
+        arg: &Label<T>,
+    ) -> (Vec<Vec<Literal>>, Vec<Vec<Literal>>)
+    where
+        T: LabelType,
+    {
+        let attacked_id = arg.id();
+        let attacked_solver_var = Self::arg_id_to_solver_var(attacked_id) as isize;
+        let mut conflict_freeness_clauses = Vec::new();
+        let mut defender_sets = vec![];
+        for att in af.iter_attacks_to(arg) {
             let attacker_id = att.attacker().id();
             let attacker_solver_var = Self::arg_id_to_solver_var(attacker_id) as isize;
-            clause_buffer.push(clause![-attacked_solver_var, -attacker_solver_var]);
+            conflict_freeness_clauses.push(clause![-attacked_solver_var, -attacker_solver_var]);
             let defenders = af
                 .iter_attacks_to(att.attacker())
-                .map(|def| {
-                    Literal::from(Self::arg_id_to_solver_var(def.attacker().id()) as isize)
-                        as Literal
-                })
-                .collect::<Vec<Literal>>();
-            if defenders.is_empty() {
-                solver.add_clause(clause![-attacked_solver_var]);
-                return;
-            }
+                .map(|def| Literal::from(Self::arg_id_to_solver_var(def.attacker().id()) as isize))
+                .collect();
             defender_sets.push(defenders);
         }
-        clause_buffer
+        (defender_sets, conflict_freeness_clauses)
+    }
+
+    pub(crate) fn encode_nontrivial_attack_constraints_for_arg<T>(
+        arg: &Label<T>,
+        solver: &mut dyn SatSolver,
+        defender_sets: Vec<Vec<Literal>>,
+        conflict_freeness_clauses: Vec<Vec<Literal>>,
+    ) where
+        T: LabelType,
+    {
+        let attacked_id = arg.id();
+        let attacked_solver_var = Self::arg_id_to_solver_var(attacked_id) as isize;
+        conflict_freeness_clauses
             .into_iter()
             .for_each(|cl| solver.add_clause(cl));
         defender_sets.iter().for_each(|d| {

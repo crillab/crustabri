@@ -36,7 +36,6 @@ where
     fn encode_constraints(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver) {
         af.argument_set().iter().for_each(|arg| {
             Self::encode_attack_constraints_for_arg(af, solver, arg);
-            AuxVarCompleteConstraintsEncoder::encode_disjunction_var(af, solver, arg);
         });
     }
 

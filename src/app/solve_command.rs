@@ -6,6 +6,7 @@ use crustabri::{
     encodings::{
         AuxVarCompleteConstraintsEncoder, AuxVarConflictFreenessConstraintsEncoder,
         ConstraintsEncoder, ExpCompleteConstraintsEncoder, ExpConflictFreenessConstraintsEncoder,
+        HybridCompleteConstraintsEncoder,
     },
     io::{
         AspartixReader, AspartixWriter, Iccma23Reader, Iccma23Writer, InstanceReader,
@@ -66,7 +67,7 @@ impl<'a> Command<'a> for SolveCommand {
                     .long("encoding")
                     .empty_values(false)
                     .multiple(false)
-                    .possible_values(&["aux_var", "exp"])
+                    .possible_values(&["aux_var", "exp", "hybrid"])
                     .help("the SAT encoding to use (not relevant for ST semantics)")
                     .required(false),
             )
@@ -464,21 +465,28 @@ fn create_encoder<T>(
 where
     T: LabelType,
 {
-    let encoding_as_str = || {
-        let str_encoding = arg_matches.value_of(ARG_ENCODING).unwrap_or("aux_var");
+    let encoding_as_str = |default_value| {
+        let str_encoding = arg_matches.value_of(ARG_ENCODING).unwrap_or(default_value);
         info!(r#"encoding strategy is "{}""#, str_encoding);
         str_encoding
     };
     match sem {
         Semantics::GR | Semantics::ST => None,
-        Semantics::STG => match encoding_as_str() {
+        Semantics::STG => match encoding_as_str("exp") {
             "aux_var" => Some(Box::new(AuxVarConflictFreenessConstraintsEncoder)),
             "exp" => Some(Box::new(ExpConflictFreenessConstraintsEncoder)),
+            "hybrid" => {
+                warn!(
+                    r#"irrelevant encoding value "hybrid" for STG semantics; falling back to default "exp""#
+                );
+                Some(Box::new(ExpConflictFreenessConstraintsEncoder))
+            }
             _ => unreachable!(),
         },
-        _ => match encoding_as_str() {
+        _ => match encoding_as_str("aux_var") {
             "aux_var" => Some(Box::new(AuxVarCompleteConstraintsEncoder)),
             "exp" => Some(Box::new(ExpCompleteConstraintsEncoder)),
+            "hybrid" => Some(Box::new(HybridCompleteConstraintsEncoder::default())),
             _ => unreachable!(),
         },
     }

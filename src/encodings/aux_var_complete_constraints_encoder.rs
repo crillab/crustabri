@@ -18,30 +18,44 @@ impl AuxVarCompleteConstraintsEncoder {
         T: LabelType,
     {
         let attacked_id = arg.id();
-        let attacked_solver_var = Self::arg_id_to_solver_var(attacked_id) as isize;
         let attacked_disjunction_solver_var =
             Self::arg_id_to_solver_disjunction_var(attacked_id) as isize;
-        solver.add_clause(clause![
-            -attacked_solver_var,
-            -attacked_disjunction_solver_var
-        ]);
-        let mut full_cl = clause![-attacked_disjunction_solver_var];
+        Self::encode_disjunction_var_with(
+            af,
+            solver,
+            arg,
+            attacked_disjunction_solver_var,
+            &Self::arg_id_to_solver_var,
+        )
+    }
+
+    pub(crate) fn encode_disjunction_var_with<T>(
+        af: &AAFramework<T>,
+        solver: &mut dyn SatSolver,
+        arg: &Label<T>,
+        disjunction_var: isize,
+        arg_id_to_solver_var: &dyn Fn(usize) -> usize,
+    ) where
+        T: LabelType,
+    {
+        let arg_id = arg.id();
+        let arg_var = arg_id_to_solver_var(arg_id) as isize;
+        solver.add_clause(clause![-arg_var, -disjunction_var]);
+        let mut full_cl = clause![-disjunction_var];
         af.iter_attacks_to(arg).for_each(|att| {
             let attacker_id = att.attacker().id();
-            let attacker_solver_var = Self::arg_id_to_solver_var(attacker_id) as isize;
-            solver.add_clause(clause![
-                attacked_disjunction_solver_var,
-                -attacker_solver_var
-            ]);
+            let attacker_solver_var = arg_id_to_solver_var(attacker_id) as isize;
+            solver.add_clause(clause![disjunction_var, -attacker_solver_var]);
             full_cl.push(attacker_solver_var.into());
         });
         solver.add_clause(full_cl);
     }
 
-    fn encode_attack_constraints_for_arg<T>(
+    pub(crate) fn encode_attack_constraints_for_arg<T>(
         af: &AAFramework<T>,
         solver: &mut dyn SatSolver,
         arg: &Label<T>,
+        arg_id_to_solver_disjunction_var: &dyn Fn(usize) -> usize,
     ) where
         T: LabelType,
     {
@@ -51,7 +65,7 @@ impl AuxVarCompleteConstraintsEncoder {
         af.iter_attacks_to(arg).for_each(|att| {
             let attacker_id = att.attacker().id();
             let attacker_disjunction_solver_var =
-                Self::arg_id_to_solver_disjunction_var(attacker_id) as isize;
+                arg_id_to_solver_disjunction_var(attacker_id) as isize;
             solver.add_clause(clause![
                 -attacked_solver_var,
                 attacker_disjunction_solver_var
@@ -103,14 +117,24 @@ where
 {
     fn encode_constraints(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver) {
         af.argument_set().iter().for_each(|arg| {
-            Self::encode_attack_constraints_for_arg(af, solver, arg);
+            Self::encode_attack_constraints_for_arg(
+                af,
+                solver,
+                arg,
+                &Self::arg_id_to_solver_disjunction_var,
+            );
             Self::encode_disjunction_var(af, solver, arg);
         });
     }
 
     fn encode_constraints_and_range(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver) {
         af.argument_set().iter().for_each(|arg| {
-            Self::encode_attack_constraints_for_arg(af, solver, arg);
+            Self::encode_attack_constraints_for_arg(
+                af,
+                solver,
+                arg,
+                &Self::arg_id_to_solver_disjunction_var,
+            );
             Self::encode_disjunction_var(af, solver, arg);
             Self::encode_range_constraint(solver, arg, af.n_arguments());
         });
