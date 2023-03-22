@@ -55,12 +55,13 @@ impl AuxVarCompleteConstraintsEncoder {
         af: &AAFramework<T>,
         solver: &mut dyn SatSolver,
         arg: &Label<T>,
+        arg_id_to_solver_var: &dyn Fn(usize) -> usize,
         arg_id_to_solver_disjunction_var: &dyn Fn(usize) -> usize,
     ) where
         T: LabelType,
     {
         let attacked_id = arg.id();
-        let attacked_solver_var = Self::arg_id_to_solver_var(attacked_id) as isize;
+        let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;
         let mut full_cl = clause![attacked_solver_var];
         af.iter_attacks_to(arg).for_each(|att| {
             let attacker_id = att.attacker().id();
@@ -121,6 +122,7 @@ where
                 af,
                 solver,
                 arg,
+                &Self::arg_id_to_solver_var,
                 &Self::arg_id_to_solver_disjunction_var,
             );
             Self::encode_disjunction_var(af, solver, arg);
@@ -133,6 +135,7 @@ where
                 af,
                 solver,
                 arg,
+                &Self::arg_id_to_solver_var,
                 &Self::arg_id_to_solver_disjunction_var,
             );
             Self::encode_disjunction_var(af, solver, arg);

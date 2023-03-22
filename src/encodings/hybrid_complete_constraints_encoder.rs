@@ -27,8 +27,7 @@ impl HybridCompleteConstraintsEncoder {
         T: LabelType,
     {
         let attacked_id = arg.id();
-        let attacked_solver_var =
-            ExpCompleteConstraintsEncoder::arg_id_to_solver_var(attacked_id) as isize;
+        let attacked_solver_var = Self::arg_id_to_solver_var(attacked_id) as isize;
         let (defender_sets, conflict_freeness_clauses) =
             ExpCompleteConstraintsEncoder::compute_defender_sets(af, arg);
         if defender_sets.is_empty() {
@@ -65,6 +64,7 @@ impl HybridCompleteConstraintsEncoder {
                 af,
                 solver,
                 arg,
+                &Self::arg_id_to_solver_var,
                 &|id| {
                     Self::arg_id_to_solver_disjunction_var(
                         Rc::clone(&attacker_disjunction_vars),
@@ -138,24 +138,17 @@ impl HybridCompleteConstraintsEncoder {
         af.iter_attacks_to(arg).for_each(|att| {
             let attacker_id = att.attacker().id();
             let opt_var = attacker_disjunction_vars.borrow()[attacker_id];
-            if opt_var.is_none() {
-                let var = *next_free_var_id.borrow();
-                *next_free_var_id.borrow_mut() += 1;
-                attacker_disjunction_vars.borrow_mut()[attacker_id] = Some(var);
+            if opt_var.is_some() {
+                return;
             }
-            let disjunction_var = if let Some(var) = opt_var {
-                var
-            } else {
-                let var = *next_free_var_id.borrow();
-                *next_free_var_id.borrow_mut() += 1;
-                attacker_disjunction_vars.borrow_mut()[attacker_id] = Some(var);
-                var
-            } as isize;
+            let disjunction_var = *next_free_var_id.borrow();
+            *next_free_var_id.borrow_mut() += 1;
+            attacker_disjunction_vars.borrow_mut()[attacker_id] = Some(disjunction_var);
             AuxVarCompleteConstraintsEncoder::encode_disjunction_var_with(
                 af,
                 solver,
-                arg,
-                disjunction_var,
+                att.attacker(),
+                disjunction_var as isize,
                 &Self::arg_id_to_solver_var,
             )
         });
