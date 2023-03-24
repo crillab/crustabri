@@ -67,6 +67,10 @@ impl SatSolver for ExternalSatSolver {
     fn add_listener(&mut self, listener: Box<dyn SolvingListener>) {
         self.buffered_sat_solver.add_listener(listener);
     }
+
+    fn reserve(&mut self, new_max_id: usize) {
+        self.buffered_sat_solver.reserve(new_max_id)
+    }
 }
 
 fn exec_solver(mut reader: DimacsInstanceRead, program: &str, options: &[String]) -> Box<dyn Read> {

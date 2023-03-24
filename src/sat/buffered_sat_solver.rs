@@ -161,6 +161,12 @@ impl SatSolver for BufferedSatSolver {
     fn add_listener(&mut self, listener: Box<dyn SolvingListener>) {
         self.listeners.push(listener);
     }
+
+    fn reserve(&mut self, new_max_id: usize) {
+        if new_max_id > self.n_vars {
+            self.n_vars = new_max_id;
+        }
+    }
 }
 
 #[cfg(test)]

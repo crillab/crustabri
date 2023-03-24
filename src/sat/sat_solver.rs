@@ -337,6 +337,9 @@ pub trait SatSolver {
 
     /// Adds a listener to this SAT solver.
     fn add_listener(&mut self, listener: Box<dyn SolvingListener>);
+
+    /// Creates all the variables from 1 to the given value, if needed.
+    fn reserve(&mut self, new_max_id: usize);
 }
 
 /// An interface for objects listening SAT solver activity.

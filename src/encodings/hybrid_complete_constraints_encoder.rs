@@ -160,6 +160,7 @@ where
     T: LabelType,
 {
     fn encode_constraints(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver) {
+        solver.reserve(af.n_arguments());
         *self.attacker_disjunction_vars.borrow_mut() = vec![None; af.n_arguments()];
         *self.next_free_var_id.borrow_mut() = 1 + af.n_arguments();
         af.argument_set().iter().for_each(|arg| {
@@ -174,6 +175,7 @@ where
     }
 
     fn encode_constraints_and_range(&self, af: &AAFramework<T>, solver: &mut dyn SatSolver) {
+        solver.reserve(af.n_arguments() << 1);
         *self.attacker_disjunction_vars.borrow_mut() = vec![None; af.n_arguments()];
         *self.next_free_var_id.borrow_mut() = 1 + (af.n_arguments() << 1);
         af.argument_set().iter().for_each(|arg| {
@@ -222,5 +224,23 @@ where
 
     fn arg_to_lit(&self, arg: &Argument<T>) -> Literal {
         Literal::from(Self::arg_id_to_solver_var(arg.id()) as isize)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        aa::{AAFramework, ArgumentSet},
+        encodings::{ConstraintsEncoder, HybridCompleteConstraintsEncoder},
+        sat::default_solver,
+    };
+
+    #[test]
+    fn test_no_attacks() {
+        let af = AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&["a0"]));
+        let encoder = HybridCompleteConstraintsEncoder::default();
+        let mut solver = default_solver();
+        encoder.encode_constraints(&af, solver.as_mut());
+        assert_ne!(solver.n_vars(), 0);
     }
 }

@@ -55,6 +55,10 @@ impl SatSolver for CadicalSolver {
     fn add_listener(&mut self, listener: Box<dyn SolvingListener>) {
         self.listeners.push(listener);
     }
+
+    fn reserve(&mut self, new_max_id: usize) {
+        self.solver.reserve(new_max_id as i32);
+    }
 }
 
 #[cfg(test)]
