@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use super::{AuxVarCompleteConstraintsEncoder, ConstraintsEncoder, ExpCompleteConstraintsEncoder};
+use super::{aux_var_constraints_encoder, exp_constraints_encoder, ConstraintsEncoder};
 use crate::{
     aa::{AAFramework, Argument},
     sat::{clause, Assignment, Literal, SatSolver},
@@ -29,7 +29,7 @@ impl HybridCompleteConstraintsEncoder {
         let attacked_id = arg.id();
         let attacked_solver_var = Self::arg_id_to_solver_var(attacked_id) as isize;
         let (defender_sets, conflict_freeness_clauses) =
-            ExpCompleteConstraintsEncoder::compute_defender_sets(af, arg);
+            exp_constraints_encoder::compute_defender_sets(af, arg);
         if defender_sets.is_empty() {
             solver.add_clause(clause![attacked_solver_var]);
             return;
@@ -46,7 +46,7 @@ impl HybridCompleteConstraintsEncoder {
             }
         }
         if product < DEFENDER_SETS_PROD_THRESHOLD {
-            ExpCompleteConstraintsEncoder::encode_nontrivial_attack_constraints_for_arg(
+            exp_constraints_encoder::encode_nontrivial_attack_constraints_for_arg(
                 arg,
                 solver,
                 defender_sets,
@@ -60,7 +60,7 @@ impl HybridCompleteConstraintsEncoder {
                 Rc::clone(&next_free_var_id),
                 arg,
             );
-            AuxVarCompleteConstraintsEncoder::encode_attack_constraints_for_arg(
+            aux_var_constraints_encoder::encode_complete_semantics_attack_constraints_for_arg(
                 af,
                 solver,
                 arg,
@@ -144,7 +144,7 @@ impl HybridCompleteConstraintsEncoder {
             let disjunction_var = *next_free_var_id.borrow();
             *next_free_var_id.borrow_mut() += 1;
             attacker_disjunction_vars.borrow_mut()[attacker_id] = Some(disjunction_var);
-            AuxVarCompleteConstraintsEncoder::encode_disjunction_var_with(
+            aux_var_constraints_encoder::encode_disjunction_var_with(
                 af,
                 solver,
                 att.attacker(),

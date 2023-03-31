@@ -4,8 +4,7 @@ use crustabri::{
     aa::{AAFramework, Argument, Query, Semantics},
     aba::{ABAFrameworkInstantiation, Iccma23ABAReader, Iccma23ABAWriter},
     encodings::{
-        AuxVarCompleteConstraintsEncoder, AuxVarConflictFreenessConstraintsEncoder,
-        ConstraintsEncoder, ExpCompleteConstraintsEncoder, ExpConflictFreenessConstraintsEncoder,
+        aux_var_constraints_encoder, exp_constraints_encoder, ConstraintsEncoder,
         HybridCompleteConstraintsEncoder,
     },
     io::{
@@ -473,19 +472,29 @@ where
     match sem {
         Semantics::GR | Semantics::ST => None,
         Semantics::STG => match encoding_as_str("exp") {
-            "aux_var" => Some(Box::new(AuxVarConflictFreenessConstraintsEncoder)),
-            "exp" => Some(Box::new(ExpConflictFreenessConstraintsEncoder)),
+            "aux_var" => Some(Box::new(
+                aux_var_constraints_encoder::new_for_conflict_freeness(),
+            )),
+            "exp" => Some(Box::new(
+                exp_constraints_encoder::new_for_conflict_freeness(),
+            )),
             "hybrid" => {
                 warn!(
                     r#"irrelevant encoding value "hybrid" for STG semantics; falling back to default "exp""#
                 );
-                Some(Box::new(ExpConflictFreenessConstraintsEncoder))
+                Some(Box::new(
+                    exp_constraints_encoder::new_for_conflict_freeness(),
+                ))
             }
             _ => unreachable!(),
         },
         _ => match encoding_as_str("aux_var") {
-            "aux_var" => Some(Box::new(AuxVarCompleteConstraintsEncoder)),
-            "exp" => Some(Box::new(ExpCompleteConstraintsEncoder)),
+            "aux_var" => Some(Box::new(
+                aux_var_constraints_encoder::new_for_complete_semantics(),
+            )),
+            "exp" => Some(Box::new(
+                exp_constraints_encoder::new_for_complete_semantics(),
+            )),
             "hybrid" => Some(Box::new(HybridCompleteConstraintsEncoder::default())),
             _ => unreachable!(),
         },
