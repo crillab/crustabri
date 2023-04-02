@@ -9,6 +9,7 @@ use crate::{
 
 enum EncodingType {
     ConflictFreeness,
+    Admissibility,
     CompleteSemantics,
 }
 
@@ -17,15 +18,26 @@ impl EncodingType {
     where
         T: LabelType,
     {
+        solver.reserve(af.n_arguments() << 1);
         match self {
             EncodingType::ConflictFreeness => {
-                solver.reserve(af.n_arguments() << 1);
                 af.argument_set().iter().for_each(|arg| {
                     encode_conflict_freeness_attack_constraints_for_arg(af, solver, arg);
                 });
             }
+            EncodingType::Admissibility => {
+                af.argument_set().iter().for_each(|arg| {
+                    encode_admissibility_attack_constraints_for_arg(
+                        af,
+                        solver,
+                        arg,
+                        &arg_id_to_solver_var,
+                        &arg_id_to_solver_disjunction_var,
+                    );
+                    encode_disjunction_var(af, solver, arg);
+                });
+            }
             EncodingType::CompleteSemantics => {
-                solver.reserve(af.n_arguments() << 1);
                 af.argument_set().iter().for_each(|arg| {
                     encode_complete_semantics_attack_constraints_for_arg(
                         af,
@@ -44,17 +56,29 @@ impl EncodingType {
     where
         T: LabelType,
     {
+        solver.reserve(af.n_arguments() * 3);
         match self {
             EncodingType::ConflictFreeness => {
-                solver.reserve(af.n_arguments() * 3);
                 af.argument_set().iter().for_each(|arg| {
                     encode_conflict_freeness_attack_constraints_for_arg(af, solver, arg);
                     encode_disjunction_var(af, solver, arg);
                     encode_range_constraint(solver, arg, af.n_arguments());
                 });
             }
+            EncodingType::Admissibility => {
+                af.argument_set().iter().for_each(|arg| {
+                    encode_admissibility_attack_constraints_for_arg(
+                        af,
+                        solver,
+                        arg,
+                        &arg_id_to_solver_var,
+                        &arg_id_to_solver_disjunction_var,
+                    );
+                    encode_disjunction_var(af, solver, arg);
+                    encode_range_constraint(solver, arg, af.n_arguments());
+                });
+            }
             EncodingType::CompleteSemantics => {
-                solver.reserve(af.n_arguments() * 3);
                 af.argument_set().iter().for_each(|arg| {
                     encode_complete_semantics_attack_constraints_for_arg(
                         af,
@@ -89,6 +113,33 @@ fn encode_conflict_freeness_attack_constraints_for_arg<T>(
         let attacker_id = att.attacker().id();
         let attacker_solver_var = arg_id_to_solver_var(attacker_id) as isize;
         solver.add_clause(clause![-attacked_solver_var, -attacker_solver_var,]);
+    });
+}
+
+/// Returns an encoder for admissibility based on auxiliary variables addition.
+pub fn new_for_admissibility() -> AuxVarConstraintsEncoder {
+    AuxVarConstraintsEncoder(EncodingType::Admissibility)
+}
+
+pub(crate) fn encode_admissibility_attack_constraints_for_arg<T>(
+    af: &AAFramework<T>,
+    solver: &mut dyn SatSolver,
+    arg: &Label<T>,
+    arg_id_to_solver_var: &dyn Fn(usize) -> usize,
+    arg_id_to_solver_disjunction_var: &dyn Fn(usize) -> usize,
+) where
+    T: LabelType,
+{
+    let attacked_id = arg.id();
+    let attacked_solver_var = arg_id_to_solver_var(attacked_id) as isize;
+    af.iter_attacks_to(arg).for_each(|att| {
+        let attacker_id = att.attacker().id();
+        let attacker_disjunction_solver_var =
+            arg_id_to_solver_disjunction_var(attacker_id) as isize;
+        solver.add_clause(clause![
+            -attacked_solver_var,
+            attacker_disjunction_solver_var
+        ]);
     });
 }
 
@@ -255,6 +306,15 @@ mod tests {
     fn test_no_attacks_complete_semantics() {
         let af = AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&["a0"]));
         let encoder = AuxVarConstraintsEncoder(EncodingType::CompleteSemantics);
+        let mut solver = default_solver();
+        encoder.encode_constraints(&af, solver.as_mut());
+        assert_ne!(solver.n_vars(), 0);
+    }
+
+    #[test]
+    fn test_no_attacks_admissibility() {
+        let af = AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&["a0"]));
+        let encoder = AuxVarConstraintsEncoder(EncodingType::Admissibility);
         let mut solver = default_solver();
         encoder.encode_constraints(&af, solver.as_mut());
         assert_ne!(solver.n_vars(), 0);
