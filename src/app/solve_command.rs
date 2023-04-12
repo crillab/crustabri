@@ -488,6 +488,16 @@ where
             }
             _ => unreachable!(),
         },
+        Semantics::PR if arg_matches.value_of(ARG_PROBLEM).unwrap() == "SE-PR" => match encoding_as_str("aux_var") {
+            "aux_var" => Some(Box::new(
+                aux_var_constraints_encoder::new_for_admissibility(),
+            )),
+            "exp" => Some(Box::new(
+                exp_constraints_encoder::new_for_complete_semantics(),
+            )),
+            "hybrid" => Some(Box::new(HybridCompleteConstraintsEncoder::default())),
+            _ => unreachable!(),
+        },
         _ => match encoding_as_str("aux_var") {
             "aux_var" => Some(Box::new(
                 aux_var_constraints_encoder::new_for_complete_semantics(),
