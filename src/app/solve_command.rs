@@ -2,7 +2,7 @@ use super::common::{self, ARG_ARG, ARG_PROBLEM};
 use anyhow::{anyhow, Context, Result};
 use crustabri::{
     aa::{AAFramework, Argument, Query, Semantics},
-    aba::{ABAFrameworkInstantiation, Iccma23ABAReader, Iccma23ABAWriter},
+    aba::{ABAFrameworkInstantiation, Iccma23ABAReader, Iccma23ABAWriter, InstantiationLabel},
     encodings::{
         aux_var_constraints_encoder, exp_constraints_encoder, ConstraintsEncoder,
         HybridCompleteConstraintsEncoder,
@@ -18,7 +18,7 @@ use crustabri::{
         SingleExtensionComputer, SkepticalAcceptanceComputer, StableSemanticsSolver,
         StageSemanticsSolver,
     },
-    utils::LabelType,
+    utils::{EquivalencyComputer, Label, LabelType},
 };
 use crusti_app_helper::{info, warn, AppSettings, Arg, ArgMatches, Command, SubCommand};
 
@@ -108,6 +108,7 @@ where
     let (query, semantics) =
         Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
     check_arg_definition(query, &arg)?;
+    let af_reducer = EquivalencyComputer::new(&af);
     let mut out = std::io::stdout();
     let mut acceptance_status_writer = |status, opt_certificate: Option<Vec<&Argument<T>>>| {
         writer.write_acceptance_status(&mut out, status)?;
@@ -117,28 +118,32 @@ where
         Ok(())
     };
     match query {
-        Query::SE => {
-            compute_one_extension(
-                &af,
-                semantics,
-                arg_matches,
-                &mut |opt_model| match opt_model {
-                    Some(m) => writer.write_single_extension(&mut out, &m),
-                    None => writer.write_no_extension(&mut out),
-                },
-            )
-        }
-        Query::DC => check_credulous_acceptance(
-            &af,
+        Query::SE => compute_one_extension(
+            af_reducer.reduced_af(),
             semantics,
-            arg.unwrap(),
+            arg_matches,
+            &mut |opt_model| match opt_model {
+                Some(m) => {
+                    let mut init_m: Vec<&Label<T>> = Vec::new();
+                    m.iter().for_each(|arg| {
+                        init_m.append(&mut af_reducer.reduced_arg_to_init_args(arg));
+                    });
+                    writer.write_single_extension(&mut out, &m)
+                }
+                None => writer.write_no_extension(&mut out),
+            },
+        ),
+        Query::DC => check_credulous_acceptance(
+            af_reducer.reduced_af(),
+            semantics,
+            af_reducer.init_to_reduced_arg(arg.unwrap()),
             arg_matches,
             &mut acceptance_status_writer,
         ),
         Query::DS => check_skeptical_acceptance(
-            &af,
+            af_reducer.reduced_af(),
             semantics,
-            arg.unwrap(),
+            af_reducer.init_to_reduced_arg(arg.unwrap()),
             arg_matches,
             &mut acceptance_status_writer,
         ),
@@ -163,35 +168,41 @@ fn execute_for_iccma23_aba(arg_matches: &crusti_app_helper::ArgMatches<'_>) -> R
         Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
     check_arg_definition(query, &arg)?;
     let af = instantiation.instantiated();
+    let af_reducer = EquivalencyComputer::new(af);
     let writer = Iccma23ABAWriter::default();
     let mut out = std::io::stdout();
     match query {
-        Query::SE => {
-            compute_one_extension(
-                af,
-                semantics,
-                arg_matches,
-                &mut |opt_model| match opt_model {
-                    Some(m) => {
-                        let assumptions =
-                            instantiation.instantiated_extension_to_aba_assumptions(&m);
-                        writer
-                            .write_single_extension(&mut out, assumptions.iter().map(|a| a.label()))
-                    }
-                    None => writer.write_no_extension(&mut out),
-                },
-            )
-        }
-        Query::DC => {
-            check_credulous_acceptance(af, semantics, arg.unwrap(), arg_matches, &mut |b, _| {
-                writer.write_acceptance_status(&mut out, b)
-            })
-        }
-        Query::DS => {
-            check_skeptical_acceptance(af, semantics, arg.unwrap(), arg_matches, &mut |b, _| {
-                writer.write_acceptance_status(&mut out, b)
-            })
-        }
+        Query::SE => compute_one_extension(
+            af_reducer.reduced_af(),
+            semantics,
+            arg_matches,
+            &mut |opt_model| match opt_model {
+                Some(m) => {
+                    let mut init_m: Vec<&Label<InstantiationLabel<usize>>> = Vec::new();
+                    m.iter().for_each(|arg| {
+                        init_m.append(&mut af_reducer.reduced_arg_to_init_args(arg));
+                    });
+                    let assumptions =
+                        instantiation.instantiated_extension_to_aba_assumptions(init_m.as_slice());
+                    writer.write_single_extension(&mut out, assumptions.iter().map(|a| a.label()))
+                }
+                None => writer.write_no_extension(&mut out),
+            },
+        ),
+        Query::DC => check_credulous_acceptance(
+            af_reducer.reduced_af(),
+            semantics,
+            af_reducer.init_to_reduced_arg(arg.unwrap()),
+            arg_matches,
+            &mut |b, _| writer.write_acceptance_status(&mut out, b),
+        ),
+        Query::DS => check_skeptical_acceptance(
+            af_reducer.reduced_af(),
+            semantics,
+            af_reducer.init_to_reduced_arg(arg.unwrap()),
+            arg_matches,
+            &mut |b, _| writer.write_acceptance_status(&mut out, b),
+        ),
     }
 }
 

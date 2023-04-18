@@ -2,6 +2,7 @@
 
 mod aba_framework_instantiation;
 pub use aba_framework_instantiation::ABAFrameworkInstantiation;
+pub use aba_framework_instantiation::InstantiationLabel;
 
 mod aba_framework;
 pub use aba_framework::ABAFramework;

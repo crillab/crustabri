@@ -3,8 +3,11 @@
 mod connected_components_computer;
 pub(crate) use connected_components_computer::ConnectedComponentsComputer;
 
+mod equivalency_computer;
+pub use equivalency_computer::EquivalencyComputer;
+
 mod label;
-pub(crate) use label::Label;
+pub use label::Label;
 pub use label::LabelSet;
 pub use label::LabelType;
 
