@@ -14,6 +14,7 @@ use std::{
 pub trait LabelType: Clone + Debug + Display + Eq + Hash {}
 impl<T: Clone + Debug + Display + Eq + Hash> LabelType for T {}
 
+/// An (abstract) argument type, associated with a unique identifier.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Label<T>
 where
@@ -31,10 +32,12 @@ where
         Self { id, label }
     }
 
+    /// Returns the argument label.
     pub fn label(&self) -> &T {
         &self.label
     }
 
+    /// Returns the argument associated with the label.
     pub fn id(&self) -> usize {
         self.id
     }
