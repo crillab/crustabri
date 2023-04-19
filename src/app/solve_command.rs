@@ -128,7 +128,7 @@ where
                     m.iter().for_each(|arg| {
                         init_m.append(&mut af_reducer.reduced_arg_to_init_args(arg));
                     });
-                    writer.write_single_extension(&mut out, &m)
+                    writer.write_single_extension(&mut out, &init_m)
                 }
                 None => writer.write_no_extension(&mut out),
             },

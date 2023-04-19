@@ -1,13 +1,41 @@
 use super::{Label, LabelType};
 use crate::aa::{AAFramework, ArgumentSet};
 
+enum EqClass {
+    Grounded(Vec<usize>),
+    GroundedDefeated(Vec<usize>),
+    NotGrounded(Vec<usize>),
+}
+
+impl EqClass {
+    fn iter(&self) -> impl Iterator<Item = &usize> + '_ {
+        match self {
+            EqClass::Grounded(v) | EqClass::GroundedDefeated(v) | EqClass::NotGrounded(v) => {
+                v.iter()
+            }
+        }
+    }
+
+    fn unwrap(self) -> Vec<usize> {
+        match self {
+            EqClass::Grounded(v) | EqClass::GroundedDefeated(v) | EqClass::NotGrounded(v) => v,
+        }
+    }
+
+    fn first(&self) -> usize {
+        match self {
+            EqClass::Grounded(v) | EqClass::GroundedDefeated(v) | EqClass::NotGrounded(v) => v[0],
+        }
+    }
+}
+
 pub struct EquivalencyComputer<'a, T>
 where
     T: LabelType,
 {
     init_af: &'a AAFramework<T>,
     reduced_af: AAFramework<T>,
-    classes: Vec<Vec<usize>>,
+    classes: Vec<EqClass>,
     init_to_reduced_id: Vec<usize>,
 }
 
@@ -48,7 +76,7 @@ where
     }
 }
 
-fn compute_classes<T>(af: &AAFramework<T>) -> Vec<Vec<usize>>
+fn compute_classes<T>(af: &AAFramework<T>) -> Vec<EqClass>
 where
     T: LabelType,
 {
@@ -58,13 +86,15 @@ where
     let mut classes = Vec::new();
     if let Some((grounded, defeated)) = compute_grounded_classes(af, &n_attacks_to) {
         if !grounded.is_empty() {
-            classes.push(grounded);
+            classes.push(EqClass::Grounded(grounded));
         }
         if !defeated.is_empty() {
-            classes.push(defeated);
+            classes.push(EqClass::GroundedDefeated(defeated));
         }
     } else {
-        return (0..af.n_arguments()).map(|i| vec![i]).collect();
+        return (0..af.n_arguments())
+            .map(|i| EqClass::NotGrounded(vec![i]))
+            .collect();
     }
     let mut in_classes = vec![false; af.n_arguments()];
     classes
@@ -85,7 +115,7 @@ where
         let mut arg_propagations = if let Some(p) = opt_arg_propagations {
             p
         } else {
-            classes.push(arg_class);
+            classes.push(EqClass::NotGrounded(arg_class));
             continue;
         };
         arg_propagations.retain(|id| !in_classes[*id] && *id > arg);
@@ -100,7 +130,7 @@ where
                 propagations[*id] = Some(Vec::new());
             }
         });
-        classes.push(arg_class);
+        classes.push(EqClass::NotGrounded(arg_class));
     }
     classes
 }
@@ -169,13 +199,18 @@ where
     Some((propagated, defeated))
 }
 
-fn reduce_af<T>(init_af: &AAFramework<T>, classes: &[Vec<usize>]) -> (AAFramework<T>, Vec<usize>)
+fn reduce_af<T>(init_af: &AAFramework<T>, classes: &[EqClass]) -> (AAFramework<T>, Vec<usize>)
 where
     T: LabelType,
 {
     let reduced_labels = classes
         .iter()
-        .map(|cl| init_af.argument_set().get_argument_by_id(cl[0]).label())
+        .map(|cl| {
+            init_af
+                .argument_set()
+                .get_argument_by_id(cl.first())
+                .label()
+        })
         .cloned()
         .collect::<Vec<T>>();
     let mut init_to_reduced_id = vec![0; init_af.n_arguments()];
@@ -187,9 +222,13 @@ where
     let reduced_arg_set = ArgumentSet::new_with_labels(&reduced_labels);
     let mut reduced_af = AAFramework::new_with_argument_set(reduced_arg_set);
     init_af.iter_attacks().for_each(|att| {
+        let reduced_from_id = init_to_reduced_id[att.attacker().id()];
+        if matches!(classes[reduced_from_id], EqClass::GroundedDefeated(_)) {
+            return;
+        }
         reduced_af
             .new_attack(
-                &reduced_labels[init_to_reduced_id[att.attacker().id()]],
+                &reduced_labels[reduced_from_id],
                 &reduced_labels[init_to_reduced_id[att.attacked().id()]],
             )
             .unwrap();
@@ -277,7 +316,13 @@ mod tests {
         let apx = "p af 3\n1 2\n2 3\n3 1\n";
         let af = Iccma23Reader::default().read(&mut apx.as_bytes()).unwrap();
         let eq_classes = compute_classes(&af);
-        assert_eq!(vec![vec![0], vec![1], vec![2]], eq_classes);
+        assert_eq!(
+            vec![vec![0], vec![1], vec![2]],
+            eq_classes
+                .into_iter()
+                .map(|c| c.unwrap())
+                .collect::<Vec<Vec<usize>>>()
+        );
     }
 
     #[test]
@@ -285,7 +330,13 @@ mod tests {
         let apx = "p af 4\n1 2\n2 3\n3 4\n4 1\n";
         let af = Iccma23Reader::default().read(&mut apx.as_bytes()).unwrap();
         let eq_classes = compute_classes(&af);
-        assert_eq!(vec![vec![0, 2], vec![1, 3]], eq_classes);
+        assert_eq!(
+            vec![vec![0, 2], vec![1, 3]],
+            eq_classes
+                .into_iter()
+                .map(|c| c.unwrap())
+                .collect::<Vec<Vec<usize>>>()
+        );
     }
 
     #[test]
@@ -293,6 +344,21 @@ mod tests {
         let apx = "p af 3\n1 2\n2 3\n3 3\n";
         let af = Iccma23Reader::default().read(&mut apx.as_bytes()).unwrap();
         let eq_classes = compute_classes(&af);
-        assert_eq!(vec![vec![0], vec![1], vec![2]], eq_classes);
+        assert_eq!(
+            vec![vec![0], vec![1], vec![2]],
+            eq_classes
+                .into_iter()
+                .map(|c| c.unwrap())
+                .collect::<Vec<Vec<usize>>>()
+        );
+    }
+
+    #[test]
+    fn test_reduce_grounded_path() {
+        let apx = "p af 3\n1 2\n2 3\n";
+        let af = Iccma23Reader::default().read(&mut apx.as_bytes()).unwrap();
+        let reducer = EquivalencyComputer::new(&af);
+        assert_eq!(2, reducer.reduced_af().n_arguments());
+        assert_eq!(1, reducer.reduced_af().n_attacks());
     }
 }
