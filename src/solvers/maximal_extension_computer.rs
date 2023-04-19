@@ -247,19 +247,7 @@ where
         solver_clone.borrow_mut().add_clause(not_in_ext);
         in_ext
     }));
-    let solver_clone = Rc::clone(&solver);
-    computer.set_discard_current_fn(Box::new(move |fn_data| {
-        let (mut in_ext, _) = split_in_extension(
-            fn_data.af,
-            fn_data.current_arg_set,
-            fn_data.af.n_arguments(),
-            fn_data.constraints_encoder,
-        );
-        in_ext.iter_mut().for_each(|l| *l = l.negate());
-        in_ext.push(fn_data.selector);
-        solver_clone.borrow_mut().add_clause(in_ext);
-    }));
-    computer.set_discard_maximal_fn(Box::new(move |fn_data| {
+    let discard_fn = Box::new(move |fn_data: MaximalExtensionComputerStateData<T>| {
         let (_, mut not_in_ext) = split_in_extension(
             fn_data.af,
             fn_data.current_arg_set,
@@ -268,7 +256,9 @@ where
         );
         not_in_ext.push(fn_data.selector);
         solver.borrow_mut().add_clause(not_in_ext);
-    }));
+    });
+    computer.set_discard_current_fn(discard_fn.clone());
+    computer.set_discard_maximal_fn(discard_fn);
     computer
 }
 

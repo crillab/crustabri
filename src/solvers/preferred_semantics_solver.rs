@@ -562,6 +562,64 @@ mod tests {
         expected.sort_unstable();
         assert_eq!(expected, actual);
     }
+
+    #[test]
+    fn [< test_skeptical_acceptance_with_autoattack_ $suffix >]() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        att(a0,a0).
+        att(a0,a1).
+        att(a0,a2).
+        att(a1,a0).
+        att(a2,a3).
+        att(a3,a2).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+        assert!(!solver.is_skeptically_accepted(&"a0".to_string()));
+        assert!(solver.is_skeptically_accepted(&"a1".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a2".to_string()));
+        assert!(!solver.is_skeptically_accepted(&"a3".to_string()));
+    }
+
+    #[test]
+    fn [< test_enumerate_extensions_with_autoattack_ $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        att(a0,a0).
+        att(a0,a1).
+        att(a0,a2).
+        att(a1,a0).
+        att(a2,a3).
+        att(a3,a2).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let solver = Rc::new(RefCell::new(sat::default_solver()));
+        let mut n_exts = 0;
+        let constraints_encoder = $encoder;
+        PreferredSemanticsSolver::enumerate_extensions(
+            &af,
+            solver,
+            &constraints_encoder,
+            &mut |ext| {
+                n_exts += 1;
+                let args = ext.iter().map(|a| a.label()).collect::<Vec<&String>>();
+                assert!(!args.contains(&&"a0".to_string()));
+                assert!(args.contains(&&"a1".to_string()));
+                assert!(args.contains(&&"a2".to_string()) ^ args.contains(&&"a3".to_string()));
+                true
+            },
+        );
+        assert_eq!(2, n_exts)
+    }
     }
     };
     }
