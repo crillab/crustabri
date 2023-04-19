@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use super::{
     maximal_extension_computer::{
         MaximalExtensionComputer, MaximalExtensionComputerState, MaximalExtensionComputerStateData,
@@ -9,9 +7,10 @@ use super::{
 use crate::{
     aa::{AAFramework, Argument},
     encodings::{aux_var_constraints_encoder, ConstraintsEncoder},
-    sat::{self, clause, Literal, SatSolver, SatSolverFactoryFn},
+    sat::{self, Literal, SatSolver, SatSolverFactoryFn},
     utils::{ConnectedComponentsComputer, LabelType},
 };
+use std::{cell::RefCell, rc::Rc};
 
 macro_rules! maximal_range_solver {
     ($solver_ident:ident, $sem_name:literal, $constraints_encoder:expr) => {
@@ -297,26 +296,39 @@ where
             computer.compute_next();
             match computer.state() {
                 MaximalExtensionComputerState::Maximal => {
-                    let stop_enum_reason = enumerate_extensions_for_range(
-                        Rc::clone(&solver),
-                        &mut computer.state_data(),
-                        self.constraints_encoder.as_ref(),
-                        &|ext| {
-                            if ext.contains(&cc_arg) == is_credulous_acceptance {
-                                Some(ext.iter().map(|a| a.id()).collect())
-                            } else {
-                                None
-                            }
-                        },
-                    );
-                    if let Some(reason) = stop_enum_reason {
+                    let fn_data = computer.state_data();
+                    let ext = fn_data.current_arg_set;
+                    if ext.contains(&cc_arg) == is_credulous_acceptance {
                         return (
                             is_credulous_acceptance,
                             Some(
-                                reason
-                                    .iter()
-                                    .map(|id| cc_af.argument_set().get_argument_by_id(*id))
+                                ext.iter()
+                                    .map(|arg| cc_af.argument_set().get_argument_by_id(arg.id()))
                                     .collect(),
+                            ),
+                        );
+                    }
+                    let (mut in_range, mut not_in_range) = split_in_range(&fn_data);
+                    not_in_range.iter_mut().for_each(|l| *l = l.negate());
+                    let mut assumptions = Vec::with_capacity(fn_data.af.n_arguments() + 2);
+                    assumptions.append(&mut in_range);
+                    assumptions.append(&mut not_in_range);
+                    assumptions.push(fn_data.selector);
+                    assumptions.push(if is_credulous_acceptance {
+                        self.constraints_encoder.arg_to_lit(cc_arg)
+                    } else {
+                        self.constraints_encoder.arg_to_lit(cc_arg).negate()
+                    });
+                    if let Some(model) = solver
+                        .borrow_mut()
+                        .solve_under_assumptions(&assumptions)
+                        .unwrap_model()
+                    {
+                        return (
+                            is_credulous_acceptance,
+                            Some(
+                                self.constraints_encoder
+                                    .assignment_to_extension(&model, cc_af),
                             ),
                         );
                     }
@@ -373,73 +385,6 @@ where
         solver.borrow_mut().add_clause(not_in_range);
     }));
     computer
-}
-
-// The callback function is called for all extension matching the range.
-//
-// This function returns `None` if the enumeration must continue.
-// Otherwise, it returns a value indicating why the enumeration should stop.
-// This value is computed and returned by the callback function.
-fn enumerate_extensions_for_range<F, T>(
-    solver: Rc<RefCell<Box<dyn SatSolver>>>,
-    fn_data: &mut MaximalExtensionComputerStateData<T>,
-    constraints_encoder: &dyn ConstraintsEncoder<T>,
-    callback: &F,
-) -> Option<Vec<usize>>
-where
-    T: LabelType,
-    F: Fn(&[&Argument<T>]) -> Option<Vec<usize>>,
-{
-    let enum_selector = Literal::from(1 + solver.borrow().n_vars() as isize);
-    let (mut in_range, mut not_in_range) = split_in_range(fn_data);
-    not_in_range.iter_mut().for_each(|l| *l = l.negate());
-    let mut assumptions = Vec::with_capacity(fn_data.af.n_arguments() + 1);
-    assumptions.append(&mut in_range);
-    assumptions.append(&mut not_in_range);
-    assumptions.push(enum_selector.negate());
-    #[allow(unused_assignments)]
-    let mut current_extension_vec = None;
-    let mut current_extension = fn_data.current_arg_set;
-    loop {
-        let must_stop = (callback)(current_extension);
-        if must_stop.is_some() {
-            return must_stop;
-        }
-        let mut in_current = vec![false; fn_data.af.n_arguments()];
-        current_extension
-            .iter()
-            .for_each(|a| in_current[a.id()] = true);
-        let blocking_clause = in_current
-            .iter()
-            .enumerate()
-            .filter_map(|(i, b)| {
-                if *b {
-                    None
-                } else {
-                    Some(
-                        constraints_encoder
-                            .arg_to_lit(fn_data.af.argument_set().get_argument_by_id(i)),
-                    )
-                }
-            })
-            .chain(std::iter::once(enum_selector))
-            .collect();
-        solver.borrow_mut().add_clause(blocking_clause);
-        match solver
-            .borrow_mut()
-            .solve_under_assumptions(&assumptions)
-            .unwrap_model()
-        {
-            Some(assignment) => {
-                current_extension_vec =
-                    Some(constraints_encoder.assignment_to_extension(&assignment, fn_data.af));
-                current_extension = current_extension_vec.as_ref().unwrap();
-            }
-            None => break,
-        }
-    }
-    solver.borrow_mut().add_clause(clause!(enum_selector));
-    None
 }
 
 fn split_in_range<T>(fn_data: &MaximalExtensionComputerStateData<T>) -> (Vec<Literal>, Vec<Literal>)
