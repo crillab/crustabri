@@ -2,7 +2,7 @@ use super::common::{self, ARG_ARG, ARG_PROBLEM};
 use anyhow::{anyhow, Context, Result};
 use crustabri::{
     aa::{AAFramework, Argument, Query, Semantics},
-    aba::{ABAFrameworkInstantiation, Iccma23ABAReader, Iccma23ABAWriter, InstantiationLabel},
+    aba::{ABAFrameworkInstantiation, Iccma23ABAReader, Iccma23ABAWriter},
     encodings::{
         aux_var_constraints_encoder, exp_constraints_encoder, ConstraintsEncoder,
         HybridCompleteConstraintsEncoder,
@@ -108,7 +108,6 @@ where
     let (query, semantics) =
         Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
     check_arg_definition(query, &arg)?;
-    let af_reducer = EquivalencyComputer::new(&af);
     let mut out = std::io::stdout();
     let mut acceptance_status_writer = |status, opt_certificate: Option<Vec<&Argument<T>>>| {
         writer.write_acceptance_status(&mut out, status)?;
@@ -117,33 +116,30 @@ where
         }
         Ok(())
     };
+    let effective_af = EffectiveAF::new(&af, semantics);
     match query {
         Query::SE => compute_one_extension(
-            af_reducer.reduced_af(),
+            effective_af.af(),
             semantics,
             arg_matches,
             &mut |opt_model| match opt_model {
                 Some(m) => {
-                    let mut init_m: Vec<&Label<T>> = Vec::new();
-                    m.iter().for_each(|arg| {
-                        init_m.append(&mut af_reducer.reduced_arg_to_init_args(arg));
-                    });
-                    writer.write_single_extension(&mut out, &init_m)
+                    writer.write_single_extension(&mut out, &effective_af.effective_model(m))
                 }
                 None => writer.write_no_extension(&mut out),
             },
         ),
         Query::DC => check_credulous_acceptance(
-            af_reducer.reduced_af(),
+            effective_af.af(),
             semantics,
-            af_reducer.init_to_reduced_arg(arg.unwrap()),
+            effective_af.effective_arg(arg.unwrap()),
             arg_matches,
             &mut acceptance_status_writer,
         ),
         Query::DS => check_skeptical_acceptance(
-            af_reducer.reduced_af(),
+            effective_af.af(),
             semantics,
-            af_reducer.init_to_reduced_arg(arg.unwrap()),
+            effective_af.effective_arg(arg.unwrap()),
             arg_matches,
             &mut acceptance_status_writer,
         ),
@@ -168,41 +164,90 @@ fn execute_for_iccma23_aba(arg_matches: &crusti_app_helper::ArgMatches<'_>) -> R
         Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
     check_arg_definition(query, &arg)?;
     let af = instantiation.instantiated();
-    let af_reducer = EquivalencyComputer::new(af);
     let writer = Iccma23ABAWriter::default();
     let mut out = std::io::stdout();
+    let effective_af = EffectiveAF::new(&af, semantics);
     match query {
         Query::SE => compute_one_extension(
-            af_reducer.reduced_af(),
+            effective_af.af(),
             semantics,
             arg_matches,
             &mut |opt_model| match opt_model {
                 Some(m) => {
-                    let mut init_m: Vec<&Label<InstantiationLabel<usize>>> = Vec::new();
-                    m.iter().for_each(|arg| {
-                        init_m.append(&mut af_reducer.reduced_arg_to_init_args(arg));
-                    });
-                    let assumptions =
-                        instantiation.instantiated_extension_to_aba_assumptions(init_m.as_slice());
+                    let effective_model = effective_af.effective_model(m);
+                    let assumptions = instantiation
+                        .instantiated_extension_to_aba_assumptions(effective_model.as_slice());
                     writer.write_single_extension(&mut out, assumptions.iter().map(|a| a.label()))
                 }
                 None => writer.write_no_extension(&mut out),
             },
         ),
         Query::DC => check_credulous_acceptance(
-            af_reducer.reduced_af(),
+            effective_af.af(),
             semantics,
-            af_reducer.init_to_reduced_arg(arg.unwrap()),
+            effective_af.effective_arg(arg.unwrap()),
             arg_matches,
             &mut |b, _| writer.write_acceptance_status(&mut out, b),
         ),
         Query::DS => check_skeptical_acceptance(
-            af_reducer.reduced_af(),
+            effective_af.af(),
             semantics,
-            af_reducer.init_to_reduced_arg(arg.unwrap()),
+            effective_af.effective_arg(arg.unwrap()),
             arg_matches,
             &mut |b, _| writer.write_acceptance_status(&mut out, b),
         ),
+    }
+}
+
+struct EffectiveAF<'a, T>
+where
+    T: LabelType,
+{
+    init_af: &'a AAFramework<T>,
+    af_reducer: Option<EquivalencyComputer<'a, T>>,
+}
+
+impl<'a, T> EffectiveAF<'a, T>
+where
+    T: LabelType,
+{
+    fn new(init_af: &'a AAFramework<T>, sem: Semantics) -> Self {
+        let af_reducer = match sem {
+            Semantics::STG => Some(EquivalencyComputer::new(init_af)),
+            _ => None,
+        };
+        Self {
+            init_af,
+            af_reducer,
+        }
+    }
+
+    fn af(&self) -> &AAFramework<T> {
+        if let Some(reducer) = &self.af_reducer {
+            reducer.reduced_af()
+        } else {
+            self.init_af
+        }
+    }
+
+    fn effective_model<'b>(&'b self, model: Vec<&'a Label<T>>) -> Vec<&'b Label<T>> {
+        if let Some(reducer) = &self.af_reducer {
+            let mut init_model: Vec<&Label<T>> = Vec::new();
+            model.iter().for_each(|arg| {
+                init_model.append(&mut reducer.reduced_arg_to_init_args(arg));
+            });
+            init_model
+        } else {
+            model
+        }
+    }
+
+    fn effective_arg<'b>(&'b self, arg: &'a Label<T>) -> &'b Label<T> {
+        if let Some(reducer) = &self.af_reducer {
+            reducer.init_to_reduced_arg(arg)
+        } else {
+            arg
+        }
     }
 }
 

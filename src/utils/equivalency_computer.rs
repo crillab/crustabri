@@ -16,12 +16,6 @@ impl EqClass {
         }
     }
 
-    fn unwrap(self) -> Vec<usize> {
-        match self {
-            EqClass::Grounded(v) | EqClass::GroundedDefeated(v) | EqClass::NotGrounded(v) => v,
-        }
-    }
-
     fn first(&self) -> usize {
         match self {
             EqClass::Grounded(v) | EqClass::GroundedDefeated(v) | EqClass::NotGrounded(v) => v[0],
@@ -29,6 +23,7 @@ impl EqClass {
     }
 }
 
+/// An object used to reduce AFs by computing argument equivalency classes for admissible semantics.
 pub struct EquivalencyComputer<'a, T>
 where
     T: LabelType,
@@ -43,6 +38,7 @@ impl<'a, T> EquivalencyComputer<'a, T>
 where
     T: LabelType,
 {
+    /// Computes a reduced AF and returns an instance a structure allowing to handle it.
     pub fn new(init_af: &'a AAFramework<T>) -> Self {
         let classes = compute_classes(init_af);
         let (reduced_af, init_to_reduced_id) = reduce_af(init_af, &classes);
@@ -54,10 +50,12 @@ where
         }
     }
 
+    /// REturns the reduced AF.
     pub fn reduced_af(&self) -> &AAFramework<T> {
         &self.reduced_af
     }
 
+    /// Given an argument that belongs to the initial AF, returns the corresponding argument in the reduced AF.
     pub fn init_to_reduced_arg(&self, init_arg: &Label<T>) -> &Label<T> {
         self.reduced_af.argument_set().get_argument_by_id(
             self.init_to_reduced_id[self
@@ -68,6 +66,7 @@ where
         )
     }
 
+    /// Given an argument of the reduced AF, returns the set of corresponding arguments in the initial AF.
     pub fn reduced_arg_to_init_args(&self, reduced_arg: &Label<T>) -> Vec<&Label<T>> {
         self.classes[reduced_arg.id()]
             .iter()
@@ -240,6 +239,14 @@ where
 mod tests {
     use super::*;
     use crate::io::{Iccma23Reader, InstanceReader};
+
+    impl EqClass {
+        fn unwrap(self) -> Vec<usize> {
+            match self {
+                EqClass::Grounded(v) | EqClass::GroundedDefeated(v) | EqClass::NotGrounded(v) => v,
+            }
+        }
+    }
 
     #[test]
     fn test_grounded_classes_path() {
