@@ -57,17 +57,19 @@ impl<T> CredulousAcceptanceComputer<T> for GroundedSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_credulously_accepted(&mut self, arg: &T) -> bool {
-        self.is_credulously_accepted_with_certificate(arg).0
+    fn are_credulously_accepted(&mut self, args: &[&T]) -> bool {
+        self.are_credulously_accepted_with_certificate(args).0
     }
 
-    fn is_credulously_accepted_with_certificate(
+    fn are_credulously_accepted_with_certificate(
         &mut self,
-        arg: &T,
+        args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>) {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let ext = self.af.grounded_extension();
-        if ext.contains(&arg) {
+        if args
+            .iter()
+            .any(|a| ext.contains(&self.af.argument_set().get_argument(a).unwrap()))
+        {
             (true, Some(ext))
         } else {
             (false, None)
@@ -79,18 +81,19 @@ impl<T> SkepticalAcceptanceComputer<T> for GroundedSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
-        self.af.grounded_extension().contains(&arg)
+    fn are_skeptically_accepted(&mut self, args: &[&T]) -> bool {
+        self.are_skeptically_accepted_with_certificate(args).0
     }
 
-    fn is_skeptically_accepted_with_certificate(
+    fn are_skeptically_accepted_with_certificate(
         &mut self,
-        arg: &T,
+        args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>) {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let ext = self.af.grounded_extension();
-        if ext.contains(&arg) {
+        if args
+            .iter()
+            .any(|a| ext.contains(&self.af.argument_set().get_argument(a).unwrap()))
+        {
             (true, None)
         } else {
             (false, Some(ext))
@@ -160,5 +163,67 @@ mod tests {
             (true, None),
             solver.is_skeptically_accepted_with_certificate(&"a0".to_string())
         );
+    }
+
+    #[test]
+    fn test_disj_credulous_acceptance() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        att(a0,a1).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a3).
+        att(a2,a4).
+        att(a3,a2).
+        att(a3,a4).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = GroundedSemanticsSolver::new(&af);
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
+        assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_credulously_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
+    }
+
+    #[test]
+    fn test_disj_skeptical_acceptance() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        att(a0,a1).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a3).
+        att(a2,a4).
+        att(a3,a2).
+        att(a3,a4).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = GroundedSemanticsSolver::new(&af);
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
     }
 }

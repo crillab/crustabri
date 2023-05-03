@@ -18,7 +18,13 @@ where
     T: LabelType,
 {
     /// Checks the credulous acceptance of an argument.
-    fn is_credulously_accepted(&mut self, arg: &T) -> bool;
+    ///
+    /// # Panic
+    ///
+    /// If the provided argument does not belong to the argument set, this function must panic.
+    fn is_credulously_accepted(&mut self, arg: &T) -> bool {
+        self.are_credulously_accepted([arg].as_slice())
+    }
 
     /// Checks the credulous acceptance of an argument, and provide a certificate if it is the case.
     ///
@@ -28,10 +34,33 @@ where
     ///
     /// # Panic
     ///
-    /// If the provided argument does not belong to the argument set, this function must panic.
+    /// If the provided arguments does not belong to the argument set, this function must panic.
     fn is_credulously_accepted_with_certificate(
         &mut self,
         arg: &T,
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
+        self.are_credulously_accepted_with_certificate([arg].as_slice())
+    }
+
+    /// Checks the credulous acceptance of a disjunction of arguments.
+    ///
+    /// # Panic
+    ///
+    /// If one of the provided argument does not belong to the argument set, this function must panic.
+    fn are_credulously_accepted(&mut self, args: &[&T]) -> bool;
+
+    /// Checks the credulous acceptance of a disjunction of arguments, and provide a certificate if it is the case.
+    ///
+    /// The certificate is set to `None` if the result of the test is `false`.
+    /// Otherwise, the certificate is provided as a set of arguments.
+    /// The exact nature of this certificate depends on underlying semantics.
+    ///
+    /// # Panic
+    ///
+    /// If one of the provided arguments does not belong to the argument set, this function must panic.
+    fn are_credulously_accepted_with_certificate(
+        &mut self,
+        args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>);
 }
 
@@ -41,7 +70,13 @@ where
     T: LabelType,
 {
     /// Checks the skeptical acceptance of an argument.
-    fn is_skeptically_accepted(&mut self, arg: &T) -> bool;
+    ///
+    /// # Panic
+    ///
+    /// If the provided argument does not belong to the argument set, this function must panic.
+    fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
+        self.are_skeptically_accepted([arg].as_slice())
+    }
 
     /// Checks the skeptical acceptance of an argument, and provide a certificate if it is the case.
     ///
@@ -55,5 +90,28 @@ where
     fn is_skeptically_accepted_with_certificate(
         &mut self,
         arg: &T,
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
+        self.are_skeptically_accepted_with_certificate([arg].as_slice())
+    }
+
+    /// Checks the skeptical acceptance of a disjunction of arguments.
+    ///
+    /// # Panic
+    ///
+    /// If one of the provided arguments does not belong to the argument set, this function must panic.
+    fn are_skeptically_accepted(&mut self, args: &[&T]) -> bool;
+
+    /// Checks the skeptical acceptance of a disjunction of arguments, and provide a certificate if it is the case.
+    ///
+    /// The certificate is set to `None` if the result of the test is `true`.
+    /// Otherwise, the certificate is provided as a set of arguments.
+    /// The exact nature of this certificate depends on underlying semantics.
+    ///
+    /// /// # Panic
+    ///
+    /// If one of the provided arguments does not belong to the argument set, this function must panic.
+    fn are_skeptically_accepted_with_certificate(
+        &mut self,
+        args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>);
 }

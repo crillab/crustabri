@@ -48,9 +48,8 @@ where
         assignment
             .iter()
             .filter(|(_, val)| val.unwrap_or(false))
-            .map(|(v, _)| {
-                af.argument_set()
-                    .get_argument_by_id(arg_id_from_solver_var(v))
+            .filter_map(|(v, _)| {
+                arg_id_from_solver_var(af, v).map(|id| af.argument_set().get_argument_by_id(id))
             })
             .collect()
     }
@@ -64,6 +63,13 @@ fn arg_id_to_solver_var(id: usize) -> usize {
     id + 1
 }
 
-fn arg_id_from_solver_var(var: usize) -> usize {
-    var - 1
+fn arg_id_from_solver_var<T>(af: &AAFramework<T>, var: usize) -> Option<usize>
+where
+    T: LabelType,
+{
+    if var <= af.n_arguments() {
+        Some(var - 1)
+    } else {
+        None
+    }
 }

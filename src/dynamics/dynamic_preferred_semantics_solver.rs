@@ -92,13 +92,13 @@ impl<T> CredulousAcceptanceComputer<T> for DynamicPreferredSemanticsSolver<T>
 where
     T: LabelType,
 {
-    fn is_credulously_accepted(&mut self, _arg: &T) -> bool {
+    fn are_credulously_accepted(&mut self, _args: &[&T]) -> bool {
         unimplemented!()
     }
 
-    fn is_credulously_accepted_with_certificate(
+    fn are_credulously_accepted_with_certificate(
         &mut self,
-        _arg: &T,
+        _args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>) {
         unimplemented!()
     }
@@ -108,7 +108,11 @@ impl<T> SkepticalAcceptanceComputer<T> for DynamicPreferredSemanticsSolver<T>
 where
     T: LabelType,
 {
-    fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
+    fn are_skeptically_accepted(&mut self, args: &[&T]) -> bool {
+        if args.len() > 1 {
+            panic!("acceptance queries for more than one argument are not available for dynamic solvers");
+        }
+        let arg = args[0];
         if let Some(b) = self.buffered_encoder.is_skeptically_accepted(arg) {
             return b;
         }
@@ -223,9 +227,9 @@ where
         result
     }
 
-    fn is_skeptically_accepted_with_certificate(
+    fn are_skeptically_accepted_with_certificate(
         &mut self,
-        _arg: &T,
+        _args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>) {
         unimplemented!()
     }

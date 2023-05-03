@@ -29,19 +29,24 @@ where
         c
     }
 
-    /// Computes the connected component in which the provided argument belongs.
+    /// Computes and merge the connected component in which the provided arguments belongs.
     ///
-    /// The argument must exist, and the related connected component must not have been computed yet.
+    /// The arguments must exist, and the related connected component must not have been computed yet.
     ///
     /// # Panics
     ///
-    /// If the argument does not exist, or if the connected component containing the argument has already been computed,
+    /// If the argument does not exist, or if the connected component containing one of the argument has already been computed,
     /// this function panics.
-    pub fn connected_component_of(&mut self, arg: &'a Argument<T>) -> AAFramework<T> {
-        if self.in_connected_components[arg.id()] {
+    pub fn merged_connected_components_of(&mut self, args: &[&'a Argument<T>]) -> AAFramework<T> {
+        if args.iter().any(|a| self.in_connected_components[a.id()]) {
             panic!("this connected component was already computed");
         }
-        let connected_component = self.find_connected_component_of(arg);
+        let mut connected_component = Vec::new();
+        args.iter().for_each(|a| {
+            if !self.in_connected_components[a.id()] {
+                connected_component.append(&mut self.find_connected_component_of(a))
+            }
+        });
         self.extract_connected_component(&connected_component)
     }
 
@@ -162,6 +167,15 @@ mod tests {
     use super::*;
     use crate::io::{AspartixReader, AspartixWriter, InstanceReader};
     use std::io::Cursor;
+
+    impl<'a, T> ConnectedComponentsComputer<'a, T>
+    where
+        T: LabelType,
+    {
+        fn connected_component_of(&mut self, arg: &'a Argument<T>) -> AAFramework<T> {
+            self.merged_connected_components_of(&vec![arg])
+        }
+    }
 
     #[test]
     fn test_connected_components_of() {

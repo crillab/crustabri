@@ -1,7 +1,8 @@
 use super::specs::CredulousAcceptanceComputer;
 use crate::aa::{AAFramework, Argument};
 use crate::encodings::{aux_var_constraints_encoder, ConstraintsEncoder};
-use crate::utils::LabelType;
+use crate::sat::Literal;
+use crate::utils::{Label, LabelType};
 use crate::{
     sat::{self, SatSolverFactoryFn},
     utils::ConnectedComponentsComputer,
@@ -144,35 +145,55 @@ impl<T> CredulousAcceptanceComputer<T> for CompleteSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_credulously_accepted(&mut self, arg: &T) -> bool {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
+    fn are_credulously_accepted(&mut self, args: &[&T]) -> bool {
+        let args = args
+            .iter()
+            .map(|a| self.af.argument_set().get_argument(a).unwrap())
+            .collect::<Vec<&Label<T>>>();
         let mut solver = (self.solver_factory)();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
-        let reduced_af = cc_computer.connected_component_of(arg);
+        let reduced_af = cc_computer.merged_connected_components_of(&args);
         self.constraints_encoder
             .encode_constraints(&reduced_af, solver.as_mut());
-        let arg_in_reduced_af = reduced_af.argument_set().get_argument(arg.label()).unwrap();
-        solver
-            .solve_under_assumptions(&[self.constraints_encoder.arg_to_lit(arg_in_reduced_af)])
+        let selector = Literal::from(1 + solver.n_vars() as isize);
+        let clause = args
+            .iter()
+            .map(|a| {
+                self.constraints_encoder
+                    .arg_to_lit(reduced_af.argument_set().get_argument(a.label()).unwrap())
+            })
+            .chain(std::iter::once(Literal::from(selector.negate())))
+            .collect::<Vec<Literal>>();
+        solver.add_clause(clause);
+        let result = solver
+            .solve_under_assumptions(&[selector])
             .unwrap_model()
-            .is_some()
+            .is_some();
+        solver.add_clause(vec![selector.negate()]);
+        result
     }
 
-    fn is_credulously_accepted_with_certificate(
+    fn are_credulously_accepted_with_certificate(
         &mut self,
-        arg: &T,
+        args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>) {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
+        let args = args
+            .iter()
+            .map(|a| self.af.argument_set().get_argument(a).unwrap())
+            .collect::<Vec<&Label<T>>>();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
-        let reduced_af = cc_computer.connected_component_of(arg);
+        let reduced_af = cc_computer.merged_connected_components_of(&args);
         let mut solver = (self.solver_factory)();
         self.constraints_encoder
             .encode_constraints(&reduced_af, solver.as_mut());
-        let arg_in_reduced_af = reduced_af.argument_set().get_argument(arg.label()).unwrap();
-        match solver
-            .solve_under_assumptions(&[self.constraints_encoder.arg_to_lit(arg_in_reduced_af)])
-            .unwrap_model()
-        {
+        let assumptions = args
+            .iter()
+            .map(|a| {
+                self.constraints_encoder
+                    .arg_to_lit(reduced_af.argument_set().get_argument(a.label()).unwrap())
+            })
+            .collect::<Vec<Literal>>();
+        match solver.solve_under_assumptions(&assumptions).unwrap_model() {
             Some(model) => {
                 let cc_ext = self
                     .constraints_encoder
@@ -335,6 +356,38 @@ mod tests {
         expected.push("a30".to_string());
         expected.sort_unstable();
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn [< test_disj_credulous_acceptance_ $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        att(a0,a1).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a3).
+        att(a2,a4).
+        att(a3,a2).
+        att(a3,a4).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver =
+            CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
     }
     }
     };

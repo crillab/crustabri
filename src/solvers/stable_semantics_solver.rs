@@ -4,8 +4,8 @@ use super::specs::{
 use crate::{
     aa::{AAFramework, Argument},
     encodings::{ConstraintsEncoder, DefaultStableConstraintsEncoder},
-    sat::{self, SatSolverFactoryFn},
-    utils::{ConnectedComponentsComputer, LabelType},
+    sat::{self, Literal, SatSolverFactoryFn},
+    utils::{ConnectedComponentsComputer, Label, LabelType},
 };
 
 /// A SAT-based solver for the stable semantics.
@@ -94,7 +94,7 @@ where
 
     fn acceptance_with_model(
         &mut self,
-        arg: &Argument<T>,
+        args: &[&Argument<T>],
         assumption_polarity: bool,
         status_on_unsat: bool,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
@@ -103,33 +103,34 @@ where
             let mut solver = (self.solver_factory)();
             self.constraints_encoder
                 .encode_constraints(&cc_af, solver.as_mut());
-            match cc_af.argument_set().get_argument(arg.label()) {
-                Ok(cc_arg) => {
-                    let mut assumption_lit = self.constraints_encoder.arg_to_lit(cc_arg);
-                    if !assumption_polarity {
-                        assumption_lit = assumption_lit.negate()
-                    }
-                    match solver
-                        .solve_under_assumptions(&[assumption_lit])
-                        .unwrap_model()
-                    {
-                        Some(assignment) => {
-                            let cc_ext = self
-                                .constraints_encoder
-                                .assignment_to_extension(&assignment, &cc_af);
-                            merged.append(
-                                &mut cc_ext
-                                    .iter()
-                                    .map(|cc_arg| {
-                                        self.af.argument_set().get_argument(cc_arg.label()).unwrap()
-                                    })
-                                    .collect::<Vec<&Argument<T>>>(),
-                            );
-                        }
-                        None => return (status_on_unsat, None),
-                    }
+            let args_in_cc = args
+                .iter()
+                .filter_map(|a| cc_af.argument_set().get_argument(a.label()).ok())
+                .collect::<Vec<&Label<T>>>();
+            if !args_in_cc.is_empty() {
+                let mut opt_selector = None;
+                let assumption_lits = if assumption_polarity {
+                    let selector = Literal::from(1 + solver.n_vars() as isize);
+                    let clause = args_in_cc
+                        .iter()
+                        .map(|a| self.constraints_encoder.arg_to_lit(a))
+                        .collect::<Vec<Literal>>();
+                    opt_selector = Some(selector);
+                    solver.add_clause(clause);
+                    vec![selector]
+                } else {
+                    args_in_cc
+                        .iter()
+                        .map(|a| self.constraints_encoder.arg_to_lit(a).negate())
+                        .collect::<Vec<Literal>>()
+                };
+                let result = solver
+                    .solve_under_assumptions(&assumption_lits)
+                    .unwrap_model();
+                if assumption_polarity {
+                    solver.add_clause(vec![opt_selector.unwrap().negate()]);
                 }
-                Err(_) => match solver.solve().unwrap_model() {
+                match result {
                     Some(assignment) => {
                         let cc_ext = self
                             .constraints_encoder
@@ -144,7 +145,24 @@ where
                         );
                     }
                     None => return (status_on_unsat, None),
-                },
+                }
+            } else {
+                match solver.solve().unwrap_model() {
+                    Some(assignment) => {
+                        let cc_ext = self
+                            .constraints_encoder
+                            .assignment_to_extension(&assignment, &cc_af);
+                        merged.append(
+                            &mut cc_ext
+                                .iter()
+                                .map(|cc_arg| {
+                                    self.af.argument_set().get_argument(cc_arg.label()).unwrap()
+                                })
+                                .collect::<Vec<&Argument<T>>>(),
+                        );
+                    }
+                    None => return (status_on_unsat, None),
+                }
             }
         }
         (!status_on_unsat, Some(merged))
@@ -186,16 +204,19 @@ impl<T> CredulousAcceptanceComputer<T> for StableSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_credulously_accepted(&mut self, arg: &T) -> bool {
-        self.is_credulously_accepted_with_certificate(arg).0
+    fn are_credulously_accepted(&mut self, args: &[&T]) -> bool {
+        self.are_credulously_accepted_with_certificate(args).0
     }
 
-    fn is_credulously_accepted_with_certificate(
+    fn are_credulously_accepted_with_certificate(
         &mut self,
-        arg: &T,
+        args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>) {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
-        self.acceptance_with_model(arg, true, false)
+        let args = args
+            .iter()
+            .map(|a| self.af.argument_set().get_argument(a).unwrap())
+            .collect::<Vec<&Argument<T>>>();
+        self.acceptance_with_model(&args, true, false)
     }
 }
 
@@ -203,16 +224,19 @@ impl<T> SkepticalAcceptanceComputer<T> for StableSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
-        self.is_skeptically_accepted_with_certificate(arg).0
+    fn are_skeptically_accepted(&mut self, args: &[&T]) -> bool {
+        self.are_skeptically_accepted_with_certificate(args).0
     }
 
-    fn is_skeptically_accepted_with_certificate(
+    fn are_skeptically_accepted_with_certificate(
         &mut self,
-        arg: &T,
+        args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>) {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
-        self.acceptance_with_model(arg, false, true)
+        let args = args
+            .iter()
+            .map(|a| self.af.argument_set().get_argument(a).unwrap())
+            .collect::<Vec<&Argument<T>>>();
+        self.acceptance_with_model(&args, false, true)
     }
 }
 
@@ -395,5 +419,67 @@ mod tests {
         assert!(!solver.is_credulously_accepted(&"a1".to_string()));
         assert!(solver.is_skeptically_accepted(&"a0".to_string()));
         assert!(solver.is_skeptically_accepted(&"a1".to_string()));
+    }
+
+    #[test]
+    fn test_disj_credulous_acceptance() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        att(a0,a1).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a3).
+        att(a2,a4).
+        att(a3,a2).
+        att(a3,a4).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StableSemanticsSolver::new(&af);
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
+    }
+
+    #[test]
+    fn test_disj_skeptical_acceptance() {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        att(a0,a1).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a3).
+        att(a2,a4).
+        att(a3,a2).
+        att(a3,a4).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = StableSemanticsSolver::new(&af);
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
+        assert!(solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
     }
 }

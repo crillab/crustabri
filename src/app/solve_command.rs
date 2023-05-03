@@ -107,7 +107,8 @@ where
         .context("while parsing the argument passed to the command line")?;
     let (query, semantics) =
         Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
-    check_arg_definition(query, &arg)?;
+    let args = arg.map(|a| vec![a]);
+    check_args_definition(query, args.as_ref())?;
     let mut out = std::io::stdout();
     let mut acceptance_status_writer = |status, opt_certificate: Option<Vec<&Argument<T>>>| {
         writer.write_acceptance_status(&mut out, status)?;
@@ -132,14 +133,14 @@ where
         Query::DC => check_credulous_acceptance(
             effective_af.af(),
             semantics,
-            effective_af.effective_arg(arg.unwrap()),
+            effective_af.effective_args(vec![arg.unwrap()]),
             arg_matches,
             &mut acceptance_status_writer,
         ),
         Query::DS => check_skeptical_acceptance(
             effective_af.af(),
             semantics,
-            effective_af.effective_arg(arg.unwrap()),
+            effective_af.effective_args(vec![arg.unwrap()]),
             arg_matches,
             &mut acceptance_status_writer,
         ),
@@ -150,19 +151,27 @@ fn execute_for_iccma23_aba(arg_matches: &crusti_app_helper::ArgMatches<'_>) -> R
     let file = arg_matches.value_of(common::ARG_INPUT).unwrap();
     let aba = common::read_file_path_with(file, &|r| Iccma23ABAReader::default().read(r))?;
     let instantiation = ABAFrameworkInstantiation::instantiate(&aba);
-    let arg = arg_matches
+    let atom = arg_matches
         .value_of(ARG_ARG)
         .map(|a| {
             a.parse::<usize>()
                 .map_err(|_| anyhow!("no such assumption: {}", a))
                 .and_then(|n| aba.language().get_atom(&n))
-                .map(|assumption| instantiation.aba_assumption_to_instantiated_arg(assumption))
         })
         .transpose()
         .context("while parsing the argument passed to the command line")?;
+    let args = if let Some(a) = atom {
+        if aba.is_assumption(a.label()).unwrap() {
+            Some(vec![instantiation.aba_assumption_to_instantiated_arg(a)])
+        } else {
+            todo!()
+        }
+    } else {
+        None
+    };
     let (query, semantics) =
         Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
-    check_arg_definition(query, &arg)?;
+    check_args_definition(query, args.as_ref())?;
     let af = instantiation.instantiated();
     let writer = Iccma23ABAWriter::default();
     let mut out = std::io::stdout();
@@ -185,14 +194,14 @@ fn execute_for_iccma23_aba(arg_matches: &crusti_app_helper::ArgMatches<'_>) -> R
         Query::DC => check_credulous_acceptance(
             effective_af.af(),
             semantics,
-            effective_af.effective_arg(arg.unwrap()),
+            effective_af.effective_args(args.unwrap()),
             arg_matches,
             &mut |b, _| writer.write_acceptance_status(&mut out, b),
         ),
         Query::DS => check_skeptical_acceptance(
             effective_af.af(),
             semantics,
-            effective_af.effective_arg(arg.unwrap()),
+            effective_af.effective_args(args.unwrap()),
             arg_matches,
             &mut |b, _| writer.write_acceptance_status(&mut out, b),
         ),
@@ -242,11 +251,13 @@ where
         }
     }
 
-    fn effective_arg<'b>(&'b self, arg: &'a Label<T>) -> &'b Label<T> {
+    fn effective_args<'b>(&'b self, args: Vec<&'a Label<T>>) -> Vec<&'b Label<T>> {
         if let Some(reducer) = &self.af_reducer {
-            reducer.init_to_reduced_arg(arg)
+            args.iter()
+                .map(|a| reducer.init_to_reduced_arg(a))
+                .collect()
         } else {
-            arg
+            args
         }
     }
 }
@@ -269,13 +280,13 @@ fn external_sat_solver_args() -> Vec<Arg<'static, 'static>> {
     ]
 }
 
-fn check_arg_definition<T>(query: Query, arg: &Option<&Argument<T>>) -> Result<()>
+fn check_args_definition<T>(query: Query, args: Option<&Vec<&Argument<T>>>) -> Result<()>
 where
     T: LabelType,
 {
     match query {
         Query::SE => {
-            if arg.is_some() {
+            if args.is_some() {
                 warn!(
                     "unexpected argument on the command line (useless for query {})",
                     query.as_ref()
@@ -284,7 +295,7 @@ where
             Ok(())
         }
         Query::DC | Query::DS => {
-            if arg.is_none() {
+            if args.is_none() {
                 Err(anyhow!(
                     "missing argument on the command line (required for query {})",
                     query.as_ref()
@@ -350,7 +361,7 @@ where
 fn check_credulous_acceptance<F, T>(
     af: &AAFramework<T>,
     semantics: Semantics,
-    arg: &Argument<T>,
+    args: Vec<&Argument<T>>,
     arg_matches: &ArgMatches<'_>,
     writing_fn: &mut F,
 ) -> Result<()>
@@ -398,11 +409,13 @@ where
     };
     let with_certificate = arg_matches.is_present(ARG_CERTIFICATE);
     if with_certificate {
-        let (acceptance_status, certificate) =
-            solver.is_credulously_accepted_with_certificate(arg.label());
+        let (acceptance_status, certificate) = solver.are_credulously_accepted_with_certificate(
+            &args.iter().map(|a| a.label()).collect::<Vec<&T>>(),
+        );
         (writing_fn)(acceptance_status, certificate)
     } else {
-        let acceptance_status = solver.is_credulously_accepted(arg.label());
+        let acceptance_status =
+            solver.are_credulously_accepted(&args.iter().map(|a| a.label()).collect::<Vec<&T>>());
         (writing_fn)(acceptance_status, None)
     }
 }
@@ -410,7 +423,7 @@ where
 fn check_skeptical_acceptance<F, T>(
     af: &AAFramework<T>,
     semantics: Semantics,
-    arg: &Argument<T>,
+    args: Vec<&Argument<T>>,
     arg_matches: &ArgMatches<'_>,
     writing_fn: &mut F,
 ) -> Result<()>
@@ -458,11 +471,13 @@ where
     };
     let with_certificate = arg_matches.is_present(ARG_CERTIFICATE);
     if with_certificate {
-        let (acceptance_status, certificate) =
-            solver.is_skeptically_accepted_with_certificate(arg.label());
+        let (acceptance_status, certificate) = solver.are_skeptically_accepted_with_certificate(
+            &args.iter().map(|a| a.label()).collect::<Vec<&T>>(),
+        );
         (writing_fn)(acceptance_status, certificate)
     } else {
-        let acceptance_status = solver.is_skeptically_accepted(arg.label());
+        let acceptance_status =
+            solver.are_skeptically_accepted(&args.iter().map(|a| a.label()).collect::<Vec<&T>>());
         (writing_fn)(acceptance_status, None)
     }
 }

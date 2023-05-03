@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use super::{
     maximal_extension_computer::{self, MaximalExtensionComputerState},
     SingleExtensionComputer, SkepticalAcceptanceComputer,
@@ -8,8 +6,9 @@ use crate::{
     aa::{AAFramework, Argument},
     encodings::{aux_var_constraints_encoder, ConstraintsEncoder},
     sat::{self, SatSolver, SatSolverFactoryFn},
-    utils::{ConnectedComponentsComputer, LabelType},
+    utils::{ConnectedComponentsComputer, Label, LabelType},
 };
+use std::{cell::RefCell, rc::Rc};
 
 /// A SAT-based solver for the preferred semantics.
 ///
@@ -126,10 +125,13 @@ where
     fn is_skeptically_accepted_in_cc<'b>(
         &self,
         cc_af: &'b AAFramework<T>,
-        arg: &'a Argument<T>,
+        args: &[&'a Argument<T>],
         allow_shortcut: bool,
     ) -> (bool, Option<Vec<&'b Argument<T>>>) {
-        let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
+        let cc_args = args
+            .iter()
+            .map(|a| cc_af.argument_set().get_argument(a.label()).unwrap())
+            .collect::<Vec<&Label<T>>>();
         let solver = Rc::new(RefCell::new((self.solver_factory)()));
         self.constraints_encoder
             .encode_constraints(cc_af, solver.borrow_mut().as_mut());
@@ -142,18 +144,26 @@ where
             computer.compute_next();
             match computer.state() {
                 MaximalExtensionComputerState::Maximal => {
-                    if !computer.current().contains(&cc_arg) {
+                    if !cc_args
+                        .iter()
+                        .any(|cc_arg| computer.current().contains(cc_arg))
+                    {
                         return (false, Some(computer.take_current()));
                     }
                 }
                 MaximalExtensionComputerState::Intermediate => {
                     let current = computer.current();
-                    if current.contains(&cc_arg) {
+                    if cc_args
+                        .iter()
+                        .any(|cc_arg: &&Label<T>| current.contains(cc_arg))
+                    {
                         computer.discard_current_search();
                     } else if allow_shortcut
-                        && cc_af
-                            .iter_attacks_to(cc_arg)
-                            .any(|att| current.contains(&att.attacker()))
+                        && cc_args.iter().all(|cc_arg| {
+                            cc_af
+                                .iter_attacks_to(cc_arg)
+                                .any(|att| current.contains(&att.attacker()))
+                        })
                     {
                         return (false, Some(computer.take_current()));
                     }
@@ -219,22 +229,28 @@ impl<T> SkepticalAcceptanceComputer<T> for PreferredSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
+    fn are_skeptically_accepted(&mut self, args: &[&T]) -> bool {
+        let args = args
+            .iter()
+            .map(|a| self.af.argument_set().get_argument(a).unwrap())
+            .collect::<Vec<&Label<T>>>();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
-        let cc_af = cc_computer.connected_component_of(arg);
-        self.is_skeptically_accepted_in_cc(&cc_af, arg, true).0
+        let cc_af = cc_computer.merged_connected_components_of(&args);
+        self.is_skeptically_accepted_in_cc(&cc_af, &args, true).0
     }
 
-    fn is_skeptically_accepted_with_certificate(
+    fn are_skeptically_accepted_with_certificate(
         &mut self,
-        arg: &T,
+        args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>) {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
+        let args = args
+            .iter()
+            .map(|a| self.af.argument_set().get_argument(a).unwrap())
+            .collect::<Vec<&Label<T>>>();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
-        let cc_af = cc_computer.connected_component_of(arg);
+        let cc_af = cc_computer.merged_connected_components_of(&args);
         let mut merged = Vec::new();
-        let is_accepted_in_cc = self.is_skeptically_accepted_in_cc(&cc_af, arg, false);
+        let is_accepted_in_cc = self.is_skeptically_accepted_in_cc(&cc_af, &args, false);
         match is_accepted_in_cc {
             (true, None) => return (true, None),
             (false, Some(cc_ext)) => {
@@ -619,6 +635,37 @@ mod tests {
             },
         );
         assert_eq!(2, n_exts)
+    }
+
+    #[test]
+    fn [< test_disj_skeptical_acceptance_ $suffix >] () {
+        let instance = r#"
+        arg(a0).
+        arg(a1).
+        arg(a2).
+        arg(a3).
+        arg(a4).
+        att(a0,a1).
+        att(a1,a2).
+        att(a1,a3).
+        att(a2,a3).
+        att(a2,a4).
+        att(a3,a2).
+        att(a3,a4).
+        "#;
+        let reader = AspartixReader::default();
+        let af = reader.read(&mut instance.as_bytes()).unwrap();
+        let mut solver = PreferredSemanticsSolver::new(&af);
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
+        assert!(solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
     }
     }
     };

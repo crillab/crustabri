@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use super::{
     maximal_extension_computer::{self},
     CredulousAcceptanceComputer, PreferredSemanticsSolver, SingleExtensionComputer,
@@ -12,6 +10,7 @@ use crate::{
     sat::{Literal, SatSolver, SatSolverFactoryFn},
     utils::{self, ConnectedComponentsComputer, Label, LabelType},
 };
+use std::{cell::RefCell, rc::Rc};
 
 /// A SAT-based solver for the ideal semantics.
 ///
@@ -172,17 +171,17 @@ where
     fn check_credulous_acceptance_for_cc<'b>(
         &self,
         cc_af: &'b AAFramework<T>,
-        cc_arg: &'b Argument<T>,
+        cc_args: &[&'b Argument<T>],
     ) -> (bool, Option<Vec<&'b Argument<T>>>) {
         let grounded = utils::grounded_extension(cc_af);
         let solver = Rc::new(RefCell::new((self.solver_factory)()));
         let (in_all, n_in_all, n_preferred) =
             self.compute_in_all_extensions_for_cc(cc_af, &grounded, Rc::clone(&solver));
-        if !in_all[cc_arg.id()] {
+        if cc_args.iter().all(|a| !in_all[a.id()]) {
             return (false, None);
         }
         let result = |ext: Vec<&'b Argument<T>>| {
-            if ext.contains(&cc_arg) {
+            if cc_args.iter().any(|a| ext.contains(a)) {
                 (true, Some(ext))
             } else {
                 (false, None)
@@ -271,23 +270,35 @@ impl<T> CredulousAcceptanceComputer<T> for IdealSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_credulously_accepted(&mut self, arg: &T) -> bool {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
+    fn are_credulously_accepted(&mut self, args: &[&T]) -> bool {
+        let args = args
+            .iter()
+            .map(|a| self.af.argument_set().get_argument(a).unwrap())
+            .collect::<Vec<&Label<T>>>();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
-        let cc_af = cc_computer.connected_component_of(arg);
-        let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
-        self.check_credulous_acceptance_for_cc(&cc_af, cc_arg).0
+        let cc_af = cc_computer.merged_connected_components_of(&args);
+        let cc_args = args
+            .iter()
+            .map(|a| cc_af.argument_set().get_argument(a.label()).unwrap())
+            .collect::<Vec<&Label<T>>>();
+        self.check_credulous_acceptance_for_cc(&cc_af, &cc_args).0
     }
 
-    fn is_credulously_accepted_with_certificate(
+    fn are_credulously_accepted_with_certificate(
         &mut self,
-        arg: &T,
+        args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>) {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
+        let args = args
+            .iter()
+            .map(|a| self.af.argument_set().get_argument(a).unwrap())
+            .collect::<Vec<&Label<T>>>();
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
-        let cc_af = cc_computer.connected_component_of(arg);
-        let cc_arg = cc_af.argument_set().get_argument(arg.label()).unwrap();
-        let cc_ext = match self.check_credulous_acceptance_for_cc(&cc_af, cc_arg) {
+        let cc_af = cc_computer.merged_connected_components_of(&args);
+        let cc_args = args
+            .iter()
+            .map(|a| cc_af.argument_set().get_argument(a.label()).unwrap())
+            .collect::<Vec<&Label<T>>>();
+        let cc_ext = match self.check_credulous_acceptance_for_cc(&cc_af, &cc_args) {
             (true, Some(ext)) => ext,
             _ => return (false, None),
         };
@@ -309,17 +320,20 @@ impl<T> SkepticalAcceptanceComputer<T> for IdealSemanticsSolver<'_, T>
 where
     T: LabelType,
 {
-    fn is_skeptically_accepted(&mut self, arg: &T) -> bool {
-        self.is_credulously_accepted(arg)
+    fn are_skeptically_accepted(&mut self, args: &[&T]) -> bool {
+        self.are_credulously_accepted(args)
     }
 
-    fn is_skeptically_accepted_with_certificate(
+    fn are_skeptically_accepted_with_certificate(
         &mut self,
-        arg: &T,
+        args: &[&T],
     ) -> (bool, Option<Vec<&Argument<T>>>) {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
+        let args = args
+            .iter()
+            .map(|a| self.af.argument_set().get_argument(a).unwrap())
+            .collect::<Vec<&Label<T>>>();
         let ext = self.compute_one_extension().unwrap();
-        if ext.contains(&arg) {
+        if args.iter().any(|a| ext.contains(a)) {
             (true, None)
         } else {
             (false, Some(ext))
@@ -578,6 +592,70 @@ mod tests {
                 expected.push("a30".to_string());
                 expected.sort_unstable();
                 assert_eq!(expected, actual);
+            }
+
+            #[test]
+            fn [< test_disj_credulous_acceptance_ $suffix >] () {
+                let instance = r#"
+                arg(a0).
+                arg(a1).
+                arg(a2).
+                arg(a3).
+                arg(a4).
+                att(a0,a1).
+                att(a1,a2).
+                att(a1,a3).
+                att(a2,a3).
+                att(a2,a4).
+                att(a3,a2).
+                att(a3,a4).
+                "#;
+                let reader = AspartixReader::default();
+                let af = reader.read(&mut instance.as_bytes()).unwrap();
+                let mut solver =
+                    IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
+                assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
+                assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
+                assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
+                assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
+                assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
+                assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
+                assert!(!solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
+                assert!(!solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
+                assert!(!solver.are_credulously_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
+            }
+
+            #[test]
+            fn [< test_disj_skeptical_acceptance_ $suffix >] () {
+                let instance = r#"
+                arg(a0).
+                arg(a1).
+                arg(a2).
+                arg(a3).
+                arg(a4).
+                att(a0,a1).
+                att(a1,a2).
+                att(a1,a3).
+                att(a2,a3).
+                att(a2,a4).
+                att(a3,a2).
+                att(a3,a4).
+                "#;
+                let reader = AspartixReader::default();
+                let af = reader.read(&mut instance.as_bytes()).unwrap();
+                let mut solver =
+                    IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
+                assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
+                assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
+                assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
+                assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
+                assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
+                assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
+                assert!(!solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
+                assert!(!solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
+                assert!(!solver.are_skeptically_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
             }
             }
         };
