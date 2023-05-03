@@ -7,9 +7,6 @@ default-run = "crustabri"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[profile.release]
-debug = true
-
 [lib]
 name = "crustabri"
 path = "src/lib.rs"
