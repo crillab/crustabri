@@ -1,7 +1,7 @@
 use super::{atom_support_computer::AtomSupport, ABAFramework, Atom};
 use crate::{
     aa::{AAFramework, Argument, ArgumentSet},
-    utils::LabelType,
+    utils::{Label, LabelType},
 };
 use std::{fmt::Display, rc::Rc};
 
@@ -56,6 +56,15 @@ where
     T: LabelType,
 {
     deduction: Rc<Deduction<'a, T>>,
+}
+
+impl<T> InstantiationLabel<'_, T>
+where
+    T: LabelType,
+{
+    pub fn claim(&self) -> &Label<T> {
+        self.deduction.claim
+    }
 }
 
 impl<'a, T> Display for InstantiationLabel<'a, T>

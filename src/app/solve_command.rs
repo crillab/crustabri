@@ -160,19 +160,24 @@ fn execute_for_iccma23_aba(arg_matches: &crusti_app_helper::ArgMatches<'_>) -> R
         })
         .transpose()
         .context("while parsing the argument passed to the command line")?;
+    let (query, semantics) =
+        Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
+    check_args_definition(query, atom.as_ref())?;
+    let af = instantiation.instantiated();
     let args = if let Some(a) = atom {
         if aba.is_assumption(a.label()).unwrap() {
             Some(vec![instantiation.aba_assumption_to_instantiated_arg(a)])
         } else {
-            todo!()
+            Some(
+                af.argument_set()
+                    .iter()
+                    .filter(|arg| arg.label().claim() == a)
+                    .collect(),
+            )
         }
     } else {
         None
     };
-    let (query, semantics) =
-        Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
-    check_args_definition(query, args.as_ref())?;
-    let af = instantiation.instantiated();
     let writer = Iccma23ABAWriter::default();
     let mut out = std::io::stdout();
     let effective_af = EffectiveAF::new(&af, semantics);
@@ -280,10 +285,7 @@ fn external_sat_solver_args() -> Vec<Arg<'static, 'static>> {
     ]
 }
 
-fn check_args_definition<T>(query: Query, args: Option<&Vec<&Argument<T>>>) -> Result<()>
-where
-    T: LabelType,
-{
+fn check_args_definition<T>(query: Query, args: Option<T>) -> Result<()> {
     match query {
         Query::SE => {
             if args.is_some() {
