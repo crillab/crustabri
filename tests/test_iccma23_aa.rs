@@ -19,8 +19,17 @@ fn test_answer_for_track(
     possible_answers: &[&'static str],
     additional_arg: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    test_answer_for_track_and_instance(INSTANCE, track, possible_answers, additional_arg)
+}
+
+fn test_answer_for_track_and_instance(
+    instance: &str,
+    track: &str,
+    possible_answers: &[&'static str],
+    additional_arg: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let file = NamedTempFile::new("test_instance.aa")?;
-    file.write_str(INSTANCE)?;
+    file.write_str(instance)?;
     let mut cmd = Command::cargo_bin("crustabri_iccma23")?;
     cmd.arg("-f").arg(file.path()).arg("-p").arg(track);
     if let Some(a) = additional_arg {
@@ -394,4 +403,14 @@ fn test_ideal_ds_3() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_ideal_ds_4() -> Result<(), Box<dyn std::error::Error>> {
     test_answer_for_track("DS-ID", &["YES\n"], Some("4"))
+}
+
+#[test]
+fn test_stg_se_no_constraints() -> Result<(), Box<dyn std::error::Error>> {
+    test_answer_for_track_and_instance(
+        "p af 2",
+        "DC-STG",
+        &["YES\nw 1 2\n", "YES\nw 2 1\n"],
+        Some("1"),
+    )
 }
