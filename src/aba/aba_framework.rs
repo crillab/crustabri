@@ -212,12 +212,6 @@ where
             ));
         }
         let contrary_index = self.language.get_atom(contrary).with_context(context)?.id();
-        if assumption_index == contrary_index {
-            return Err(anyhow!(
-                "assumption defined as its own contrary: {}",
-                assumption
-            ));
-        }
         match self.atom_type[assumption_index] {
             AtomType::Assumption { .. } => {
                 return Err(anyhow!(
@@ -482,14 +476,6 @@ mod tests {
         f.new_assumption(&"a", &"b").unwrap();
         assert_eq!(1, f.n_assumptions());
         assert_eq!(AtomType::Assumption { contrary_index: 1 }, f.atom_type[0]);
-    }
-
-    #[test]
-    fn test_new_assumption_own_contrary() {
-        let atoms = vec!["a", "b", "c"];
-        let l = Language::new_with_labels(&atoms);
-        let mut f = ABAFramework::new_with_language(l);
-        f.new_assumption(&"a", &"a").unwrap_err();
     }
 
     #[test]

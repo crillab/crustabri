@@ -324,3 +324,22 @@ fn add_attacks<'a, T>(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::aba::Iccma23ABAReader;
+
+    #[test]
+    fn test_assumption_is_own_contrary() {
+        let instance = "p aba 1\na 1\nc 1 1";
+        let aba = Iccma23ABAReader::default()
+            .read(&mut instance.as_bytes())
+            .unwrap();
+        let instantiation = ABAFrameworkInstantiation::instantiate(&aba);
+        assert_eq!(1, instantiation.instantiated().n_arguments());
+        assert_eq!(1, instantiation.instantiated().n_attacks());
+        let attack = instantiation.instantiated().iter_attacks().next().unwrap();
+        assert_eq!(attack.attacked().label(), attack.attacker().label());
+    }
+}
