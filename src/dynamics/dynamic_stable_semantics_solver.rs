@@ -2,7 +2,7 @@ use super::{
     buffered_dynamic_constraints_encoder::BufferedDynamicConstraintsEncoder, DynamicSolver,
 };
 use crate::{
-    aa::{Argument, Semantics},
+    aa::{AAFramework, Argument, ArgumentSet, Semantics},
     sat::{self, SatSolver, SatSolverFactoryFn},
     solvers::{CredulousAcceptanceComputer, SkepticalAcceptanceComputer},
     utils::LabelType,
@@ -15,6 +15,7 @@ pub struct DynamicStableSemanticsSolver<T>
 where
     T: LabelType,
 {
+    af: AAFramework<T>,
     buffered_encoder: BufferedDynamicConstraintsEncoder<T>,
     solver: Rc<RefCell<Box<dyn SatSolver>>>,
 }
@@ -42,6 +43,7 @@ where
     {
         let solver = Rc::new(RefCell::new((solver_factory)()));
         Self {
+            af: AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&[])),
             buffered_encoder: BufferedDynamicConstraintsEncoder::new(
                 Rc::clone(&solver),
                 Semantics::ST,
@@ -85,18 +87,29 @@ impl<T> CredulousAcceptanceComputer<T> for DynamicStableSemanticsSolver<T>
 where
     T: LabelType,
 {
-    fn are_credulously_accepted(&mut self, args: &[&T]) -> bool {
+    fn are_credulously_accepted_with_certificate(
+        &mut self,
+        args: &[&T],
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
         if args.len() > 1 {
             panic!("acceptance queries for more than one argument are not available for dynamic solvers");
         }
         let arg = args[0];
-        if let Some(b) = self.buffered_encoder.is_credulously_accepted(arg) {
-            return b;
+        if let (Some(b), Some(e)) = self.buffered_encoder.is_credulously_accepted(arg) {
+            return (
+                b,
+                Some(
+                    e.iter()
+                        .map(|id| self.af.argument_set().get_argument_by_id(*id))
+                        .collect(),
+                ),
+            );
         }
+        self.buffered_encoder.update_encoding(&mut self.af);
         let encoder_ref = self.buffered_encoder.encoder();
         let mut assumptions = Vec::with_capacity(encoder_ref.assumptions().len() + 1);
         assumptions.append(&mut encoder_ref.assumptions().to_vec());
-        assumptions.push(encoder_ref.arg_to_lit(arg));
+        assumptions.push(encoder_ref.arg_to_lit(&self.af, arg));
         match self
             .solver
             .borrow_mut()
@@ -108,32 +121,33 @@ where
                     .iter()
                     .filter_map(|(v, b)| {
                         if b != Some(false) {
-                            if let Some(arg) = encoder_ref.solver_var_to_arg(v) {
+                            if let Some(arg) = encoder_ref.solver_var_to_arg(&self.af, v) {
                                 return Some(arg.label().clone());
                             }
                         }
                         None
                     })
                     .collect();
+                let extension = encoder_ref.assignment_to_extension(&self.af, m);
                 std::mem::drop(encoder_ref);
-                self.buffered_encoder
-                    .add_credulous_computation(proved_accepted, vec![]);
-                true
+                self.buffered_encoder.add_credulous_computation(
+                    proved_accepted,
+                    vec![],
+                    Some(extension.clone()),
+                );
+                (true, Some(extension))
             }
             None => {
                 std::mem::drop(encoder_ref);
                 self.buffered_encoder
-                    .add_credulous_computation(vec![], vec![arg.clone()]);
-                false
+                    .add_credulous_computation(vec![], vec![arg.clone()], None);
+                (false, None)
             }
         }
     }
 
-    fn are_credulously_accepted_with_certificate(
-        &mut self,
-        _args: &[&T],
-    ) -> (bool, Option<Vec<&Argument<T>>>) {
-        unimplemented!()
+    fn are_credulously_accepted(&mut self, args: &[&T]) -> bool {
+        self.are_credulously_accepted_with_certificate(args).0
     }
 }
 
@@ -141,18 +155,29 @@ impl<T> SkepticalAcceptanceComputer<T> for DynamicStableSemanticsSolver<T>
 where
     T: LabelType,
 {
-    fn are_skeptically_accepted(&mut self, args: &[&T]) -> bool {
+    fn are_skeptically_accepted_with_certificate(
+        &mut self,
+        args: &[&T],
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
         if args.len() > 1 {
             panic!("acceptance queries for more than one argument are not available for dynamic solvers");
         }
         let arg = args[0];
-        if let Some(b) = self.buffered_encoder.is_skeptically_accepted(arg) {
-            return b;
+        if let (Some(b), Some(e)) = self.buffered_encoder.is_skeptically_accepted(arg) {
+            return (
+                b,
+                Some(
+                    e.iter()
+                        .map(|id| self.af.argument_set().get_argument_by_id(*id))
+                        .collect(),
+                ),
+            );
         }
+        self.buffered_encoder.update_encoding(&mut self.af);
         let encoder_ref = self.buffered_encoder.encoder();
         let mut assumptions = Vec::with_capacity(encoder_ref.assumptions().len() + 1);
         assumptions.append(&mut encoder_ref.assumptions().to_vec());
-        assumptions.push(encoder_ref.arg_to_lit(arg).negate());
+        assumptions.push(encoder_ref.arg_to_lit(&self.af, arg).negate());
         match self
             .solver
             .borrow_mut()
@@ -164,37 +189,41 @@ where
                     .iter()
                     .filter_map(|(v, b)| {
                         if b != Some(true) {
-                            if let Some(arg) = encoder_ref.solver_var_to_arg(v) {
+                            if let Some(arg) = encoder_ref.solver_var_to_arg(&self.af, v) {
                                 return Some(arg.label().clone());
                             }
                         }
                         None
                     })
                     .collect();
+                let extension = encoder_ref.assignment_to_extension(&self.af, m);
                 std::mem::drop(encoder_ref);
-                self.buffered_encoder
-                    .add_skeptical_computation(vec![], proved_refused);
-                false
+                self.buffered_encoder.add_skeptical_computation(
+                    vec![],
+                    proved_refused,
+                    Some(extension.clone()),
+                );
+                (false, Some(extension))
             }
             None => {
-                let proved_refused = encoder_ref
-                    .af()
-                    .iter_attacks_from(encoder_ref.af().argument_set().get_argument(arg).unwrap())
+                let proved_refused = self
+                    .af
+                    .iter_attacks_from(self.af.argument_set().get_argument(arg).unwrap())
                     .map(|att| att.attacked().label().clone())
                     .collect();
                 std::mem::drop(encoder_ref);
-                self.buffered_encoder
-                    .add_skeptical_computation(vec![arg.clone()], proved_refused);
-                true
+                self.buffered_encoder.add_skeptical_computation(
+                    vec![arg.clone()],
+                    proved_refused,
+                    None,
+                );
+                (true, None)
             }
         }
     }
 
-    fn are_skeptically_accepted_with_certificate(
-        &mut self,
-        _args: &[&T],
-    ) -> (bool, Option<Vec<&Argument<T>>>) {
-        unimplemented!()
+    fn are_skeptically_accepted(&mut self, args: &[&T]) -> bool {
+        return self.are_skeptically_accepted_with_certificate(args).0;
     }
 }
 

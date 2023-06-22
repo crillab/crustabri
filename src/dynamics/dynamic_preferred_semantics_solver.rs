@@ -3,7 +3,7 @@ use super::{
     dynamic_constraints_encoder::DynamicConstraintsEncoder, DynamicSolver,
 };
 use crate::{
-    aa::{AAFramework, Argument, Semantics},
+    aa::{AAFramework, Argument, ArgumentSet, Semantics},
     encodings::ConstraintsEncoder,
     sat::{self, Assignment, Literal, SatSolver, SatSolverFactoryFn},
     solvers::{
@@ -22,6 +22,7 @@ pub struct DynamicPreferredSemanticsSolver<T>
 where
     T: LabelType,
 {
+    af: AAFramework<T>,
     buffered_encoder: BufferedDynamicConstraintsEncoder<T>,
     solver: Rc<RefCell<Box<dyn SatSolver>>>,
 }
@@ -49,6 +50,7 @@ where
     {
         let solver = Rc::new(RefCell::new((solver_factory)()));
         Self {
+            af: AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&[])),
             buffered_encoder: BufferedDynamicConstraintsEncoder::new(
                 Rc::clone(&solver),
                 Semantics::PR,
@@ -108,42 +110,47 @@ impl<T> SkepticalAcceptanceComputer<T> for DynamicPreferredSemanticsSolver<T>
 where
     T: LabelType,
 {
-    fn are_skeptically_accepted(&mut self, args: &[&T]) -> bool {
+    fn are_skeptically_accepted_with_certificate(
+        &mut self,
+        args: &[&T],
+    ) -> (bool, Option<Vec<&Argument<T>>>) {
         if args.len() > 1 {
             panic!("acceptance queries for more than one argument are not available for dynamic solvers");
         }
         let arg = args[0];
-        if let Some(b) = self.buffered_encoder.is_skeptically_accepted(arg) {
-            return b;
+        if let (Some(b), Some(e)) = self.buffered_encoder.is_skeptically_accepted(arg) {
+            return (
+                b,
+                Some(
+                    e.iter()
+                        .map(|id| self.af.argument_set().get_argument_by_id(*id))
+                        .collect(),
+                ),
+            );
         }
+        self.buffered_encoder.update_encoding(&mut self.af);
         let encoder_ref = self.buffered_encoder.encoder();
         let constraints_encoder = LocalConstraintsEncoder {
             encoder: &encoder_ref,
+            af: &self.af,
         };
         let mut computer = maximal_extension_computer::new_for_preferred_semantics(
-            encoder_ref.af(),
+            &self.af,
             Rc::clone(&self.solver),
             &constraints_encoder,
         );
         computer.set_additional_assumptions(encoder_ref.assumptions().to_vec());
-        let arg = encoder_ref.af().argument_set().get_argument(arg).unwrap();
+        let arg = self.af.argument_set().get_argument(arg).unwrap();
         let mut first_maximal = true;
         let mut in_all_maximal = None;
         let mut missing_in_one_maximal =
-            vec![false; 1 + encoder_ref.af().max_argument_id().unwrap_or_default()];
+            vec![false; 1 + self.af.max_argument_id().unwrap_or_default()];
         let bool_slice_to_labels = |v: &[bool]| {
             v.iter()
                 .enumerate()
                 .filter_map(|(i, b)| {
-                    if *b && encoder_ref.af().argument_set().has_argument_with_id(i) {
-                        Some(
-                            encoder_ref
-                                .af()
-                                .argument_set()
-                                .get_argument_by_id(i)
-                                .label()
-                                .clone(),
-                        )
+                    if *b && self.af.argument_set().has_argument_with_id(i) {
+                        Some(self.af.argument_set().get_argument_by_id(i).label().clone())
                     } else {
                         None
                     }
@@ -151,8 +158,7 @@ where
                 .collect()
         };
         let compute_in_current_bool = |c: &MaximalExtensionComputer<T>| {
-            let mut in_current =
-                vec![false; 1 + encoder_ref.af().max_argument_id().unwrap_or_default()];
+            let mut in_current = vec![false; 1 + self.af.max_argument_id().unwrap_or_default()];
             c.current().iter().for_each(|a| {
                 in_current[a.id()] = true;
             });
@@ -161,13 +167,12 @@ where
         let add_defeated_in_current_to_missing =
             |c: &MaximalExtensionComputer<T>, m: &mut [bool]| {
                 c.current().iter().for_each(|attacker| {
-                    encoder_ref
-                        .af()
+                    self.af
                         .iter_attacks_from_id(attacker.id())
                         .for_each(|att| m[att.attacked().id()] = true);
                 });
             };
-        let (result, proved_accepted_bool, proved_refused_bool) = loop {
+        let (result, proved_accepted_bool, proved_refused_bool, extension) = loop {
             computer.compute_next();
             match computer.state() {
                 MaximalExtensionComputerState::Maximal => {
@@ -187,7 +192,12 @@ where
                     }
                     first_maximal = false;
                     if arg_is_missing {
-                        break (false, vec![], missing_in_one_maximal);
+                        break (
+                            false,
+                            vec![],
+                            missing_in_one_maximal,
+                            Some(computer.current().to_vec()),
+                        );
                     }
                 }
                 MaximalExtensionComputerState::Intermediate => {
@@ -200,12 +210,6 @@ where
                         }
                         first_maximal = false;
                         computer.discard_current_search();
-                    } else if encoder_ref
-                        .af()
-                        .iter_attacks_to(arg)
-                        .any(|att| current.contains(&att.attacker()))
-                    {
-                        break (false, vec![], missing_in_one_maximal);
                     }
                 }
                 MaximalExtensionComputerState::None => {
@@ -213,6 +217,7 @@ where
                         true,
                         in_all_maximal.unwrap_or_default(),
                         missing_in_one_maximal,
+                        None,
                     );
                 }
                 _ => {}
@@ -222,16 +227,16 @@ where
         let proved_refused = bool_slice_to_labels(&proved_refused_bool);
         std::mem::drop(computer);
         std::mem::drop(encoder_ref);
-        self.buffered_encoder
-            .add_skeptical_computation(proved_accepted, proved_refused);
-        result
+        self.buffered_encoder.add_skeptical_computation(
+            proved_accepted,
+            proved_refused,
+            extension.clone(),
+        );
+        (result, extension)
     }
 
-    fn are_skeptically_accepted_with_certificate(
-        &mut self,
-        _args: &[&T],
-    ) -> (bool, Option<Vec<&Argument<T>>>) {
-        unimplemented!()
+    fn are_skeptically_accepted(&mut self, args: &[&T]) -> bool {
+        self.are_skeptically_accepted_with_certificate(args).0
     }
 }
 
@@ -239,7 +244,8 @@ struct LocalConstraintsEncoder<'a, T>
 where
     T: LabelType,
 {
-    encoder: &'a DynamicConstraintsEncoder<T>,
+    encoder: &'a DynamicConstraintsEncoder,
+    af: &'a AAFramework<T>,
 }
 
 impl<T> ConstraintsEncoder<T> for LocalConstraintsEncoder<'_, T>
@@ -267,7 +273,7 @@ where
     }
 
     fn arg_to_lit(&self, arg: &Argument<T>) -> Literal {
-        self.encoder.arg_to_lit(arg.label())
+        self.encoder.arg_to_lit(&self.af, arg.label())
     }
 }
 

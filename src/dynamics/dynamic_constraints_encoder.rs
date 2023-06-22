@@ -1,17 +1,13 @@
 use crate::{
-    aa::{AAFramework, Argument, ArgumentSet, Semantics},
-    sat::{Literal, SatSolver},
+    aa::{AAFramework, Argument, Semantics},
+    sat::{Assignment, Literal, SatSolver},
     utils::LabelType,
 };
 use anyhow::Result;
 use std::{cell::RefCell, rc::Rc};
 
-pub struct DynamicConstraintsEncoder<T>
-where
-    T: LabelType,
-{
+pub struct DynamicConstraintsEncoder {
     semantics: Semantics,
-    af: AAFramework<T>,
     arg_id_to_solver_var: Vec<Option<usize>>,
     arg_id_to_attacker_set_selector_var: Vec<Option<usize>>,
     solver_vars: Vec<SolverVarType>,
@@ -28,17 +24,10 @@ enum SolverVarType {
     Ignored,
 }
 
-impl<T> DynamicConstraintsEncoder<T>
-where
-    T: LabelType,
-{
-    pub fn new(solver: Rc<RefCell<Box<dyn SatSolver>>>, semantics: Semantics) -> Self
-    where
-        T: LabelType,
-    {
+impl DynamicConstraintsEncoder {
+    pub fn new(solver: Rc<RefCell<Box<dyn SatSolver>>>, semantics: Semantics) -> Self {
         Self {
             semantics,
-            af: AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&[])),
             arg_id_to_solver_var: Vec::new(),
             arg_id_to_attacker_set_selector_var: Vec::new(),
             solver_vars: vec![SolverVarType::Ignored],
@@ -48,22 +37,18 @@ where
         }
     }
 
-    pub fn af(&self) -> &AAFramework<T> {
-        &self.af
-    }
-
     pub fn assumptions(&self) -> &[Literal] {
         &self.assumptions
     }
 
-    pub fn arg_to_lit(&self, arg: &T) -> Literal {
-        let arg = self.af.argument_set().get_argument(arg).unwrap();
+    pub fn arg_to_lit<T: LabelType>(&self, af: &AAFramework<T>, arg: &T) -> Literal {
+        let arg = af.argument_set().get_argument(arg).unwrap();
         Literal::from(self.arg_id_to_solver_var[arg.id()].unwrap() as isize)
     }
 
-    pub fn new_argument(&mut self, label: T) {
-        self.af.new_argument(label);
-        let arg_id = self.af.max_argument_id().unwrap();
+    pub fn new_argument<T: LabelType>(&mut self, af: &mut AAFramework<T>, label: T) {
+        af.new_argument(label);
+        let arg_id = af.max_argument_id().unwrap();
         let solver_var = self.new_solver_var(SolverVarType::Argument(arg_id));
         match self.semantics {
             Semantics::CO | Semantics::PR => {
@@ -78,7 +63,7 @@ where
         }
         self.arg_id_to_solver_var.push(Some(solver_var));
         self.arg_id_to_attacker_set_selector_var.push(None);
-        self.update_attacks_to_constraints(arg_id);
+        self.update_attacks_to_constraints(af, arg_id);
     }
 
     fn new_solver_var(&mut self, var_type: SolverVarType) -> usize {
@@ -90,7 +75,11 @@ where
         self.update_attacks_to_constraints = v;
     }
 
-    pub(crate) fn update_attacks_to_constraints(&mut self, to_arg_id: usize) {
+    pub(crate) fn update_attacks_to_constraints<T: LabelType>(
+        &mut self,
+        af: &AAFramework<T>,
+        to_arg_id: usize,
+    ) {
         if !self.update_attacks_to_constraints {
             return;
         }
@@ -103,9 +92,8 @@ where
         let attacker_set_selector_lit = Literal::from(attacker_set_selector_var as isize);
         self.assumptions.push(attacker_set_selector_lit);
         self.arg_id_to_attacker_set_selector_var[to_arg_id] = Some(attacker_set_selector_var);
-        let attackers_ids = self
-            .af
-            .iter_attacks_to(self.af.argument_set().get_argument_by_id(to_arg_id))
+        let attackers_ids = af
+            .iter_attacks_to(af.argument_set().get_argument_by_id(to_arg_id))
             .map(|att| att.attacker().id())
             .collect::<Vec<usize>>();
         match self.semantics {
@@ -200,16 +188,19 @@ where
         );
     }
 
-    pub fn remove_argument(&mut self, label: &T) -> Result<()> {
-        let arg = self.af.argument_set().get_argument(label)?;
+    pub fn remove_argument<T: LabelType>(
+        &mut self,
+        af: &mut AAFramework<T>,
+        label: &T,
+    ) -> Result<()> {
+        let arg = af.argument_set().get_argument(label)?;
         let arg_id = arg.id();
-        let attacked_constraints_to_update = self
-            .af
+        let attacked_constraints_to_update = af
             .iter_attacks_from(arg)
             .map(|att| att.attacked().id())
             .filter(|id| *id != arg_id)
             .collect::<Vec<usize>>();
-        self.af.remove_argument(label)?;
+        af.remove_argument(label)?;
         let solver_var = self.arg_id_to_solver_var[arg_id].unwrap();
         self.arg_id_to_solver_var[arg_id] = None;
         if let Some(s) = self.arg_id_to_attacker_set_selector_var[arg_id] {
@@ -222,29 +213,60 @@ where
             .add_clause(vec![Literal::from(solver_var as isize)]);
         attacked_constraints_to_update
             .iter()
-            .for_each(|id| self.update_attacks_to_constraints(*id));
+            .for_each(|id| self.update_attacks_to_constraints(af, *id));
         Ok(())
     }
 
-    pub fn new_attack(&mut self, from: &T, to: &T) -> Result<()> {
-        self.af.new_attack(from, to)?;
-        let to_id = self.af.argument_set().get_argument(to).unwrap().id();
-        self.update_attacks_to_constraints(to_id);
+    pub fn new_attack<T: LabelType>(
+        &mut self,
+        af: &mut AAFramework<T>,
+        from: &T,
+        to: &T,
+    ) -> Result<()> {
+        af.new_attack(from, to)?;
+        let to_id = af.argument_set().get_argument(to).unwrap().id();
+        self.update_attacks_to_constraints(af, to_id);
         Ok(())
     }
 
-    pub fn remove_attack(&mut self, from: &T, to: &T) -> Result<()> {
-        self.af.remove_attack(from, to)?;
-        let to_id = self.af.argument_set().get_argument(to).unwrap().id();
-        self.update_attacks_to_constraints(to_id);
+    pub fn remove_attack<T: LabelType>(
+        &mut self,
+        af: &mut AAFramework<T>,
+        from: &T,
+        to: &T,
+    ) -> Result<()> {
+        af.remove_attack(from, to)?;
+        let to_id = af.argument_set().get_argument(to).unwrap().id();
+        self.update_attacks_to_constraints(af, to_id);
         Ok(())
     }
 
-    pub fn solver_var_to_arg(&self, solver_var: usize) -> Option<&Argument<T>> {
+    pub fn solver_var_to_arg<'a, T: LabelType>(
+        &self,
+        af: &'a AAFramework<T>,
+        solver_var: usize,
+    ) -> Option<&'a Argument<T>> {
         if let SolverVarType::Argument(arg_id) = self.solver_vars[solver_var] {
-            return Some(self.af().argument_set().get_argument_by_id(arg_id));
+            return Some(af.argument_set().get_argument_by_id(arg_id));
         } else {
             None
         }
+    }
+
+    pub fn assignment_to_extension<'a, T: LabelType>(
+        &self,
+        af: &'a AAFramework<T>,
+        assignment: Assignment,
+    ) -> Vec<&'a Argument<T>> {
+        assignment
+            .iter()
+            .filter_map(|(v, b)| {
+                if b == Some(true) {
+                    self.solver_var_to_arg(af, v)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
