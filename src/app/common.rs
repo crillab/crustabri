@@ -104,6 +104,6 @@ where
 
 /// Canonicalize a path given by the user.
 pub(crate) fn canonicalize_file_path(file_path: &str) -> Result<PathBuf> {
-    fs::canonicalize(&PathBuf::from(file_path))
+    fs::canonicalize(PathBuf::from(file_path))
         .with_context(|| format!(r#"while opening file "{}""#, file_path))
 }

@@ -111,28 +111,25 @@ impl SatSolver for BufferedSatSolver {
                 set_status(false);
             } else if line.starts_with("v ") {
                 assignment_line_seen = true;
-                line.split_ascii_whitespace()
-                    .into_iter()
-                    .skip(1)
-                    .for_each(|w| {
-                        let n = match w.parse::<isize>() {
-                            Ok(n) => n,
-                            Err(_) => panic!(r#"{}: "{}" is not a literal"#, context, w),
-                        };
-                        if n == 0 {
-                            if assignment_line_end {
-                                panic!("{}: multiple zeroes on value line", context)
-                            } else {
-                                assignment_line_end = true;
-                            }
+                line.split_ascii_whitespace().skip(1).for_each(|w| {
+                    let n = match w.parse::<isize>() {
+                        Ok(n) => n,
+                        Err(_) => panic!(r#"{}: "{}" is not a literal"#, context, w),
+                    };
+                    if n == 0 {
+                        if assignment_line_end {
+                            panic!("{}: multiple zeroes on value line", context)
                         } else {
-                            let v = n.unsigned_abs() - 1;
-                            if v >= self.n_vars {
-                                panic!("{}: a variable in value line is out of bounds", context)
-                            }
-                            assignment[v] = Some(n > 0);
+                            assignment_line_end = true;
                         }
-                    });
+                    } else {
+                        let v = n.unsigned_abs() - 1;
+                        if v >= self.n_vars {
+                            panic!("{}: a variable in value line is out of bounds", context)
+                        }
+                        assignment[v] = Some(n > 0);
+                    }
+                });
             } else if !line.starts_with("c ") && line != "c" && line != "v" && !line.is_empty() {
                 panic!(r#"{}: unexpected line "{}""#, context, line)
             }

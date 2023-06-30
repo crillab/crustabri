@@ -149,7 +149,7 @@ where
             })
     }
 
-    pub fn is_credulously_accepted<'a>(&self, label: &T) -> (Option<bool>, Option<Vec<usize>>) {
+    pub fn is_credulously_accepted(&self, label: &T) -> (Option<bool>, Option<Vec<usize>>) {
         for e in self.buffer.iter().rev() {
             match e {
                 DynamicsEvent::CredulousAcceptanceComputation {
@@ -193,7 +193,7 @@ where
             })
     }
 
-    pub fn is_skeptically_accepted<'a>(&self, label: &T) -> (Option<bool>, Option<Vec<usize>>) {
+    pub fn is_skeptically_accepted(&self, label: &T) -> (Option<bool>, Option<Vec<usize>>) {
         for e in self.buffer.iter().rev() {
             match e {
                 DynamicsEvent::SkepticalAcceptanceComputation {

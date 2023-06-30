@@ -162,7 +162,7 @@ where
                 self.constraints_encoder
                     .arg_to_lit(reduced_af.argument_set().get_argument(a.label()).unwrap())
             })
-            .chain(std::iter::once(Literal::from(selector.negate())))
+            .chain(std::iter::once(selector.negate()))
             .collect::<Vec<Literal>>();
         solver.add_clause(clause);
         let result = solver
@@ -378,16 +378,16 @@ mod tests {
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver =
             CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
-        assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a1".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_credulously_accepted(&[&"a1".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a2".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a2".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a3".to_string(), &"a4".to_string()]));
     }
     }
     };

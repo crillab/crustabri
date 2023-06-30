@@ -274,7 +274,7 @@ where
         is_credulous_acceptance: bool,
     ) -> (bool, Option<Vec<&Argument<T>>>) {
         let mut cc_computer = ConnectedComponentsComputer::new(self.af);
-        let cc_af = cc_computer.merged_connected_components_of(&args);
+        let cc_af = cc_computer.merged_connected_components_of(args);
         let mut merged = Vec::new();
         match self.check_acceptance_in_cc(&cc_af, args, is_credulous_acceptance) {
             (_, None) => return (!is_credulous_acceptance, None),
@@ -340,7 +340,7 @@ where
                         let clause = cc_args
                             .iter()
                             .map(|a| self.constraints_encoder.arg_to_lit(a))
-                            .chain(std::iter::once(Literal::from(selector.negate())))
+                            .chain(std::iter::once(selector.negate()))
                             .collect::<Vec<Literal>>();
                         solver.borrow_mut().add_clause(clause);
                         assumptions.push(selector);
@@ -704,16 +704,16 @@ mod tests {
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver =
             SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
-        assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a1".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_credulously_accepted(&[&"a1".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a2".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a2".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a3".to_string(), &"a4".to_string()]));
     }
 
     #[test]
@@ -736,16 +736,16 @@ mod tests {
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver =
             SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
-        assert!(solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a1".to_string(), &"a2".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a1".to_string(), &"a4".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a2".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a2".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a3".to_string(), &"a4".to_string()]));
     }
     }
     };
@@ -962,16 +962,16 @@ mod tests {
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver =
             StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
-        assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a1".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_credulously_accepted(&[&"a1".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a2".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a2".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a3".to_string(), &"a4".to_string()]));
     }
 
     #[test]
@@ -994,16 +994,16 @@ mod tests {
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver =
             StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
-        assert!(solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a1".to_string(), &"a2".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a1".to_string(), &"a4".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a2".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a2".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a3".to_string(), &"a4".to_string()]));
     }
     }
     };

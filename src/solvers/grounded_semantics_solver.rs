@@ -184,16 +184,16 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = GroundedSemanticsSolver::new(&af);
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
-        assert!(solver.are_credulously_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
-        assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
-        assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
-        assert!(!solver.are_credulously_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
-        assert!(!solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
-        assert!(!solver.are_credulously_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
-        assert!(!solver.are_credulously_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_credulously_accepted(&[&"a1".to_string(), &"a2".to_string()]));
+        assert!(!solver.are_credulously_accepted(&[&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_credulously_accepted(&[&"a1".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_credulously_accepted(&[&"a2".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_credulously_accepted(&[&"a2".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_credulously_accepted(&[&"a3".to_string(), &"a4".to_string()]));
     }
 
     #[test]
@@ -215,15 +215,15 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let mut solver = GroundedSemanticsSolver::new(&af);
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a1".to_string()]));
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a2".to_string()]));
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a3".to_string()]));
-        assert!(solver.are_skeptically_accepted(&vec![&"a0".to_string(), &"a4".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a2".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a3".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a1".to_string(), &"a4".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a3".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a2".to_string(), &"a4".to_string()]));
-        assert!(!solver.are_skeptically_accepted(&vec![&"a3".to_string(), &"a4".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a1".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a2".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a3".to_string()]));
+        assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a1".to_string(), &"a2".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a1".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a1".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a2".to_string(), &"a3".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a2".to_string(), &"a4".to_string()]));
+        assert!(!solver.are_skeptically_accepted(&[&"a3".to_string(), &"a4".to_string()]));
     }
 }

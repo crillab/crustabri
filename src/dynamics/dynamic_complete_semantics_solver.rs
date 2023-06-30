@@ -137,7 +137,6 @@ where
                     .buffered_encoder
                     .encoder()
                     .assignment_to_extension(&self.af, m);
-                std::mem::drop(encoder_ref);
                 self.buffered_encoder.add_credulous_computation(
                     proved_accepted,
                     vec![],
@@ -146,7 +145,6 @@ where
                 (true, Some(extension))
             }
             None => {
-                std::mem::drop(encoder_ref);
                 self.buffered_encoder
                     .add_credulous_computation(vec![], vec![arg.clone()], None);
                 (false, None)

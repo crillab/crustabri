@@ -355,7 +355,7 @@ pub trait SolvingListener {
 ///
 /// This is currently the [CadicalSolver].
 pub fn default_solver() -> Box<dyn SatSolver> {
-    Box::new(CadicalSolver::default())
+    Box::<CadicalSolver>::default()
 }
 
 /// The type of solver factories.

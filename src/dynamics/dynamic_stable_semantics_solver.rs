@@ -129,7 +129,6 @@ where
                     })
                     .collect();
                 let extension = encoder_ref.assignment_to_extension(&self.af, m);
-                std::mem::drop(encoder_ref);
                 self.buffered_encoder.add_credulous_computation(
                     proved_accepted,
                     vec![],
@@ -138,7 +137,6 @@ where
                 (true, Some(extension))
             }
             None => {
-                std::mem::drop(encoder_ref);
                 self.buffered_encoder
                     .add_credulous_computation(vec![], vec![arg.clone()], None);
                 (false, None)
@@ -197,7 +195,6 @@ where
                     })
                     .collect();
                 let extension = encoder_ref.assignment_to_extension(&self.af, m);
-                std::mem::drop(encoder_ref);
                 self.buffered_encoder.add_skeptical_computation(
                     vec![],
                     proved_refused,
@@ -211,7 +208,6 @@ where
                     .iter_attacks_from(self.af.argument_set().get_argument(arg).unwrap())
                     .map(|att| att.attacked().label().clone())
                     .collect();
-                std::mem::drop(encoder_ref);
                 self.buffered_encoder.add_skeptical_computation(
                     vec![arg.clone()],
                     proved_refused,

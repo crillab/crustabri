@@ -459,14 +459,14 @@ fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Box<SatSolverFacto
         info!("using {} for problems requiring a SAT solver", s);
         Box::new(move || {
             let mut s = ExternalSatSolver::new(s.to_string(), external_solver_options.clone());
-            s.add_listener(Box::new(SatSolvingLogger::default()));
+            s.add_listener(Box::<SatSolvingLogger>::default());
             Box::new(s)
         })
     } else {
         info!("using the default SAT solver for problems requiring a SAT solver");
         Box::new(|| {
             let mut s = sat::default_solver();
-            s.add_listener(Box::new(SatSolvingLogger::default()));
+            s.add_listener(Box::<SatSolvingLogger>::default());
             s
         })
     }
@@ -511,7 +511,7 @@ where
                 "exp" => Some(Box::new(
                     exp_constraints_encoder::new_for_complete_semantics(),
                 )),
-                "hybrid" => Some(Box::new(HybridCompleteConstraintsEncoder::default())),
+                "hybrid" => Some(Box::<HybridCompleteConstraintsEncoder>::default()),
                 _ => unreachable!(),
             }
         }
@@ -522,7 +522,7 @@ where
             "exp" => Some(Box::new(
                 exp_constraints_encoder::new_for_complete_semantics(),
             )),
-            "hybrid" => Some(Box::new(HybridCompleteConstraintsEncoder::default())),
+            "hybrid" => Some(Box::<HybridCompleteConstraintsEncoder>::default()),
             _ => unreachable!(),
         },
     }

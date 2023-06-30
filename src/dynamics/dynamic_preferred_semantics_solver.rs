@@ -131,7 +131,7 @@ where
         self.buffered_encoder.update_encoding(&mut self.af);
         let encoder_ref = self.buffered_encoder.encoder();
         let constraints_encoder = LocalConstraintsEncoder {
-            encoder: &encoder_ref,
+            encoder: encoder_ref,
             af: &self.af,
         };
         let mut computer = maximal_extension_computer::new_for_preferred_semantics(
@@ -226,7 +226,6 @@ where
         let proved_accepted = bool_slice_to_labels(&proved_accepted_bool);
         let proved_refused = bool_slice_to_labels(&proved_refused_bool);
         std::mem::drop(computer);
-        std::mem::drop(encoder_ref);
         self.buffered_encoder.add_skeptical_computation(
             proved_accepted,
             proved_refused,
@@ -279,7 +278,7 @@ where
     }
 
     fn arg_to_lit(&self, arg: &Argument<T>) -> Literal {
-        self.encoder.arg_to_lit(&self.af, arg.label())
+        self.encoder.arg_to_lit(self.af, arg.label())
     }
 }
 

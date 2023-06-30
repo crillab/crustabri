@@ -173,7 +173,7 @@ mod tests {
         T: LabelType,
     {
         fn connected_component_of(&mut self, arg: &'a Argument<T>) -> AAFramework<T> {
-            self.merged_connected_components_of(&vec![arg])
+            self.merged_connected_components_of(&[arg])
         }
     }
 

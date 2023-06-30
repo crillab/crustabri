@@ -94,7 +94,7 @@ impl InstanceReader<usize> for Iccma23Reader {
     }
 }
 
-pub(crate) fn read_preamble<'a>(words: &[&'a str], expected_kind: &str) -> Result<usize> {
+pub(crate) fn read_preamble(words: &[&str], expected_kind: &str) -> Result<usize> {
     if words.len() != 3 {
         return Err(anyhow!(
             r#"error in preamble; expected 3 words, got {}"#,
