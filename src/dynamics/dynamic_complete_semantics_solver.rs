@@ -207,4 +207,13 @@ mod tests {
         assert!(solver.is_credulously_accepted(&3));
         assert!(solver.is_credulously_accepted(&4));
     }
+
+    #[test]
+    fn test_del_unencoded_arg() {
+        let mut solver = DynamicCompleteSemanticsSolver::new();
+        solver.new_argument(1);
+        solver.new_argument(2);
+        solver.remove_argument(&2).unwrap();
+        assert!(solver.is_credulously_accepted_with_certificate(&1).0);
+    }
 }

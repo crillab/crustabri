@@ -125,6 +125,7 @@ where
         self.encoder.enable_update_attacks_to_constraints(true);
         update_attacks_to
             .into_iter()
+            .filter(|id| af.argument_set().has_argument_with_id(*id))
             .for_each(|id| self.encoder.update_attacks_to_constraints(af, id));
         self.encoder.enable_update_attacks_to_constraints(false);
         self.next_to_encode.set(self.buffer.len());

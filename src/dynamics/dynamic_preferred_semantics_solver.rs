@@ -266,10 +266,16 @@ where
 
     fn assignment_to_extension<'a>(
         &self,
-        _assignment: &Assignment,
-        _af: &'a AAFramework<T>,
+        assignment: &Assignment,
+        af: &'a AAFramework<T>,
     ) -> Vec<&'a Argument<T>> {
-        unimplemented!()
+        assignment
+            .iter()
+            .filter_map(|(var, opt_v)| match opt_v {
+                Some(true) => self.encoder.solver_var_to_arg(af, var),
+                _ => None,
+            })
+            .collect()
     }
 
     fn arg_to_lit(&self, arg: &Argument<T>) -> Literal {
@@ -308,5 +314,17 @@ mod tests {
         assert!(!solver.is_skeptically_accepted(&2));
         assert!(!solver.is_skeptically_accepted(&3));
         assert!(!solver.is_skeptically_accepted(&4));
+    }
+
+    #[test]
+    fn test_wrong_witness() {
+        let mut solver = DynamicPreferredSemanticsSolver::new();
+        solver.new_argument(28);
+        assert!(solver.is_skeptically_accepted(&28));
+        solver.new_argument(41);
+        solver.new_attack(&28, &41).unwrap();
+        let (status, witness) = solver.is_skeptically_accepted_with_certificate(&41);
+        assert!(!status);
+        assert_eq!(1, witness.unwrap().len());
     }
 }

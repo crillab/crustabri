@@ -272,7 +272,13 @@ where
     T: LabelType,
 {
     let mut in_ext_bool = vec![false; n_args];
-    current.iter().for_each(|a| in_ext_bool[a.id()] = true);
+    current.iter().for_each(|a| {
+        let id = a.id();
+        if id >= in_ext_bool.len() {
+            in_ext_bool.resize(id + 1, false);
+        }
+        in_ext_bool[a.id()] = true
+    });
     let mut not_in_ext = Vec::with_capacity(n_args);
     let mut in_ext = Vec::with_capacity(n_args);
     in_ext_bool.iter().enumerate().for_each(|(i, b)| {

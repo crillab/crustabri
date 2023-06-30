@@ -246,6 +246,9 @@ impl DynamicConstraintsEncoder {
         af: &'a AAFramework<T>,
         solver_var: usize,
     ) -> Option<&'a Argument<T>> {
+        if solver_var >= self.solver_vars.len() {
+            return None;
+        }
         if let SolverVarType::Argument(arg_id) = self.solver_vars[solver_var] {
             return Some(af.argument_set().get_argument_by_id(arg_id));
         } else {
