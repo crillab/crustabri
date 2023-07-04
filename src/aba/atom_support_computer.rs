@@ -1,38 +1,6 @@
 use crate::aba::aba_framework::ABAFramework;
-use crate::aba::aba_framework::Rule;
 use crate::utils::LabelType;
-
-struct AssumptionSet {
-    data: Vec<bool>,
-    list: Vec<usize>,
-}
-
-impl AssumptionSet {
-    fn new(n_atoms: usize) -> Self {
-        AssumptionSet {
-            data: vec![false; n_atoms],
-            list: vec![],
-        }
-    }
-
-    fn add(&mut self, index: usize) {
-        if !self.data[index] {
-            self.data[index] = true;
-            self.list.push(index);
-        }
-    }
-
-    fn get(&self) -> Vec<usize> {
-        self.list.clone()
-    }
-
-    fn clear(&mut self) {
-        for i in self.list.iter() {
-            self.data[*i] = false;
-        }
-        self.list.clear();
-    }
-}
+use permutator::CartesianProduct;
 
 #[derive(Clone, Debug, PartialEq)]
 enum AtomDerivationType {
@@ -47,8 +15,7 @@ where
 {
     framework: &'a ABAFramework<T>,
     supports: Vec<Option<Vec<Vec<usize>>>>,
-    closed: Vec<bool>,
-    assumption_set: AssumptionSet,
+    supports_cache: Vec<Option<Option<Vec<Vec<usize>>>>>,
 }
 
 impl<'a, T> AtomSupport<'a, T>
@@ -62,11 +29,10 @@ where
         let mut sc = AtomSupport {
             framework,
             supports: vec![None; language_len],
-            closed: vec![false; language_len],
-            assumption_set: AssumptionSet::new(language_len),
+            supports_cache: vec![None; language_len],
         };
         for i in 0..sc.framework.language().len() {
-            sc.close_atom(vec![i], &derivable_atoms);
+            sc.supports[i] = sc.compute_derivation_from_assumptions(vec![i], &derivable_atoms);
         }
         sc
     }
@@ -85,116 +51,80 @@ where
         self.supports.iter()
     }
 
-    fn close_atom(&mut self, path: Vec<usize>, derivable_atoms: &[Option<AtomDerivationType>]) {
-        use AtomDerivationType::*;
-        let i = *path.last().expect("path must be non-empty");
-        if self.closed[i] {
-            return;
+    fn compute_derivation_from_assumptions(
+        &mut self,
+        path: Vec<usize>,
+        derivable_atoms: &[Option<AtomDerivationType>],
+    ) -> Option<Vec<Vec<usize>>> {
+        let current = *path.last().unwrap();
+        if path[0..path.len() - 1].contains(&current) {
+            return None;
         }
-        match &derivable_atoms[i] {
-            None => {}
-            Some(Assumption) => {
-                self.supports[i] = Some(vec![vec![i]]) // only one manner to be derived: itself
-            }
-            Some(Rules(rules)) => {
-                self.supports[i] = Some(vec![]);
-                for rule_index in rules.iter() {
+        if let Some(cached) = &self.supports_cache[current] {
+            return cached.clone();
+        }
+        let result = match &derivable_atoms[current] {
+            None => None,
+            Some(AtomDerivationType::Assumption) => Some(vec![vec![current]]),
+            Some(AtomDerivationType::Rules(rules)) => {
+                let mut domain_union = Vec::with_capacity(rules.len());
+                let mut got_solution = false;
+                rules.iter().for_each(|rule_index| {
+                    let mut rule_domains = Vec::new();
                     let rule = self.framework.get_rule_by_id(*rule_index);
-                    let mut skip = false;
-                    for v in rule.body_ids().iter() {
-                        let mut occurrences = 0;
-                        for p in path.iter() {
-                            if v == p {
-                                occurrences += 1;
-                                if occurrences >= 2 {
-                                    break;
-                                }
-                            }
-                        }
-                        if occurrences >= 2 {
-                            skip = true;
-                            break;
-                        }
+                    let mut got_cycle = false;
+                    if rule.body_ids().is_empty() {
+                        domain_union.push(vec![]);
+                        got_solution = true;
+                        return;
                     }
-                    if skip {
-                        continue;
-                    }
-                    for b in rule.body_ids() {
+                    rule.body_ids().iter().for_each(|body_id| {
                         let mut path_clone = path.clone();
-                        path_clone.push(*b);
-                        self.close_atom(path_clone, derivable_atoms);
+                        path_clone.push(*body_id);
+                        if let Some(domain) =
+                            self.compute_derivation_from_assumptions(path_clone, derivable_atoms)
+                        {
+                            rule_domains.push(domain);
+                        } else {
+                            got_cycle = true;
+                        }
+                    });
+                    if !got_cycle {
+                        got_solution = true;
+                        let rule_domain_refs = rule_domains
+                            .iter()
+                            .map(|v| v.as_slice())
+                            .collect::<Vec<&[Vec<usize>]>>();
+                        let mut rule_derivations = rule_domain_refs
+                            .as_slice()
+                            .cart_prod()
+                            .map(|p| {
+                                let mut d = p.iter().fold(Vec::new(), |mut acc, x| {
+                                    acc.append(&mut x.as_slice().to_vec());
+                                    acc
+                                });
+                                d.sort_unstable();
+                                d.dedup();
+                                d
+                            })
+                            .collect::<Vec<Vec<usize>>>();
+                        domain_union.append(&mut rule_derivations);
                     }
-                    let mut new_supports =
-                        rule_supports(&rule, &mut self.supports, &mut self.assumption_set);
-                    self.supports[i].as_mut().unwrap().append(&mut new_supports);
+                });
+                if got_solution {
+                    domain_union.sort_unstable();
+                    domain_union.dedup();
+                    Some(domain_union)
+                } else {
+                    None
                 }
-                self.supports[i] = Some(remove_duplicates(self.supports[i].as_ref().unwrap()));
             }
+        };
+        if result.is_some() {
+            self.supports_cache[current] = Some(result.clone());
         }
-        self.closed[i] = true;
+        result
     }
-}
-
-fn rule_supports<T>(
-    r: &Rule<T>,
-    supports: &mut [Option<Vec<Vec<usize>>>],
-    assumption_set: &mut AssumptionSet,
-) -> Vec<Vec<usize>>
-where
-    T: LabelType,
-{
-    let body = r.body_ids();
-    if body.is_empty() {
-        return vec![vec![]];
-    }
-    let mut res = supports[body[0]]
-        .as_ref()
-        .unwrap_or_else(|| panic!("atom with id {} should be closed", body[0]))
-        .clone();
-    let product_merge = |init: Vec<Vec<usize>>,
-                         new: &[Vec<usize>],
-                         assumption_set: &mut AssumptionSet|
-     -> Vec<Vec<usize>> {
-        let mut res = vec![];
-        for a in init {
-            for b in new {
-                assumption_set.clear();
-                a.iter().for_each(|v| assumption_set.add(*v));
-                b.iter().for_each(|v| assumption_set.add(*v));
-                res.push(assumption_set.get());
-            }
-        }
-        remove_duplicates(res.as_slice())
-    };
-    for b in body.iter().skip(1) {
-        res = product_merge(
-            res,
-            supports[*b]
-                .as_ref()
-                .unwrap_or_else(|| panic!("atom with id {} should be closed", b)),
-            assumption_set,
-        );
-    }
-    res
-}
-
-fn remove_duplicates(data: &[Vec<usize>]) -> Vec<Vec<usize>> {
-    let mut res = vec![];
-    for (i, s) in data.iter().enumerate() {
-        let mut c = s.to_vec();
-        c.sort();
-        let mut add = true;
-        for p in res.iter().take(i) {
-            if c == *p {
-                add = false;
-                break;
-            }
-        }
-        if add {
-            res.push(c);
-        }
-    }
-    res
 }
 
 fn compute_derivables<T>(framework: &ABAFramework<T>) -> Vec<Option<AtomDerivationType>>
@@ -241,19 +171,6 @@ where
 mod tests {
     use super::*;
     use crate::aba::language::Language;
-
-    #[test]
-    fn test_remove_duplicates() {
-        let data = vec![vec![1], vec![1, 2], vec![2, 1], vec![2]];
-        let no_dup = remove_duplicates(data.as_slice());
-        assert_eq!(3, no_dup.len());
-        no_dup.iter().find(|s| **s == vec![1]).unwrap();
-        no_dup
-            .iter()
-            .find(|s| **s == vec![1, 2] || **s == vec![2, 1])
-            .unwrap();
-        no_dup.iter().find(|s| **s == vec![2]).unwrap();
-    }
 
     fn toni_tutorial_ex() -> ABAFramework<&'static str> {
         let l = Language::new_with_labels(&["a", "b", "c", "p", "q", "r", "s", "t"]);
@@ -310,72 +227,6 @@ mod tests {
     }
 
     #[test]
-    fn test_rule_support_empty_body() {
-        let f = toni_tutorial_ex();
-        let mut assumption_set = AssumptionSet::new(8);
-        let actual = rule_supports(
-            &f.get_rule_by_id(1),
-            &mut [None, None, None, None, None, None, None, None],
-            &mut assumption_set,
-        );
-        assert_eq!(vec![vec![] as Vec<usize>], actual);
-    }
-
-    #[test]
-    fn test_rule_support_assumption_only_body() {
-        let f = toni_tutorial_ex();
-        let mut assumption_set = AssumptionSet::new(8);
-        let actual = rule_supports(
-            &f.get_rule_by_id(2),
-            &mut [
-                None,
-                Some(vec![vec![1]]),
-                Some(vec![vec![2]]),
-                None,
-                None,
-                None,
-                None,
-                None,
-            ],
-            &mut assumption_set,
-        );
-        assert_eq!(vec![vec![1_usize, 2]], actual);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_rule_support_body_not_closed() {
-        let f = toni_tutorial_ex();
-        let mut assumption_set = AssumptionSet::new(8);
-        rule_supports(
-            &f.get_rule_by_id(2),
-            &mut [None, None, None, None, None, None, None, None],
-            &mut assumption_set,
-        );
-    }
-
-    #[test]
-    fn test_rule_support_inference() {
-        let f = toni_tutorial_ex();
-        let mut assumption_set = AssumptionSet::new(8);
-        let actual = rule_supports(
-            &f.get_rule_by_id(0),
-            &mut [
-                Some(vec![vec![0]]),
-                None,
-                None,
-                None,
-                Some(vec![vec![]]),
-                None,
-                None,
-                None,
-            ],
-            &mut assumption_set,
-        );
-        assert_eq!(vec![vec![0_usize]], actual);
-    }
-
-    #[test]
     fn test_supports_computer() {
         let f = toni_tutorial_ex();
         let sc = AtomSupport::compute(&f);
@@ -410,6 +261,53 @@ mod tests {
                 Some(vec![vec![1, 2]]),
                 Some(vec![vec![0]]),
                 None
+            ],
+            sc.supports
+        );
+    }
+
+    #[test]
+    fn test_derive_contrary() {
+        use AtomDerivationType::*;
+        let l = Language::new_with_labels(&[0, 1, 2, 3, 4, 5, 6, 7, 8]);
+        let mut framework = ABAFramework::new_with_language(l);
+        framework.new_assumption(&0, &5).unwrap();
+        framework.new_assumption(&1, &6).unwrap();
+        framework.new_rule(&4, &[&0]).unwrap();
+        framework.new_rule(&6, &[&4]).unwrap();
+        framework.new_rule(&7, &[&6]).unwrap();
+        framework.new_rule(&5, &[&7]).unwrap();
+        framework.new_rule(&7, &[&3, &5]).unwrap();
+        framework.new_rule(&3, &[&6]).unwrap();
+        framework.new_rule(&8, &[&7]).unwrap();
+        framework.new_rule(&6, &[&8, &3]).unwrap();
+        let derivables = compute_derivables(&framework);
+        assert_eq!(
+            vec![
+                Some(Assumption),
+                Some(Assumption),
+                None,
+                Some(Rules(vec![5])),
+                Some(Rules(vec![0])),
+                Some(Rules(vec![3])),
+                Some(Rules(vec![1, 7])),
+                Some(Rules(vec![2, 4])),
+                Some(Rules(vec![6])),
+            ],
+            derivables
+        );
+        let sc = AtomSupport::compute(&framework);
+        assert_eq!(
+            vec![
+                Some(vec![vec![0]]),
+                Some(vec![vec![1]]),
+                None,
+                Some(vec![vec![0]]),
+                Some(vec![vec![0]]),
+                Some(vec![vec![0]]),
+                Some(vec![vec![0]]),
+                Some(vec![vec![0]]),
+                Some(vec![vec![0]]),
             ],
             sc.supports
         );
