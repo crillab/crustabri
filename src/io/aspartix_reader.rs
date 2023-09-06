@@ -67,7 +67,7 @@ where
 /// A reader for the Aspartix format.
 ///
 /// This object is used to read an [`AAFramework`] encoded using the Aspartix input format, as defined on [the Aspartix website](https://www.dbai.tuwien.ac.at/research/argumentation/aspartix/dung.html).
-/// The [LabelType](crate::aa::LabelType) of the returned argument frameworks is [String].
+/// The [`LabelType`](crate::utils::LabelType) of the returned argument frameworks is [`String`].
 ///
 /// # Aspartix format
 ///

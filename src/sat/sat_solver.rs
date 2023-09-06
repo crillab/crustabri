@@ -137,7 +137,7 @@ pub(crate) use clause;
 /// An assignment of a set of variables.
 ///
 /// Inside the set of variables involved in the assignment, some may be unassigned.
-/// This is the reason why accessors to assigned value return an [Option<bool>].
+/// This is the reason why accessors to assigned value return an [`Option<bool>`].
 #[derive(Debug, PartialEq, Eq)]
 pub struct Assignment(Vec<Option<bool>>);
 

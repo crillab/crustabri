@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader, Read};
 /// A reader for the ICCMA 2023 format.
 ///
 /// This object is used to read an [`AAFramework`] encoded using the ICCMA 2023 input format, as defined on [the competition website](https://iccma2023.github.io/rules.html).
-/// The [LabelType](crate::aa::LabelType) of the returned argument frameworks is [usize].
+/// The [`LabelType`](crate::utils::LabelType) of the returned argument frameworks is [`usize`].
 ///
 /// # ICCMA 2023 format
 ///

@@ -21,9 +21,9 @@ where
 {
     /// Reads an [`AAFramework`].
     ///
-    /// The [LabelType](crate::aa::LabelType) of the returned AFs is depends on the reader.
+    /// The [`LabelType`](crate::utils::LabelType) of the returned AFs is depends on the reader.
     ///
-    /// In case warnings are raised, the callback functions registered by [add_warning_handler](Self::add_warning_handler) are triggered.
+    /// In case warnings are raised, the callback functions registered by [`add_warning_handler`](Self::add_warning_handler) are triggered.
     ///
     /// # Example
     ///
