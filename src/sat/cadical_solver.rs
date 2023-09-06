@@ -11,6 +11,7 @@ use cadical::Solver as CadicalCSolver;
 pub struct CadicalSolver {
     solver: CadicalCSolver,
     listeners: Vec<Box<dyn SolvingListener>>,
+    max_reserved: i32,
 }
 
 impl SatSolver for CadicalSolver {
@@ -32,11 +33,15 @@ impl SatSolver for CadicalSolver {
             .solve_with(assumptions.iter().map(|l| isize::from(*l) as i32))
         {
             Some(true) => {
-                let assignment = Assignment::new(
-                    (1..=self.solver.max_variable())
-                        .map(|i| self.solver.value(i))
-                        .collect(),
-                );
+                let mut assignment_it: Box<dyn Iterator<Item = Option<bool>>> =
+                    Box::new((1..=self.solver.max_variable()).map(|i| self.solver.value(i)));
+                if self.max_reserved > self.solver.max_variable() {
+                    assignment_it =
+                        Box::new(assignment_it.chain(
+                            (self.solver.max_variable() + 1..=self.max_reserved).map(|_| None),
+                        ))
+                }
+                let assignment = Assignment::new(assignment_it.collect());
                 SolvingResult::Satisfiable(assignment)
             }
             Some(false) => SolvingResult::Unsatisfiable,
@@ -49,7 +54,7 @@ impl SatSolver for CadicalSolver {
     }
 
     fn n_vars(&self) -> usize {
-        self.solver.max_variable() as usize
+        i32::max(self.solver.max_variable(), self.max_reserved) as usize
     }
 
     fn add_listener(&mut self, listener: Box<dyn SolvingListener>) {
@@ -57,7 +62,7 @@ impl SatSolver for CadicalSolver {
     }
 
     fn reserve(&mut self, new_max_id: usize) {
-        self.solver.reserve(new_max_id as i32);
+        self.max_reserved = i32::max(self.max_reserved, new_max_id as i32)
     }
 }
 
@@ -106,5 +111,19 @@ mod tests {
             .solve_under_assumptions(&[Literal::from(-1)])
             .unwrap_model()
             .is_none());
+    }
+
+    #[test]
+    fn test_reserve() {
+        let mut s = CadicalSolver::default();
+        s.add_clause(clause![1]);
+        assert_eq!(1, s.n_vars());
+        s.reserve(2);
+        assert_eq!(2, s.n_vars());
+        assert_eq!(2, s.solve().unwrap_model().unwrap().iter().count());
+        s.add_clause(clause![-1, 2]);
+        assert_eq!(2, s.solve().unwrap_model().unwrap().iter().count());
+        s.add_clause(clause![-1, -2]);
+        assert!(s.solve() == SolvingResult::Unsatisfiable);
     }
 }

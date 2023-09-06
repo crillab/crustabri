@@ -25,7 +25,7 @@ path = "src/main_iccma23.rs"
 
 [dependencies]
 anyhow = "1.0.65"
-cadical = { git = "https://github.com/elonca/cadical-rs.git", rev = "f6bd96c" }
+cadical = "0.1.14"
 chrono = "0.4.19"
 clap = "2.33.3"
 fern = { version = "0.6.0", features = ["colored"] }
