@@ -52,8 +52,3 @@ impl Predicate<[u8]> for CheckProblemsPredicate {
 fn test_iccma23() {
     test_problems("crustabri_iccma23")
 }
-
-#[test]
-fn test_iccma23_aba() {
-    test_problems("crustabri_iccma23_aba")
-}

@@ -1,9 +1,6 @@
 use super::common;
 use anyhow::Result;
-use crustabri::{
-    aba::Iccma23ABAReader,
-    io::{AspartixReader, Iccma23Reader},
-};
+use crustabri::io::{AspartixReader, Iccma23Reader};
 use crusti_app_helper::{AppSettings, Command, SubCommand};
 
 const CMD_NAME: &str = "check";
@@ -35,11 +32,6 @@ impl<'a> Command<'a> for CheckCommand {
         match arg_matches.value_of(common::ARG_READER).unwrap() {
             "apx" => common::read_file_path(file, &mut AspartixReader::default()).map(|_| ()),
             "iccma23" => common::read_file_path(file, &mut Iccma23Reader::default()).map(|_| ()),
-            "iccma23_aba" => common::read_file_path_with(file, &|r| {
-                let mut aba_reader = Iccma23ABAReader::default();
-                aba_reader.read(r)
-            })
-            .map(|_| ()),
             _ => unreachable!(),
         }?;
         Ok(())

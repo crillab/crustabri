@@ -18,8 +18,3 @@ fn test_authors(cargo_bin: &str) {
 fn test_iccma23() {
     test_authors("crustabri_iccma23")
 }
-
-#[test]
-fn test_iccma23_aba() {
-    test_authors("crustabri_iccma23_aba")
-}

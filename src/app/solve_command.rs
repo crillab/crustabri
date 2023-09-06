@@ -2,7 +2,6 @@ use super::common::{self, ARG_ARG, ARG_PROBLEM};
 use anyhow::{anyhow, Context, Result};
 use crustabri::{
     aa::{AAFramework, Argument, Query, Semantics},
-    aba::{ABAFrameworkInstantiation, Iccma23ABAReader, Iccma23ABAWriter},
     encodings::{
         aux_var_constraints_encoder, exp_constraints_encoder, ConstraintsEncoder,
         HybridCompleteConstraintsEncoder,
@@ -84,7 +83,6 @@ impl<'a> Command<'a> for SolveCommand {
                 &mut Iccma23Reader::default(),
                 &mut Iccma23Writer::default(),
             ),
-            "iccma23_aba" => execute_for_iccma23_aba(arg_matches),
             _ => unreachable!(),
         }
     }
@@ -143,69 +141,6 @@ where
             arg_matches,
             &mut acceptance_status_writer,
         ),
-    }
-}
-
-fn execute_for_iccma23_aba(arg_matches: &crusti_app_helper::ArgMatches<'_>) -> Result<()> {
-    let file = arg_matches.value_of(common::ARG_INPUT).unwrap();
-    let aba = common::read_file_path_with(file, &|r| Iccma23ABAReader::default().read(r))?;
-    let instantiation = ABAFrameworkInstantiation::instantiate(&aba);
-    let atom = arg_matches
-        .value_of(ARG_ARG)
-        .map(|a| {
-            a.parse::<usize>()
-                .map_err(|_| anyhow!("no such assumption: {}", a))
-                .and_then(|n| aba.language().get_atom(&n))
-        })
-        .transpose()
-        .context("while parsing the argument passed to the command line")?;
-    let (query, semantics) =
-        Query::read_problem_string(arg_matches.value_of(ARG_PROBLEM).unwrap())?;
-    check_args_definition(query, atom.as_ref())?;
-    let af = instantiation.instantiated();
-    let args = if let Some(a) = atom {
-        if aba.is_assumption(a.label()).unwrap() {
-            Some(vec![instantiation.aba_assumption_to_instantiated_arg(a)])
-        } else {
-            Some(
-                af.argument_set()
-                    .iter()
-                    .filter(|arg| arg.label().claim() == a)
-                    .collect(),
-            )
-        }
-    } else {
-        None
-    };
-    let writer = Iccma23ABAWriter::default();
-    let mut out = std::io::stdout();
-    match query {
-        Query::SE => {
-            compute_one_extension(
-                af,
-                semantics,
-                arg_matches,
-                &mut |opt_model| match opt_model {
-                    Some(m) => {
-                        let assumptions =
-                            instantiation.instantiated_extension_to_aba_assumptions(m.as_slice());
-                        writer
-                            .write_single_extension(&mut out, assumptions.iter().map(|a| a.label()))
-                    }
-                    None => writer.write_no_extension(&mut out),
-                },
-            )
-        }
-        Query::DC => {
-            check_credulous_acceptance(af, semantics, args.unwrap(), arg_matches, &mut |b, _| {
-                writer.write_acceptance_status(&mut out, b)
-            })
-        }
-        Query::DS => {
-            check_skeptical_acceptance(af, semantics, args.unwrap(), arg_matches, &mut |b, _| {
-                writer.write_acceptance_status(&mut out, b)
-            })
-        }
     }
 }
 
