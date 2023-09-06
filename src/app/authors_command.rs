@@ -1,5 +1,6 @@
+use super::{cli_manager, command::Command};
 use anyhow::Result;
-use crusti_app_helper::{AppSettings, Command, SubCommand};
+use clap::{App, AppSettings, ArgMatches, SubCommand};
 
 const CMD_NAME: &str = "authors";
 
@@ -24,14 +25,14 @@ impl<'a> Command<'a> for AuthorsCommand<'a> {
         CMD_NAME
     }
 
-    fn clap_subcommand(&self) -> crusti_app_helper::App<'a, 'a> {
+    fn clap_subcommand(&self) -> App<'a, 'a> {
         SubCommand::with_name(CMD_NAME)
             .about("Displays app version and authors")
             .setting(AppSettings::DisableVersion)
-            .arg(crusti_app_helper::logging_level_cli_arg())
+            .arg(cli_manager::logging_level_cli_arg())
     }
 
-    fn execute(&self, _arg_matches: &crusti_app_helper::ArgMatches<'_>) -> Result<()> {
+    fn execute(&self, _arg_matches: &ArgMatches<'_>) -> Result<()> {
         println!("{} {}", self.app_name, self.app_version);
         println!("{}", self.authors.replace(':', ", "));
         Ok(())

@@ -1,20 +1,4 @@
-// crusti_app_helper
-// Copyright (C) 2020  Univ. Artois & CNRS
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-use crate::cli_manager::{cli_manager::CliManager, command::Command};
+use super::{cli_manager::CliManager, command::Command};
 use anyhow::Result;
 use log::{error, info};
 use std::{ffi::OsString, sync::Once, time::SystemTime};
@@ -75,6 +59,7 @@ impl<'a> AppHelper<'a> {
     /// If an error is returned by a command, the error stack is displayed and a status of 1 is returned to the system.
     ///
     /// This function consumes the helper.
+    #[allow(dead_code)]
     pub fn launch_app(self) {
         self.launch_app_with_args(std::env::args_os())
     }

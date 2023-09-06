@@ -1,4 +1,4 @@
-use crusti_app_helper::App;
+use clap::App;
 use std::ffi::OsString;
 
 mod app;

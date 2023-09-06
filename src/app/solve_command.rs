@@ -1,5 +1,10 @@
-use super::common::{self, ARG_ARG, ARG_PROBLEM};
+use super::{
+    cli_manager,
+    command::Command,
+    common::{self, ARG_ARG, ARG_PROBLEM},
+};
 use anyhow::{anyhow, Context, Result};
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use crustabri::{
     aa::{AAFramework, Argument, Query, Semantics},
     encodings::{
@@ -19,7 +24,7 @@ use crustabri::{
     },
     utils::LabelType,
 };
-use crusti_app_helper::{info, warn, AppSettings, Arg, ArgMatches, Command, SubCommand};
+use log::{info, warn};
 
 const CMD_NAME: &str = "solve";
 
@@ -43,7 +48,7 @@ impl<'a> Command<'a> for SolveCommand {
         CMD_NAME
     }
 
-    fn clap_subcommand(&self) -> crusti_app_helper::App<'a, 'a> {
+    fn clap_subcommand(&self) -> App<'a, 'a> {
         SubCommand::with_name(CMD_NAME)
             .about("Solves an argumentation framework problem")
             .setting(AppSettings::DisableVersion)
@@ -51,7 +56,7 @@ impl<'a> Command<'a> for SolveCommand {
             .arg(common::reader_arg())
             .args(&common::problem_args())
             .args(&external_sat_solver_args())
-            .arg(crusti_app_helper::logging_level_cli_arg())
+            .arg(cli_manager::logging_level_cli_arg())
             .arg(
                 Arg::with_name(ARG_CERTIFICATE)
                     .short("c")
@@ -71,7 +76,7 @@ impl<'a> Command<'a> for SolveCommand {
             )
     }
 
-    fn execute(&self, arg_matches: &crusti_app_helper::ArgMatches<'_>) -> Result<()> {
+    fn execute(&self, arg_matches: &ArgMatches<'_>) -> Result<()> {
         match arg_matches.value_of(common::ARG_READER).unwrap() {
             "apx" => execute_with_reader_and_writer(
                 arg_matches,
@@ -89,7 +94,7 @@ impl<'a> Command<'a> for SolveCommand {
 }
 
 fn execute_with_reader_and_writer<T>(
-    arg_matches: &crusti_app_helper::ArgMatches<'_>,
+    arg_matches: &ArgMatches<'_>,
     reader: &mut dyn InstanceReader<T>,
     writer: &mut dyn ResponseWriter<T>,
 ) -> Result<()>

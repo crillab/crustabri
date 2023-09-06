@@ -22,12 +22,16 @@ path = "src/main_iccma23.rs"
 [dependencies]
 anyhow = "1.0.65"
 cadical = { git = "https://github.com/elonca/cadical-rs.git", rev = "f6bd96c" }
-crusti_app_helper = {path = "local_crates/crusti_app_helper-v0.1"}
+chrono = "0.4.19"
+clap = "2.33.3"
+fern = { version = "0.6.0", features = ["colored"] }
 lazy_static = "1.4.0"
+log = "0.4.20"
 permutator = "0.4.3"
 regex = "1.6.0"
 strum = "0.24.1"
 strum_macros = "0.24.1"
+sysinfo = "0.23.13"
 
 [dev-dependencies]
 assert_cmd = "2.0"

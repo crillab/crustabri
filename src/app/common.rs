@@ -1,7 +1,11 @@
-use super::{AuthorsCommand, CheckCommand, ProblemsCommand, SolveCommand};
+use super::{
+    app_helper::AppHelper, command::Command, AuthorsCommand, CheckCommand, ProblemsCommand,
+    SolveCommand,
+};
 use anyhow::{Context, Result};
+use clap::Arg;
 use crustabri::{aa::AAFramework, io::InstanceReader, utils::LabelType};
-use crusti_app_helper::{info, warn, AppHelper, Arg, Command};
+use log::{info, warn};
 use std::{
     fs::{self, File},
     io::{BufReader, Read},

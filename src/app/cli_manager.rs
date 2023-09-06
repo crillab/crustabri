@@ -1,21 +1,6 @@
-// crusti_app_helper
-// Copyright (C) 2020  Univ. Artois & CNRS
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+use crate::app::app_helper;
 
 use super::{command::Command, writable_string::WritableString};
-use crate::{init_logger, app_helper::app_helper::init_logger_with_level};
 use anyhow::{anyhow, Result};
 use clap::{App, AppSettings, Arg};
 use log::info;
@@ -88,7 +73,7 @@ impl<'a> CliManager<'a> {
                         } else {
                             log::LevelFilter::Info
                         };
-                        init_logger_with_level(log_level);
+                        app_helper::init_logger_with_level(log_level);
                         info!("{} {}", self.app_name, self.version);
                         sys_info();
                         return c.execute(matches);
@@ -100,12 +85,12 @@ impl<'a> CliManager<'a> {
                 kind: clap::ErrorKind::HelpDisplayed,
                 ..
             }) => {
-                init_logger();
+                app_helper::init_logger();
                 self.print_help(&mut app, args.as_slice());
                 Ok(())
             }
             Err(e) => {
-                init_logger();
+                app_helper::init_logger();
                 info!("{} {}", self.app_name, self.version);
                 Err(anyhow!("{}", e))
             }
