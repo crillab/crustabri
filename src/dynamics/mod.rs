@@ -15,3 +15,6 @@ pub use dynamic_solver::DynamicSolver;
 
 mod dynamic_stable_semantics_solver;
 pub use dynamic_stable_semantics_solver::DynamicStableSemanticsSolver;
+
+mod dummy_dynamic_constraints_encoder;
+pub use dummy_dynamic_constraints_encoder::DummyDynamicConstraintsEncoder;
