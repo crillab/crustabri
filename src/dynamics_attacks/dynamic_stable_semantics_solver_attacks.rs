@@ -1,8 +1,7 @@
-use super::{
-    buffered_dynamic_constraints_encoder::BufferedDynamicConstraintsEncoder, DynamicSolver,
-};
+use super::buffered_dynamic_constraints_encoder_attacks::BufferedDynamicConstraintsEncoder;
 use crate::{
     aa::{AAFramework, Argument, ArgumentSet, Semantics},
+    dynamics::DynamicSolver,
     sat::{self, SatSolver, SatSolverFactoryFn},
     solvers::{CredulousAcceptanceComputer, SkepticalAcceptanceComputer},
     utils::LabelType,
@@ -10,8 +9,8 @@ use crate::{
 use anyhow::Result;
 use std::{cell::RefCell, rc::Rc};
 
-/// A dynamic solver dedicated to the stable semantics.
-pub struct DynamicStableSemanticsSolver<T>
+/// A dynamic solver dedicated to the complete semantics.
+pub struct DynamicStableSemanticsSolverAttacks<T>
 where
     T: LabelType,
 {
@@ -20,40 +19,55 @@ where
     solver: Rc<RefCell<Box<dyn SatSolver>>>,
 }
 
-impl<T> DynamicStableSemanticsSolver<T>
+impl<T> DynamicStableSemanticsSolverAttacks<T>
 where
     T: LabelType,
 {
-    /// Builds a new SAT based dynamic solver for the stable semantics.
+    /// Builds a new SAT based dynamic solver for the complete semantics.
     ///
     /// The underlying SAT solver is one returned by [default_solver](crate::sat::default_solver).
     pub fn new() -> Self
     where
         T: LabelType,
     {
-        Self::new_with_sat_solver_factory(Box::new(|| sat::default_solver()))
+        Self::new_with_sat_solver_factory_and_arg_factor(Box::new(|| sat::default_solver()), 2.)
     }
 
-    /// Builds a new SAT based dynamic solver for the stable semantics.
+    pub fn new_with_arg_factor(arg_factor: f64) -> Self
+    where
+        T: LabelType,
+    {
+        Self::new_with_sat_solver_factory_and_arg_factor(
+            Box::new(|| sat::default_solver()),
+            arg_factor,
+        )
+    }
+
+    /// Builds a new SAT based dynamic solver for the complete semantics.
     ///
     /// The SAT solver to use in given through the solver factory.
-    pub fn new_with_sat_solver_factory(solver_factory: Box<SatSolverFactoryFn>) -> Self
+    pub fn new_with_sat_solver_factory_and_arg_factor(
+        solver_factory: Box<SatSolverFactoryFn>,
+        arg_factor: f64,
+    ) -> Self
     where
         T: LabelType,
     {
         let solver = Rc::new(RefCell::new((solver_factory)()));
         Self {
             af: AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&[])),
-            buffered_encoder: BufferedDynamicConstraintsEncoder::new(
+            buffered_encoder: BufferedDynamicConstraintsEncoder::new_with_arg_factor(
                 Rc::clone(&solver),
+                solver_factory,
                 Semantics::ST,
+                arg_factor,
             ),
             solver,
         }
     }
 }
 
-impl<T> Default for DynamicStableSemanticsSolver<T>
+impl<T> Default for DynamicStableSemanticsSolverAttacks<T>
 where
     T: LabelType,
 {
@@ -62,7 +76,7 @@ where
     }
 }
 
-impl<T> DynamicSolver<T> for DynamicStableSemanticsSolver<T>
+impl<T> DynamicSolver<T> for DynamicStableSemanticsSolverAttacks<T>
 where
     T: LabelType,
 {
@@ -83,7 +97,7 @@ where
     }
 }
 
-impl<T> CredulousAcceptanceComputer<T> for DynamicStableSemanticsSolver<T>
+impl<T> CredulousAcceptanceComputer<T> for DynamicStableSemanticsSolverAttacks<T>
 where
     T: LabelType,
 {
@@ -107,8 +121,8 @@ where
         }
         self.buffered_encoder.update_encoding(&mut self.af);
         let encoder_ref = self.buffered_encoder.encoder();
-        let mut assumptions = Vec::with_capacity(encoder_ref.assumptions().len() + 1);
-        assumptions.append(&mut encoder_ref.assumptions().to_vec());
+        let mut assumptions = Vec::new();
+        assumptions.append(&mut encoder_ref.assumptions(&self.af).to_vec());
         assumptions.push(encoder_ref.arg_to_lit(&self.af, arg));
         match self
             .solver
@@ -149,7 +163,7 @@ where
     }
 }
 
-impl<T> SkepticalAcceptanceComputer<T> for DynamicStableSemanticsSolver<T>
+impl<T> SkepticalAcceptanceComputer<T> for DynamicStableSemanticsSolverAttacks<T>
 where
     T: LabelType,
 {
@@ -173,8 +187,8 @@ where
         }
         self.buffered_encoder.update_encoding(&mut self.af);
         let encoder_ref = self.buffered_encoder.encoder();
-        let mut assumptions = Vec::with_capacity(encoder_ref.assumptions().len() + 1);
-        assumptions.append(&mut encoder_ref.assumptions().to_vec());
+        let mut assumptions = Vec::new();
+        assumptions.append(&mut encoder_ref.assumptions(&self.af).to_vec());
         assumptions.push(encoder_ref.arg_to_lit(&self.af, arg).negate());
         match self
             .solver
@@ -229,7 +243,85 @@ mod tests {
 
     #[test]
     fn coreo_test() {
-        let mut solver = DynamicStableSemanticsSolver::new();
+        let mut solver = DynamicStableSemanticsSolverAttacks::new();
+        solver.new_argument(1);
+        solver.new_argument(2);
+        solver.new_attack(&1, &2).unwrap();
+        assert!(solver.is_credulously_accepted(&1));
+        assert!(!solver.is_credulously_accepted(&2));
+        assert!(solver.is_skeptically_accepted(&1));
+        assert!(!solver.is_skeptically_accepted(&2));
+
+        solver.remove_attack(&1, &2).unwrap();
+        assert!(solver.is_credulously_accepted(&1));
+        assert!(solver.is_credulously_accepted(&2));
+        assert!(solver.is_skeptically_accepted(&1));
+        assert!(solver.is_skeptically_accepted(&2));
+
+        solver.new_argument(3);
+        solver.new_attack(&3, &2).unwrap();
+        solver.new_attack(&2, &1).unwrap();
+        assert!(solver.is_credulously_accepted(&1));
+        assert!(!solver.is_credulously_accepted(&2));
+        assert!(solver.is_credulously_accepted(&3));
+        assert!(solver.is_skeptically_accepted(&1));
+        assert!(!solver.is_skeptically_accepted(&2));
+        assert!(solver.is_skeptically_accepted(&3));
+
+        solver.remove_argument(&1).unwrap();
+        solver.new_argument(4);
+        solver.new_attack(&4, &3).unwrap();
+        solver.new_attack(&3, &4).unwrap();
+        assert!(solver.is_credulously_accepted(&2));
+        assert!(solver.is_credulously_accepted(&3));
+        assert!(solver.is_credulously_accepted(&4));
+        assert!(!solver.is_skeptically_accepted(&2));
+        assert!(!solver.is_skeptically_accepted(&3));
+        assert!(!solver.is_skeptically_accepted(&4));
+    }
+
+    #[test]
+    fn coreo_test_1_5() {
+        let mut solver = DynamicStableSemanticsSolverAttacks::new_with_arg_factor(1.5);
+        solver.new_argument(1);
+        solver.new_argument(2);
+        solver.new_attack(&1, &2).unwrap();
+        assert!(solver.is_credulously_accepted(&1));
+        assert!(!solver.is_credulously_accepted(&2));
+        assert!(solver.is_skeptically_accepted(&1));
+        assert!(!solver.is_skeptically_accepted(&2));
+
+        solver.remove_attack(&1, &2).unwrap();
+        assert!(solver.is_credulously_accepted(&1));
+        assert!(solver.is_credulously_accepted(&2));
+        assert!(solver.is_skeptically_accepted(&1));
+        assert!(solver.is_skeptically_accepted(&2));
+
+        solver.new_argument(3);
+        solver.new_attack(&3, &2).unwrap();
+        solver.new_attack(&2, &1).unwrap();
+        assert!(solver.is_credulously_accepted(&1));
+        assert!(!solver.is_credulously_accepted(&2));
+        assert!(solver.is_credulously_accepted(&3));
+        assert!(solver.is_skeptically_accepted(&1));
+        assert!(!solver.is_skeptically_accepted(&2));
+        assert!(solver.is_skeptically_accepted(&3));
+
+        solver.remove_argument(&1).unwrap();
+        solver.new_argument(4);
+        solver.new_attack(&4, &3).unwrap();
+        solver.new_attack(&3, &4).unwrap();
+        assert!(solver.is_credulously_accepted(&2));
+        assert!(solver.is_credulously_accepted(&3));
+        assert!(solver.is_credulously_accepted(&4));
+        assert!(!solver.is_skeptically_accepted(&2));
+        assert!(!solver.is_skeptically_accepted(&3));
+        assert!(!solver.is_skeptically_accepted(&4));
+    }
+
+    #[test]
+    fn coreo_test_1_25() {
+        let mut solver = DynamicStableSemanticsSolverAttacks::new_with_arg_factor(1.25);
         solver.new_argument(1);
         solver.new_argument(2);
         solver.new_attack(&1, &2).unwrap();
