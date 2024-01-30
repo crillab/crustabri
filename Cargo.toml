@@ -36,7 +36,7 @@ permutator = "0.4.3"
 regex = "1.6.0"
 strum = "0.24.1"
 strum_macros = "0.24.1"
-sysinfo = "0.23.13"
+sysinfo = "0.30"
 
 [dev-dependencies]
 assert_cmd = "2.0"

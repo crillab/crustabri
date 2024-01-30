@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use clap::{App, AppSettings, Arg};
 use log::info;
 use std::{ffi::OsString, str::FromStr};
-use sysinfo::{ProcessorExt, System, SystemExt};
+use sysinfo::System;
 
 /// A structure used to handle the set of commands and to process the CLI arguments against them.
 pub(crate) struct CliManager<'a> {
@@ -144,14 +144,14 @@ fn sys_info() {
     info!("----------------------------------------");
     let sys = System::new_all();
     let unknown = || "[unknown]".to_string();
-    info!("running on {}", sys.host_name().unwrap_or_else(unknown));
+    info!("running on {}", System::host_name().unwrap_or_else(unknown));
     info!(
         "OS is {} {} with kernel {}",
-        sys.name().unwrap_or_else(unknown),
-        sys.os_version().unwrap_or_else(unknown),
-        sys.kernel_version().unwrap_or_else(unknown)
+        System::name().unwrap_or_else(unknown),
+        System::os_version().unwrap_or_else(unknown),
+        System::kernel_version().unwrap_or_else(unknown)
     );
-    let mut processor_kinds: Vec<&str> = sys.processors().iter().map(|p| p.brand()).collect();
+    let mut processor_kinds: Vec<&str> = sys.cpus().iter().map(|p| p.brand()).collect();
     processor_kinds.sort();
     processor_kinds.dedup();
     info!(
