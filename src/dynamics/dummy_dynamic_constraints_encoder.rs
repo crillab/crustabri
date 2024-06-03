@@ -1,10 +1,12 @@
 use super::DynamicSolver;
 use crate::{
     aa::{AAFramework, Argument, ArgumentSet},
-    solvers::{CredulousAcceptanceComputer, SkepticalAcceptanceComputer},
-    utils::LabelType,
+    solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
+    utils::{Label, LabelType},
 };
 
+type SingleExtensionComputerFactory<T> =
+    dyn for<'a> Fn(&'a AAFramework<T>) -> Box<dyn SingleExtensionComputer<T> + 'a>;
 type CredulousAcceptanceComputerFactory<T> =
     dyn for<'a> Fn(&'a AAFramework<T>) -> Box<dyn CredulousAcceptanceComputer<T> + 'a>;
 type SkepticalAcceptanceComputerFactory<T> =
@@ -16,6 +18,7 @@ where
     T: LabelType,
 {
     af: AAFramework<T>,
+    single_extension_computer_factory: Option<Box<SingleExtensionComputerFactory<T>>>,
     credulous_acceptance_computer_factory: Option<Box<CredulousAcceptanceComputerFactory<T>>>,
     skeptical_acceptance_computer_factory: Option<Box<SkepticalAcceptanceComputerFactory<T>>>,
 }
@@ -26,14 +29,22 @@ where
 {
     /// Builds a new dummy solver given factories to build its underlying solvers.
     pub fn new(
+        single_extension_computer_factory: Option<Box<SingleExtensionComputerFactory<T>>>,
         credulous_acceptance_computer_factory: Option<Box<CredulousAcceptanceComputerFactory<T>>>,
         skeptical_acceptance_computer_factory: Option<Box<SkepticalAcceptanceComputerFactory<T>>>,
     ) -> Self {
         Self {
             af: AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&[])),
+            single_extension_computer_factory,
             credulous_acceptance_computer_factory,
             skeptical_acceptance_computer_factory,
         }
+    }
+
+    fn to_owned_args<'a>(&'a self, ext: Vec<&Label<T>>) -> Vec<&'a Label<T>> {
+        ext.iter()
+            .map(|l| self.af.argument_set().get_argument_by_id(l.id()))
+            .collect()
     }
 }
 
@@ -58,6 +69,19 @@ where
     }
 }
 
+impl<T> SingleExtensionComputer<T> for DummyDynamicConstraintsEncoder<T>
+where
+    T: LabelType,
+{
+    fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
+        let mut single_extension_computer =
+            (self.single_extension_computer_factory.as_ref().unwrap())(&self.af);
+        single_extension_computer
+            .compute_one_extension()
+            .map(|e| self.to_owned_args(e))
+    }
+}
+
 impl<T> CredulousAcceptanceComputer<T> for DummyDynamicConstraintsEncoder<T>
 where
     T: LabelType,
@@ -75,11 +99,7 @@ where
         let mut acceptance_computer =
             (self.credulous_acceptance_computer_factory.as_ref().unwrap())(&self.af);
         let (status, ext) = acceptance_computer.are_credulously_accepted_with_certificate(args);
-        let extension = ext.map(|e| {
-            e.iter()
-                .map(|l| self.af.argument_set().get_argument_by_id(l.id()))
-                .collect()
-        });
+        let extension = ext.map(|e| self.to_owned_args(e));
         (status, extension)
     }
 }
@@ -101,11 +121,7 @@ where
         let mut acceptance_computer =
             (self.skeptical_acceptance_computer_factory.as_ref().unwrap())(&self.af);
         let (status, ext) = acceptance_computer.are_skeptically_accepted_with_certificate(args);
-        let extension = ext.map(|e| {
-            e.iter()
-                .map(|l| self.af.argument_set().get_argument_by_id(l.id()))
-                .collect()
-        });
+        let extension = ext.map(|e| self.to_owned_args(e));
         (status, extension)
     }
 }

@@ -3,7 +3,7 @@ use crate::{
     aa::{AAFramework, Argument, ArgumentSet, Semantics},
     dynamics::DynamicSolver,
     sat::{self, SatSolver, SatSolverFactoryFn},
-    solvers::{CredulousAcceptanceComputer, SkepticalAcceptanceComputer},
+    solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
     utils::LabelType,
 };
 use anyhow::Result;
@@ -106,6 +106,22 @@ where
 
     fn remove_attack(&mut self, from: &T, to: &T) -> Result<()> {
         self.buffered_encoder.buffer_remove_attack(from, to)
+    }
+}
+
+impl<T> SingleExtensionComputer<T> for DynamicStableSemanticsSolverAttacks<T>
+where
+    T: LabelType,
+{
+    fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
+        self.buffered_encoder.update_encoding(&mut self.af);
+        let encoder_ref = self.buffered_encoder.encoder();
+        let assumptions = encoder_ref.assumptions(&self.af).to_vec();
+        self.solver
+            .borrow_mut()
+            .solve_under_assumptions(&assumptions)
+            .unwrap_model()
+            .map(|m| encoder_ref.assignment_to_extension(&self.af, m))
     }
 }
 
