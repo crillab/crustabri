@@ -1,4 +1,12 @@
-use crate::{aa::Argument, utils::LabelType};
+use crate::{aa::Argument, sat::SatSolver, utils::LabelType};
+
+/// A trait for argumentation solvers relying on SAT solvers.
+///
+/// Implementors are able to encode the constraints imposed by the semantics into a SAT solver.
+pub trait SatEncoder {
+    /// Encodes the constraints into a SAT solver and returns it.
+    fn encode(&mut self) -> Box<dyn SatSolver>;
+}
 
 /// A trait for solvers able to compute an extension.
 pub trait SingleExtensionComputer<T>

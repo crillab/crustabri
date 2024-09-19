@@ -12,6 +12,9 @@ pub(crate) mod command;
 
 pub(crate) mod common;
 
+mod encode_to_sat_command;
+pub(crate) use encode_to_sat_command::EncodeToSatCommand;
+
 mod problems_command;
 pub(crate) use problems_command::ProblemsCommand;
 

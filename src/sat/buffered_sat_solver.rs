@@ -4,8 +4,12 @@ use super::{
 };
 use std::io::{BufRead, BufReader, Cursor, Read};
 
-type SolvingFn = dyn Fn(DimacsInstanceRead) -> Box<dyn Read>;
+/// A function called when solving the instance within a [`BufferedSatSolver`] using [`SatSolver::solve`] or [`SatSolver::solve_under_assumptions`]
+pub type SolvingFn = dyn Fn(DimacsInstanceRead) -> Box<dyn Read>;
 
+/// A structure providing [`Read`].
+///
+/// The content read from this structure is a DIMACS SAT instance.
 pub struct DimacsInstanceRead {
     preamble: Cursor<String>,
     clauses: Cursor<String>,
@@ -32,6 +36,7 @@ impl Read for DimacsInstanceRead {
 
 const DEFAULT_BUFFER_CAP: usize = 1 << 20;
 
+/// A [`SatSolver`] that stores the current instance as a DIMACS string and that applies a predefined function at solving time.
 pub struct BufferedSatSolver {
     n_vars: usize,
     n_clauses: usize,
@@ -41,6 +46,10 @@ pub struct BufferedSatSolver {
 }
 
 impl BufferedSatSolver {
+    /// Builds a new instance of [`BufferedSatSolver`].
+    ///
+    /// The function to provide is the one that will be called when solving the instance with [`SatSolver::solve`] or [`SatSolver::solve_under_assumptions`].
+    /// This function takes as input a [`DimacsInstanceRead`] and returns a reader that contains the solver output.
     pub fn new(solving_fn: Box<SolvingFn>) -> Self {
         Self {
             n_vars: 0,

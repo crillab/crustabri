@@ -1,6 +1,9 @@
 //! SAT solver interfaces for Abstract Argumentation solvers.
 
 mod buffered_sat_solver;
+pub use buffered_sat_solver::BufferedSatSolver;
+pub use buffered_sat_solver::DimacsInstanceRead;
+pub use buffered_sat_solver::SolvingFn;
 
 mod cadical_solver;
 pub use cadical_solver::CadicalSolver;

@@ -1,7 +1,8 @@
 use super::specs::CredulousAcceptanceComputer;
+use super::SatEncoder;
 use crate::aa::{AAFramework, Argument};
 use crate::encodings::{aux_var_constraints_encoder, ConstraintsEncoder};
-use crate::sat::Literal;
+use crate::sat::{Literal, SatSolver};
 use crate::utils::{Label, LabelType};
 use crate::{
     sat::{self, SatSolverFactoryFn},
@@ -138,6 +139,18 @@ where
             solver_factory,
             constraints_encoder,
         }
+    }
+}
+
+impl<T> SatEncoder for CompleteSemanticsSolver<'_, T>
+where
+    T: LabelType,
+{
+    fn encode(&mut self) -> Box<dyn SatSolver> {
+        let mut solver = (self.solver_factory)();
+        self.constraints_encoder
+            .encode_constraints(self.af, solver.as_mut());
+        solver
     }
 }
 

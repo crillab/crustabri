@@ -20,6 +20,7 @@ pub use preferred_semantics_solver::PreferredSemanticsSolver;
 
 mod specs;
 pub use specs::CredulousAcceptanceComputer;
+pub use specs::SatEncoder;
 pub use specs::SingleExtensionComputer;
 pub use specs::SkepticalAcceptanceComputer;
 

@@ -1,6 +1,6 @@
 use super::{
-    app_helper::AppHelper, command::Command, AuthorsCommand, CheckCommand, ProblemsCommand,
-    SolveCommand,
+    app_helper::AppHelper, command::Command, AuthorsCommand, CheckCommand, EncodeToSatCommand,
+    ProblemsCommand, SolveCommand,
 };
 use anyhow::{Context, Result};
 use clap::Arg;
@@ -25,6 +25,7 @@ pub(crate) fn create_app_helper() -> AppHelper<'static> {
     let commands: Vec<Box<dyn Command>> = vec![
         Box::new(AuthorsCommand::new(app_name, app_version, authors)),
         Box::new(CheckCommand::new()),
+        Box::new(EncodeToSatCommand::new()),
         Box::new(ProblemsCommand::new()),
         Box::new(SolveCommand::new()),
     ];
@@ -76,6 +77,18 @@ pub(crate) fn reader_arg() -> Arg<'static, 'static> {
         .possible_values(&["apx", "iccma23", "iccma23_aba"])
         .default_value("iccma23")
         .help("the input file format")
+        .required(false)
+}
+
+pub(crate) const ARG_ENCODING: &str = "ENCODING";
+
+pub(crate) fn encoding_arg() -> Arg<'static, 'static> {
+    Arg::with_name(ARG_ENCODING)
+        .long("encoding")
+        .empty_values(false)
+        .multiple(false)
+        .possible_values(&["aux_var", "exp", "hybrid"])
+        .help("the SAT encoding to use (not relevant for ST semantics)")
         .required(false)
 }
 

@@ -1,10 +1,11 @@
-use super::specs::{
-    CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer,
+use super::{
+    specs::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
+    SatEncoder,
 };
 use crate::{
     aa::{AAFramework, Argument},
     encodings::{ConstraintsEncoder, DefaultStableConstraintsEncoder},
-    sat::{self, Literal, SatSolverFactoryFn},
+    sat::{self, Literal, SatSolver, SatSolverFactoryFn},
     utils::{ConnectedComponentsComputer, Label, LabelType},
 };
 
@@ -166,6 +167,18 @@ where
             }
         }
         (!status_on_unsat, Some(merged))
+    }
+}
+
+impl<T> SatEncoder for StableSemanticsSolver<'_, T>
+where
+    T: LabelType,
+{
+    fn encode(&mut self) -> Box<dyn SatSolver> {
+        let mut solver = (self.solver_factory)();
+        self.constraints_encoder
+            .encode_constraints(self.af, solver.as_mut());
+        solver
     }
 }
 

@@ -33,8 +33,6 @@ const ARG_EXTERNAL_SAT_SOLVER_OPTIONS: &str = "EXTERNAL_SAT_SOLVER_OPTIONS";
 
 const ARG_CERTIFICATE: &str = "CERTIFICATE";
 
-const ARG_ENCODING: &str = "ENCODING";
-
 pub(crate) struct SolveCommand;
 
 impl SolveCommand {
@@ -65,15 +63,7 @@ impl<'a> Command<'a> for SolveCommand {
                     .help("generate a certificate when possible")
                     .required(false),
             )
-            .arg(
-                Arg::with_name(ARG_ENCODING)
-                    .long("encoding")
-                    .empty_values(false)
-                    .multiple(false)
-                    .possible_values(&["aux_var", "exp", "hybrid"])
-                    .help("the SAT encoding to use (not relevant for ST semantics)")
-                    .required(false),
-            )
+            .arg(common::encoding_arg())
     }
 
     fn execute(&self, arg_matches: &ArgMatches<'_>) -> Result<()> {
@@ -81,12 +71,12 @@ impl<'a> Command<'a> for SolveCommand {
             "apx" => execute_with_reader_and_writer(
                 arg_matches,
                 &mut AspartixReader::default(),
-                &mut AspartixWriter::default(),
+                &mut AspartixWriter,
             ),
             "iccma23" => execute_with_reader_and_writer(
                 arg_matches,
                 &mut Iccma23Reader::default(),
-                &mut Iccma23Writer::default(),
+                &mut Iccma23Writer,
             ),
             _ => unreachable!(),
         }
@@ -420,7 +410,9 @@ where
     T: LabelType,
 {
     let encoding_as_str = |default_value| {
-        let str_encoding = arg_matches.value_of(ARG_ENCODING).unwrap_or(default_value);
+        let str_encoding = arg_matches
+            .value_of(common::ARG_ENCODING)
+            .unwrap_or(default_value);
         info!(r#"encoding strategy is "{}""#, str_encoding);
         str_encoding
     };
@@ -469,7 +461,7 @@ where
 }
 
 fn warn_on_unexpected_encoding(arg_matches: &ArgMatches<'_>) {
-    if arg_matches.value_of(ARG_ENCODING).is_some() {
+    if arg_matches.value_of(common::ARG_ENCODING).is_some() {
         warn!("irrelevant encoding parameter for problem; ignoring it")
     }
 }
