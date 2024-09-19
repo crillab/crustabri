@@ -1,4 +1,4 @@
-use std::{cell::RefCell, io::Read, rc::Rc};
+use std::{cell::RefCell, fs, io::Read, rc::Rc};
 
 use anyhow::Result;
 use clap::{AppSettings, Arg, ArgMatches, SubCommand};
@@ -20,6 +20,7 @@ use super::{cli_manager, command::Command, common};
 
 const CMD_NAME: &str = "encode-to-sat";
 
+const ARG_OUT: &str = "ARG_OUT";
 const ARG_SEM: &str = "ARG_SEM";
 
 pub(crate) struct EncodeToSatCommand;
@@ -52,6 +53,15 @@ impl<'a> Command<'a> for EncodeToSatCommand {
                     .possible_values(&["CO", "ST"])
                     .help("the semantics to encode")
                     .required(true),
+            )
+            .arg(
+                Arg::with_name(ARG_OUT)
+                    .short("o")
+                    .long("output")
+                    .empty_values(false)
+                    .multiple(false)
+                    .help("the output file for the encoding")
+                    .required(false),
             )
     }
 
@@ -112,6 +122,10 @@ where
     solver.solve();
     let mut instance_content = Vec::new();
     std::mem::swap(&mut instance_content, &mut instance.borrow_mut());
-    println!("{}", String::from_utf8(instance_content).unwrap());
+    if let Some(output_file) = arg_matches.value_of(ARG_OUT) {
+        fs::write(output_file, String::from_utf8(instance_content).unwrap())?;
+    } else {
+        println!("{}", String::from_utf8(instance_content).unwrap());
+    }
     Ok(())
 }

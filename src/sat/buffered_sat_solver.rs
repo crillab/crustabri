@@ -43,6 +43,7 @@ pub struct BufferedSatSolver {
     clauses: String,
     solving_fn: Box<SolvingFn>,
     listeners: Vec<Box<dyn SolvingListener>>,
+    str_var_cache: Vec<Option<String>>,
 }
 
 impl BufferedSatSolver {
@@ -57,6 +58,7 @@ impl BufferedSatSolver {
             clauses: String::with_capacity(DEFAULT_BUFFER_CAP),
             solving_fn,
             listeners: Vec::new(),
+            str_var_cache: Vec::new(),
         }
     }
 }
@@ -64,8 +66,18 @@ impl BufferedSatSolver {
 impl SatSolver for BufferedSatSolver {
     fn add_clause(&mut self, cl: Vec<Literal>) {
         cl.iter().for_each(|l| {
-            self.n_vars = usize::max(self.n_vars, usize::from(l.var()));
-            self.clauses.push_str(&format!("{} ", l));
+            let var = usize::from(l.var());
+            self.n_vars = usize::max(self.n_vars, var);
+            self.str_var_cache.resize(self.n_vars + 1, None);
+            if self.str_var_cache[var].is_none() {
+                self.str_var_cache[var] = Some(l.to_string());
+            }
+            if isize::from(*l) < 0 {
+                self.clauses.push('-');
+            }
+            self.clauses
+                .push_str(self.str_var_cache[var].as_ref().unwrap());
+            self.clauses.push(' ');
         });
         self.clauses.push('0');
         self.clauses.push('\n');
