@@ -70,7 +70,7 @@ impl SatSolver for BufferedSatSolver {
             self.n_vars = usize::max(self.n_vars, var);
             self.str_var_cache.resize(self.n_vars + 1, None);
             if self.str_var_cache[var].is_none() {
-                self.str_var_cache[var] = Some(l.to_string());
+                self.str_var_cache[var] = Some(usize::from(l.var()).to_string());
             }
             if isize::from(*l) < 0 {
                 self.clauses.push('-');
