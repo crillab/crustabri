@@ -20,7 +20,7 @@ pub struct DynamicConstraintsEncoder {
 #[derive(Debug)]
 enum SolverVarType {
     Argument(usize),
-    AttackerDisjunctionVar(usize),
+    AttackerDisjunctionVar,
     AttackAssumption,
     Ignored,
 }
@@ -77,7 +77,7 @@ impl DynamicConstraintsEncoder {
         self.solver_vars[self.next_dummy_arg_var] = SolverVarType::Argument(arg_id);
         if self.semantics == Semantics::CO {
             self.solver_vars[self.next_dummy_arg_var + self.n_arg_vars * (1 + self.n_arg_vars)] =
-                SolverVarType::AttackerDisjunctionVar(arg_id);
+                SolverVarType::AttackerDisjunctionVar;
         }
         self.next_dummy_arg_var += 1;
     }
@@ -176,9 +176,8 @@ impl DynamicConstraintsEncoder {
         (0..self.n_arg_vars - n_args).for_each(|_| self.solver_vars.push(SolverVarType::Ignored));
         (0..self.n_arg_vars * self.n_arg_vars)
             .for_each(|_| self.solver_vars.push(SolverVarType::AttackAssumption));
-        af.argument_set().iter().for_each(|a| {
-            self.solver_vars
-                .push(SolverVarType::AttackerDisjunctionVar(a.id()));
+        af.argument_set().iter().for_each(|_| {
+            self.solver_vars.push(SolverVarType::AttackerDisjunctionVar);
         });
         (0..self.n_arg_vars - n_args).for_each(|_| self.solver_vars.push(SolverVarType::Ignored));
         self.next_dummy_arg_var = n_args + 1;

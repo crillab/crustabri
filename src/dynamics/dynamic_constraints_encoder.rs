@@ -19,8 +19,8 @@ pub struct DynamicConstraintsEncoder {
 #[derive(Debug)]
 enum SolverVarType {
     Argument(usize),
-    AttackerDisjunctionVar(usize),
-    AttackerSetSelector(usize),
+    AttackerDisjunctionVar,
+    AttackerSetSelector,
     Ignored,
 }
 
@@ -53,7 +53,7 @@ impl DynamicConstraintsEncoder {
         match self.semantics {
             Semantics::CO | Semantics::PR => {
                 let attacker_disjunction_var =
-                    self.new_solver_var(SolverVarType::AttackerDisjunctionVar(arg_id));
+                    self.new_solver_var(SolverVarType::AttackerDisjunctionVar);
                 self.solver.borrow_mut().add_clause(vec![
                     Literal::from(solver_var as isize).negate(),
                     Literal::from(attacker_disjunction_var as isize).negate(),
@@ -87,8 +87,7 @@ impl DynamicConstraintsEncoder {
             self.remove_selector(s);
             self.arg_id_to_attacker_set_selector_var[to_arg_id] = None;
         }
-        let attacker_set_selector_var =
-            self.new_solver_var(SolverVarType::AttackerSetSelector(to_arg_id));
+        let attacker_set_selector_var = self.new_solver_var(SolverVarType::AttackerSetSelector);
         let attacker_set_selector_lit = Literal::from(attacker_set_selector_var as isize);
         self.assumptions.push(attacker_set_selector_lit);
         self.arg_id_to_attacker_set_selector_var[to_arg_id] = Some(attacker_set_selector_var);

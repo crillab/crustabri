@@ -37,10 +37,9 @@ impl<T, W> WarningResult<T, W> {
             },
             WarningResult::Warned(t, w1) => match other {
                 WarningResult::Ok(u) => WarningResult::Warned((t, u), w1),
-                WarningResult::Warned(u, w2) => WarningResult::Warned(
-                    (t, u),
-                    w1.into_iter().chain(w2.into_iter()).collect::<Vec<W>>(),
-                ),
+                WarningResult::Warned(u, w2) => {
+                    WarningResult::Warned((t, u), w1.into_iter().chain(w2).collect::<Vec<W>>())
+                }
             },
         }
     }

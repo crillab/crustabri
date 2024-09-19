@@ -30,7 +30,7 @@ fn translate_args_os_params() -> Vec<OsString> {
         fake_app.get_matches();
         Box::new(
             std::iter::once("solve".to_string().into())
-                .chain(real_args.into_iter())
+                .chain(real_args)
                 .chain(COMMON_ARGS.iter().map(|s| s.into()))
                 .chain(
                     ["--with-certificate", "--reader", "iccma23"]

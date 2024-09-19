@@ -59,9 +59,7 @@ impl<'a> CliManager<'a> {
         for c in self.commands.iter() {
             app = app.subcommand(c.clap_subcommand());
         }
-        let matches_result = app
-            .clone()
-            .get_matches_from_safe(&mut args.clone().into_iter());
+        let matches_result = app.clone().get_matches_from_safe(args.clone());
         match matches_result {
             Ok(matches) => {
                 for c in self.commands.iter() {
@@ -204,9 +202,9 @@ mod tests {
         }
     }
 
-    fn test_local_command_result(
-        args: Vec<&'static str>,
-    ) -> Result<(Rc<RefCell<bool>>, Rc<RefCell<bool>>)> {
+    type BoolRefCell = Rc<RefCell<bool>>;
+
+    fn test_local_command_result(args: Vec<&'static str>) -> Result<(BoolRefCell, BoolRefCell)> {
         let mut manager = CliManager::new("app_name", "app_version", "author", "about");
         let command_involved = Rc::new(RefCell::new(false));
         let argument_set = Rc::new(RefCell::new(false));

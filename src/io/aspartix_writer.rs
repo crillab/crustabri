@@ -39,7 +39,7 @@ use std::io::Write;
 /// # use crustabri::utils::LabelType;
 /// # use anyhow::Result;
 /// fn write_af_to_stdout<T: LabelType>(af: &AAFramework<T>) -> Result<()> {
-///     let writer = AspartixWriter::default();
+///     let writer = AspartixWriter;
 ///     writer.write_framework(&af, &mut std::io::stdout())
 /// }
 /// # write_af_to_stdout(&AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&[] as &[String])));
@@ -61,7 +61,7 @@ impl AspartixWriter {
     /// # use crustabri::utils::LabelType;
     /// # use anyhow::Result;
     /// fn write_af_to_stdout<T: LabelType>(af: &AAFramework<T>) -> Result<()> {
-    ///     let writer = AspartixWriter::default();
+    ///     let writer = AspartixWriter;
     ///     writer.write_framework(&af, &mut std::io::stdout())
     /// }
     /// # write_af_to_stdout(&AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&[] as &[String])));
@@ -134,7 +134,7 @@ mod tests {
         framework.new_attack(&arg_names[0], &arg_names[0]).unwrap();
         framework.new_attack(&arg_names[1], &arg_names[2]).unwrap();
         let mut buffer = BufWriter::new(Vec::new());
-        let writer = AspartixWriter::default();
+        let writer = AspartixWriter;
         writer.write_framework(&framework, &mut buffer).unwrap();
         assert_eq!(
             "arg(a).\narg(b).\narg(c).\natt(a,a).\natt(b,c).\n",
@@ -146,7 +146,7 @@ mod tests {
     fn test_write_single_extension() {
         let arg_names = vec!["a".to_string(), "b".to_string(), "c".to_string()];
         let args = ArgumentSet::new_with_labels(&arg_names);
-        let writer = AspartixWriter::default();
+        let writer = AspartixWriter;
         let mut buffer = BufWriter::new(Vec::new());
         writer
             .write_single_extension(
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_write_empty_extension() {
-        let writer = AspartixWriter::default();
+        let writer = AspartixWriter;
         let mut buffer = BufWriter::new(Vec::new());
         writer
             .write_single_extension(&mut buffer, &[] as &[&Argument<String>])
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_write_no_extension() {
-        let writer = AspartixWriter::default();
+        let writer = AspartixWriter;
         let mut buffer = BufWriter::new(Vec::new());
         writer.write_no_extension(&mut buffer).unwrap();
         assert_eq!(
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn test_write_acceptance_status_yes() {
-        let writer = AspartixWriter::default();
+        let writer = AspartixWriter;
         let mut buffer = BufWriter::new(Vec::new());
         writer.write_acceptance_status(&mut buffer, true).unwrap();
         assert_eq!(
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_write_acceptance_status_no() {
-        let writer = AspartixWriter::default();
+        let writer = AspartixWriter;
         let mut buffer = BufWriter::new(Vec::new());
         writer.write_acceptance_status(&mut buffer, false).unwrap();
         assert_eq!(

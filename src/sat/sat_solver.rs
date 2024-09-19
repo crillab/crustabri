@@ -204,24 +204,6 @@ impl Assignment {
     }
 }
 
-pub(crate) struct AssignmentIterator<'a> {
-    assignment: &'a Assignment,
-    next: usize,
-}
-
-impl Iterator for AssignmentIterator<'_> {
-    type Item = (usize, Option<bool>);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.next == self.assignment.0.len() {
-            None
-        } else {
-            self.next += 1;
-            Some((self.next, self.assignment.0[self.next - 1]))
-        }
-    }
-}
-
 /// The result produced by a SAT solver search process.
 ///
 /// This object handles positive result (satisfiable, with a model), negative result (unsatisfiable) and also erroneous invocations (timeout, solver crash, ...).

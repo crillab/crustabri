@@ -73,8 +73,7 @@ where
         let mut current = vec![arg];
         let mut newly_in_current = vec![arg];
         self.update_next();
-        while !newly_in_current.is_empty() {
-            let arg = newly_in_current.pop().unwrap();
+        while let Some(arg) = newly_in_current.pop() {
             self.init_af
                 .iter_attacks_from(arg)
                 .chain(self.init_af.iter_attacks_to(arg))
@@ -187,7 +186,7 @@ mod tests {
         let reader = AspartixReader::default();
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let arg = af.argument_set().get_argument(&"a1".to_string()).unwrap();
-        let writer = AspartixWriter::default();
+        let writer = AspartixWriter;
         let mut buffer0 = Cursor::new(Vec::new());
         writer.write_framework(&af, &mut buffer0).unwrap();
         let mut buffer1 = Cursor::new(Vec::new());
@@ -232,7 +231,7 @@ mod tests {
         let af = reader.read(&mut instance.as_bytes()).unwrap();
         let components = ConnectedComponentsComputer::iter_connected_components(&af)
             .collect::<Vec<AAFramework<String>>>();
-        let writer = AspartixWriter::default();
+        let writer = AspartixWriter;
         let mut instance0 = Cursor::new(Vec::new());
         writer
             .write_framework(&components[0], &mut instance0)
@@ -270,7 +269,7 @@ mod tests {
         let components_after = ConnectedComponentsComputer::iter_connected_components(&af)
             .collect::<Vec<AAFramework<String>>>();
         assert_eq!(2, components_after.len());
-        let writer = AspartixWriter::default();
+        let writer = AspartixWriter;
         let mut instance0 = Cursor::new(Vec::new());
         writer
             .write_framework(&components_after[0], &mut instance0)

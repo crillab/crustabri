@@ -50,7 +50,7 @@ mod tests {
     fn test_write_single_extension() {
         let arg_names = vec![0, 1, 2];
         let args = ArgumentSet::new_with_labels(&arg_names);
-        let writer = Iccma23Writer::default();
+        let writer = Iccma23Writer;
         let mut buffer = BufWriter::new(Vec::new());
         writer
             .write_single_extension(&mut buffer, &args.iter().collect::<Vec<&Argument<usize>>>())
@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_write_empty_extension() {
-        let writer = Iccma23Writer::default();
+        let writer = Iccma23Writer;
         let mut buffer = BufWriter::new(Vec::new());
         writer
             .write_single_extension(&mut buffer, &[] as &[&Argument<usize>])
@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn test_write_no_extension() {
-        let writer = Iccma23Writer::default();
+        let writer = Iccma23Writer;
         let mut buffer = BufWriter::new(Vec::new());
         writer.write_no_extension(&mut buffer).unwrap();
         assert_eq!(
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn test_write_acceptance_status_yes() {
-        let writer = Iccma23Writer::default();
+        let writer = Iccma23Writer;
         let mut buffer = BufWriter::new(Vec::new());
         writer.write_acceptance_status(&mut buffer, true).unwrap();
         assert_eq!(
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn test_write_acceptance_status_no() {
-        let writer = Iccma23Writer::default();
+        let writer = Iccma23Writer;
         let mut buffer = BufWriter::new(Vec::new());
         writer.write_acceptance_status(&mut buffer, false).unwrap();
         assert_eq!(
