@@ -124,3 +124,50 @@ pub(crate) fn canonicalize_file_path(file_path: &str) -> Result<PathBuf> {
     fs::canonicalize(PathBuf::from(file_path))
         .with_context(|| format!(r#"while opening file "{}""#, file_path))
 }
+
+#[cfg(feature = "iccma")]
+#[allow(dead_code)]
+pub(crate) fn translate_args_for_iccma() -> Vec<std::ffi::OsString> {
+    use crate::app::cli_manager;
+
+    const COMMON_ARGS: [&str; 2] = ["--logging-level", "off"];
+
+    let real_args = std::env::args_os()
+        .skip(1)
+        .collect::<Vec<std::ffi::OsString>>();
+    let new_args: Vec<std::ffi::OsString> = if real_args.is_empty() {
+        std::iter::once("authors".to_string().into())
+            .chain(COMMON_ARGS.iter().map(|s| s.into()))
+            .collect()
+    } else if real_args == ["--problems"] {
+        std::iter::once("problems".to_string().into())
+            .chain(COMMON_ARGS.iter().map(|s| s.into()))
+            .collect()
+    } else {
+        let mut new_args: Vec<std::ffi::OsString> = std::iter::once("solve".to_string().into())
+            .chain(real_args)
+            .chain(
+                ["--with-certificate", "--reader", "iccma23"]
+                    .iter()
+                    .map(|s| s.into()),
+            )
+            .collect();
+        if std::env::args_os().all(|arg| arg.to_str().unwrap() != "--logging-level") {
+            let fake_app =
+                clap::App::new(option_env!("CARGO_PKG_NAME").unwrap_or("unknown app name"))
+                    .arg(input_args())
+                    .args(&problem_args())
+                    .arg(cli_manager::logging_level_cli_arg_with_default_value("off"));
+            let fake_app_matches = fake_app.get_matches();
+            let logging_level = fake_app_matches
+                .value_of(cli_manager::APP_HELPER_LOGGING_LEVEL_ARG)
+                .unwrap()
+                .to_string();
+            new_args.append(&mut vec!["--logging-level".into(), logging_level.into()]);
+        }
+        new_args
+    };
+    std::iter::once(std::env::args_os().next().unwrap())
+        .chain(new_args)
+        .collect()
+}

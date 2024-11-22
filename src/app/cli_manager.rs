@@ -16,13 +16,22 @@ pub(crate) struct CliManager<'a> {
     commands: Vec<Box<dyn Command<'a>>>,
 }
 
-const APP_HELPER_LOGGING_LEVEL_ARG: &str = "APP_HELPER_LOGGING_LEVEL_ARG";
+pub const APP_HELPER_LOGGING_LEVEL_ARG: &str = "APP_HELPER_LOGGING_LEVEL_ARG";
 
 pub fn logging_level_cli_arg<'a>() -> Arg<'a, 'a> {
     Arg::with_name(APP_HELPER_LOGGING_LEVEL_ARG)
         .long("logging-level")
         .multiple(false)
         .default_value("info")
+        .possible_values(&["trace", "debug", "info", "warn", "error", "off"])
+        .help("set the minimal logging level")
+}
+
+pub fn logging_level_cli_arg_with_default_value(default: &'_ str) -> Arg<'_, '_> {
+    Arg::with_name(APP_HELPER_LOGGING_LEVEL_ARG)
+        .long("logging-level")
+        .multiple(false)
+        .default_value(default)
         .possible_values(&["trace", "debug", "info", "warn", "error", "off"])
         .help("set the minimal logging level")
 }
