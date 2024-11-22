@@ -30,6 +30,7 @@ cadical = "0.1.14"
 chrono = "0.4.19"
 clap = "2.33.3"
 fern = { version = "0.6.0", features = ["colored"] }
+ipasir-loading = "0.1"
 lazy_static = "1.4.0"
 log = "0.4.20"
 permutator = "0.4.3"

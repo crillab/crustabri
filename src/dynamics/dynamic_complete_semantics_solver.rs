@@ -3,7 +3,7 @@ use super::{
 };
 use crate::{
     aa::{AAFramework, Argument, ArgumentSet, Semantics},
-    sat::{self, SatSolver, SatSolverFactoryFn},
+    sat::{DefaultSatSolverFactory, SatSolver, SatSolverFactory},
     solvers::{CredulousAcceptanceComputer, SkepticalAcceptanceComputer},
     utils::LabelType,
 };
@@ -31,17 +31,17 @@ where
     where
         T: LabelType,
     {
-        Self::new_with_sat_solver_factory(Box::new(|| sat::default_solver()))
+        Self::new_with_sat_solver_factory(Box::new(DefaultSatSolverFactory))
     }
 
     /// Builds a new SAT based dynamic solver for the complete semantics.
     ///
     /// The SAT solver to use in given through the solver factory.
-    pub fn new_with_sat_solver_factory(solver_factory: Box<SatSolverFactoryFn>) -> Self
+    pub fn new_with_sat_solver_factory(solver_factory: Box<dyn SatSolverFactory>) -> Self
     where
         T: LabelType,
     {
-        let solver = Rc::new(RefCell::new((solver_factory)()));
+        let solver = Rc::new(RefCell::new(solver_factory.new_solver()));
         Self {
             af: AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&[])),
             buffered_encoder: BufferedDynamicConstraintsEncoder::new(

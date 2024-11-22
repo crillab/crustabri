@@ -1,6 +1,6 @@
 use crate::{
     aa::{AAFramework, Argument, Semantics},
-    sat::{Assignment, Literal, SatSolver},
+    sat::{Assignment, Literal, SatSolver, SatSolverFactory},
     utils::LabelType,
 };
 use anyhow::Result;
@@ -85,7 +85,7 @@ impl DynamicConstraintsEncoder {
     pub fn update_encoding<T: LabelType>(
         &mut self,
         af: &mut AAFramework<T>,
-        solver_factory: &dyn Fn() -> Box<dyn SatSolver>,
+        solver_factory: &dyn SatSolverFactory,
     ) {
         match self.semantics {
             Semantics::CO => self.update_encoding_for_complete_semantics(af, solver_factory),
@@ -97,13 +97,13 @@ impl DynamicConstraintsEncoder {
     pub fn update_encoding_for_stable_semantics<T: LabelType>(
         &mut self,
         af: &mut AAFramework<T>,
-        solver_factory: &dyn Fn() -> Box<dyn SatSolver>,
+        solver_factory: &dyn SatSolverFactory,
     ) {
         if !self.need_to_encode {
             return;
         }
         self.need_to_encode = false;
-        *self.solver.borrow_mut() = (solver_factory)();
+        *self.solver.borrow_mut() = solver_factory.new_solver();
         let n_args = af.n_arguments();
         self.n_arg_vars = (n_args as f64 * self.arg_factor) as usize;
         self.solver
@@ -155,13 +155,13 @@ impl DynamicConstraintsEncoder {
     pub fn update_encoding_for_complete_semantics<T: LabelType>(
         &mut self,
         af: &mut AAFramework<T>,
-        solver_factory: &dyn Fn() -> Box<dyn SatSolver>,
+        solver_factory: &dyn SatSolverFactory,
     ) {
         if !self.need_to_encode {
             return;
         }
         self.need_to_encode = false;
-        *self.solver.borrow_mut() = (solver_factory)();
+        *self.solver.borrow_mut() = solver_factory.new_solver();
         let n_args = af.n_arguments();
         self.n_arg_vars = (n_args as f64 * self.arg_factor) as usize;
         self.solver

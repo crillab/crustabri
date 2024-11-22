@@ -1,7 +1,7 @@
 use super::dynamic_constraints_encoder_attacks::DynamicConstraintsEncoder;
 use crate::{
     aa::{AAFramework, Argument, Semantics},
-    sat::SatSolver,
+    sat::{SatSolver, SatSolverFactory},
     utils::LabelType,
 };
 use anyhow::Result;
@@ -37,7 +37,7 @@ where
     buffer: Vec<DynamicsEvent<T>>,
     next_to_encode: Cell<usize>,
     encoder: DynamicConstraintsEncoder,
-    solver_factory: Box<dyn Fn() -> Box<dyn SatSolver>>,
+    solver_factory: Box<dyn SatSolverFactory>,
 }
 
 impl<T> BufferedDynamicConstraintsEncoder<T>
@@ -46,7 +46,7 @@ where
 {
     pub fn new_with_arg_factor(
         solver: Rc<RefCell<Box<dyn SatSolver>>>,
-        solver_factory: Box<dyn Fn() -> Box<dyn SatSolver>>,
+        solver_factory: Box<dyn SatSolverFactory>,
         semantics: Semantics,
         arg_factor: f64,
     ) -> Self {

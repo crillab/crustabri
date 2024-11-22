@@ -9,7 +9,7 @@ use crustabri::{
         HybridCompleteConstraintsEncoder,
     },
     io::{AspartixReader, Iccma23Reader, InstanceReader},
-    sat::{BufferedSatSolver, SatSolver},
+    sat::{BufferedSatSolver, SatSolver, SatSolverFactory},
     solvers::{CompleteSemanticsSolver, SatEncoder, StableSemanticsSolver},
     utils::LabelType,
 };
@@ -85,15 +85,8 @@ where
     let af = common::read_file_path(file, reader)?;
     let semantics = Semantics::try_from(arg_matches.value_of(ARG_SEM).unwrap()).unwrap();
     let instance = Rc::new(RefCell::new(Vec::new()));
-    let instance_cl = Rc::clone(&instance);
-    let fake_solver_factory: Box<dyn Fn() -> Box<dyn SatSolver>> = Box::new(move || {
-        Box::new(BufferedSatSolver::new(Box::new({
-            let instance_cl = Rc::clone(&instance_cl);
-            move |mut r| {
-                r.read_to_end(&mut instance_cl.borrow_mut()).unwrap();
-                Box::new("s UNSATISFIABLE".as_bytes())
-            }
-        })))
+    let fake_solver_factory = Box::new(FakeSatSolverFactory {
+        instance: Rc::clone(&instance),
     });
     let mut sat_encoder: Box<dyn SatEncoder> = match semantics {
         Semantics::CO => {
@@ -128,4 +121,20 @@ where
         println!("{}", String::from_utf8(instance_content).unwrap());
     }
     Ok(())
+}
+
+struct FakeSatSolverFactory {
+    instance: Rc<RefCell<Vec<u8>>>,
+}
+
+impl SatSolverFactory for FakeSatSolverFactory {
+    fn new_solver(&self) -> Box<dyn SatSolver> {
+        Box::new(BufferedSatSolver::new(Box::new({
+            let instance_cl = Rc::clone(&self.instance);
+            move |mut r| {
+                r.read_to_end(&mut instance_cl.borrow_mut()).unwrap();
+                Box::new("s UNSATISFIABLE".as_bytes())
+            }
+        })))
+    }
 }

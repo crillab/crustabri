@@ -5,7 +5,7 @@ use super::{
 use crate::{
     aa::{AAFramework, Argument},
     encodings::{ConstraintsEncoder, DefaultStableConstraintsEncoder},
-    sat::{self, Literal, SatSolver, SatSolverFactoryFn},
+    sat::{DefaultSatSolverFactory, Literal, SatSolver, SatSolverFactory},
     utils::{ConnectedComponentsComputer, Label, LabelType},
 };
 
@@ -24,7 +24,7 @@ where
     T: LabelType,
 {
     af: &'a AAFramework<T>,
-    solver_factory: Box<SatSolverFactoryFn>,
+    solver_factory: Box<dyn SatSolverFactory>,
     constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
 }
 
@@ -54,7 +54,7 @@ where
     /// # search_one_extension::<usize>(&AAFramework::default());
     /// ```
     pub fn new(af: &'a AAFramework<T>) -> Self {
-        Self::new_with_sat_solver_factory(af, Box::new(|| sat::default_solver()))
+        Self::new_with_sat_solver_factory(af, Box::new(DefaultSatSolverFactory))
     }
 
     /// Builds a new SAT based solver for the stable semantics.
@@ -66,12 +66,12 @@ where
     /// ```
     /// # use crustabri::aa::{AAFramework};
     /// # use crustabri::utils::LabelType;
-    /// # use crustabri::sat::CadicalSolver;
+    /// # use crustabri::sat::DefaultSatSolverFactory;
     /// # use crustabri::solvers::{SingleExtensionComputer, StableSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = StableSemanticsSolver::new_with_sat_solver_factory(
     ///         af,
-    ///         Box::new(|| Box::new(CadicalSolver::default())),
+    ///         Box::new(DefaultSatSolverFactory),
     ///     );
     ///     let opt_ext = solver.compute_one_extension();
     ///     if let Some(ext) = opt_ext {
@@ -84,7 +84,7 @@ where
     /// ```
     pub fn new_with_sat_solver_factory(
         af: &'a AAFramework<T>,
-        solver_factory: Box<SatSolverFactoryFn>,
+        solver_factory: Box<dyn SatSolverFactory>,
     ) -> Self {
         Self {
             af,
@@ -101,7 +101,7 @@ where
     ) -> (bool, Option<Vec<&Argument<T>>>) {
         let mut merged = Vec::new();
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
-            let mut solver = (self.solver_factory)();
+            let mut solver = self.solver_factory.new_solver();
             self.constraints_encoder
                 .encode_constraints(&cc_af, solver.as_mut());
             let args_in_cc = args
@@ -175,7 +175,7 @@ where
     T: LabelType,
 {
     fn encode(&mut self) -> Box<dyn SatSolver> {
-        let mut solver = (self.solver_factory)();
+        let mut solver = self.solver_factory.new_solver();
         self.constraints_encoder
             .encode_constraints(self.af, solver.as_mut());
         solver
@@ -189,7 +189,7 @@ where
     fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
         let mut merged = Vec::new();
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
-            let mut solver = (self.solver_factory)();
+            let mut solver = self.solver_factory.new_solver();
             self.constraints_encoder
                 .encode_constraints(&cc_af, solver.as_mut());
             match solver.solve().unwrap_model() {
