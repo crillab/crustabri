@@ -24,7 +24,7 @@ Extract the archive, then compile it with the flags required to build a shared l
 ./configure CXXFLAGS=-fPIC
 make -j
 cd build
-gcc -shared -o libcadical.so $(ls *.o | grep -v mobical.o)
+g++ -shared -o libcadical.so $(ls *.o | grep -v mobical.o)
 IPASIR_LIBRARY=$(realpath libcadical.so)
 ```
 
