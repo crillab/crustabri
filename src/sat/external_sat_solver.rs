@@ -1,7 +1,7 @@
 use super::{
     buffered_sat_solver::{BufferedSatSolver, DimacsInstanceRead},
     sat_solver::{SolvingListener, SolvingResult},
-    Literal, SatSolver,
+    Literal, SatSolver, SatSolverFactory,
 };
 use std::{
     io::{Read, Write},
@@ -96,6 +96,41 @@ fn exec_solver(mut reader: DimacsInstanceRead, program: &str, options: &[String]
     let stdout = child.stdout.take().expect("Failed to open stdout");
     child.wait().expect("failed to wait on child");
     Box::new(stdout)
+}
+
+/// A [`SatSolverFactory`] for [`ExternalSatSolver`].
+pub struct ExternalSatSolverFactory {
+    program: String,
+    options: Vec<String>,
+    listeners: Vec<Box<dyn Fn() -> Box<dyn SolvingListener>>>,
+}
+
+impl ExternalSatSolverFactory {
+    /// Creates a new factory given the path to the program and the set of options to invoke it with.
+    pub fn new(program: String, options: Vec<String>) -> Self {
+        Self {
+            program,
+            options,
+            listeners: vec![],
+        }
+    }
+
+    /// Adds a function used to generate listeners for new solvers.
+    pub fn add_solver_listener<L>(&mut self, listener: Box<L>)
+    where
+        L: Fn() -> Box<dyn SolvingListener> + 'static,
+    {
+        self.listeners.push(listener);
+    }
+}
+
+impl SatSolverFactory for ExternalSatSolverFactory {
+    fn new_solver(&self) -> Box<dyn SatSolver> {
+        Box::new(ExternalSatSolver::new(
+            self.program.clone(),
+            self.options.clone(),
+        ))
+    }
 }
 
 #[cfg(test)]

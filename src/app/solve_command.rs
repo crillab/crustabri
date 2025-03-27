@@ -16,8 +16,8 @@ use crustabri::{
         ResponseWriter,
     },
     sat::{
-        DefaultSatSolverFactory, ExternalSatSolver, IpasirSatSolver, SatSolver, SatSolverFactory,
-        SolvingListener, SolvingResult,
+        DefaultSatSolverFactory, ExternalSatSolverFactory, IpasirSatSolverFactory,
+        SatSolverFactory, SolvingListener, SolvingResult,
     },
     solvers::{
         CompleteSemanticsSolver, CredulousAcceptanceComputer, GroundedSemanticsSolver,
@@ -27,7 +27,6 @@ use crustabri::{
     },
     utils::LabelType,
 };
-use ipasir_loading::IpasirSolverLoader;
 use log::{info, warn};
 
 const CMD_NAME: &str = "solve";
@@ -418,47 +417,24 @@ fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Result<Box<dyn Sat
     if let Some(s) = external_solver {
         let path = common::canonicalize_file_path(&s)?;
         info!("using {path:?} for problems requiring a SAT solver");
-        Ok(Box::new(ExternalSatSolverFactory {
-            program: path.to_str().unwrap().to_string(),
-            options: external_solver_options,
-        }))
+        let mut factory = ExternalSatSolverFactory::new(
+            path.to_str().unwrap().to_string(),
+            external_solver_options,
+        );
+        factory.add_solver_listener(Box::new(|| {
+            Box::<SatSolvingLogger>::default() as Box<dyn SolvingListener>
+        }));
+        Ok(Box::new(factory))
     } else if let Some(s) = ipasir_library {
         let path = common::canonicalize_file_path(&s)?;
         info!("using {path:?} IPASIR library for problems requiring a SAT solver");
-        let loader = IpasirSolverLoader::from_path(path.to_str().unwrap())
-            .context("while loading the shared library {path}")?;
-        let signature = loader
-            .ipasir_signature()
-            .context("while reading the IPASIR signature")?;
-        info!("IPASIR signature is {}", signature);
-        let result = Box::new(IpasirSatSolverFactory { loader });
+        let factory = IpasirSatSolverFactory::new(path.to_str().unwrap());
+        info!("IPASIR signature is {}", factory.ipasir_signature());
+        let result = Box::new(factory);
         Ok(result)
     } else {
         info!("using the default SAT solver for problems requiring a SAT solver");
         Ok(Box::new(DefaultSatSolverFactory))
-    }
-}
-
-struct ExternalSatSolverFactory {
-    program: String,
-    options: Vec<String>,
-}
-
-impl SatSolverFactory for ExternalSatSolverFactory {
-    fn new_solver(&self) -> Box<dyn SatSolver> {
-        let mut s = ExternalSatSolver::new(self.program.clone(), self.options.clone());
-        s.add_listener(Box::<SatSolvingLogger>::default());
-        Box::new(s)
-    }
-}
-
-struct IpasirSatSolverFactory {
-    loader: IpasirSolverLoader,
-}
-
-impl SatSolverFactory for IpasirSatSolverFactory {
-    fn new_solver(&self) -> Box<dyn SatSolver> {
-        Box::new(IpasirSatSolver::new(self.loader.new_solver().unwrap()))
     }
 }
 

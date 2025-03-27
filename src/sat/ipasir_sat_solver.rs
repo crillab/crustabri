@@ -1,5 +1,7 @@
-use super::{Assignment, Literal, SatSolver, SolvingListener, SolvingResult};
-use ipasir_loading::IpasirSolverWrapper;
+use std::ffi::OsStr;
+
+use super::{Assignment, Literal, SatSolver, SatSolverFactory, SolvingListener, SolvingResult};
+use ipasir_loading::{IpasirSolverLoader, IpasirSolverWrapper};
 
 /// A wrapper for solvers that implement the IPASIR interface.
 pub struct IpasirSatSolver {
@@ -72,5 +74,30 @@ impl SatSolver for IpasirSatSolver {
 
     fn reserve(&mut self, new_max_id: usize) {
         self.n_vars = i32::max(self.n_vars, new_max_id as i32)
+    }
+}
+
+/// A [`SatSolverFactory`] for [`IpasirSatSolver`].
+pub struct IpasirSatSolverFactory {
+    loader: IpasirSolverLoader,
+}
+
+impl IpasirSatSolverFactory {
+    /// Creates a new [`IpasirSatSolverFactory`] given a path the the underlying library.
+    pub fn new<P: AsRef<OsStr>>(path: P) -> Self {
+        Self {
+            loader: IpasirSolverLoader::from_path(path).unwrap(),
+        }
+    }
+
+    /// Returns the IPASIR signature of the underlying library.
+    pub fn ipasir_signature(&self) -> String {
+        self.loader.ipasir_signature().unwrap()
+    }
+}
+
+impl SatSolverFactory for IpasirSatSolverFactory {
+    fn new_solver(&self) -> Box<dyn SatSolver> {
+        Box::new(IpasirSatSolver::new(self.loader.new_solver().unwrap()))
     }
 }

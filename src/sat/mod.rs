@@ -10,9 +10,11 @@ pub use cadical_solver::CadicalSolver;
 
 mod external_sat_solver;
 pub use external_sat_solver::ExternalSatSolver;
+pub use external_sat_solver::ExternalSatSolverFactory;
 
 mod ipasir_sat_solver;
 pub use ipasir_sat_solver::IpasirSatSolver;
+pub use ipasir_sat_solver::IpasirSatSolverFactory;
 
 mod sat_solver;
 pub(crate) use sat_solver::clause;
