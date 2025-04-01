@@ -1,5 +1,6 @@
 use crate::{
     aa::{AAFramework, Argument},
+    aba::FlatABAFramework,
     utils::LabelType,
 };
 use anyhow::{Context, Result};
@@ -61,6 +62,38 @@ where
     /// # print_arg_status(&AspartixReader::default(), &AAFramework::default(), "");
     /// ```
     fn read_arg_from_str<'a>(&self, af: &'a AAFramework<T>, arg: &str) -> Result<&'a Argument<T>>;
+
+    /// Adds a callback function to call when warnings are raised while parsing an AF.
+    ///
+    /// Such callback functions take as input the line number and the warning message.
+    fn add_warning_handler(&mut self, h: WarningHandler);
+}
+
+/// A trait implemented by objects able to read Flat Assumption-Based Argumentation Frameworks.
+///
+/// They must detect errors encountered while reading a framework and can also raise warnings using the ones registered through the [add_warning_handler](Self::add_warning_handler) function.
+///
+/// In addition to complete frameworks, such readers are also able to read single argument labels given as strings.
+pub trait FlatABAInstanceReader<T>
+where
+    T: LabelType,
+{
+    /// Reads an [`FlatABAFramework`].
+    ///
+    /// The [`LabelType`](crate::utils::LabelType) of the returned AFs is depends on the reader.
+    ///
+    /// In case warnings are raised, the callback functions registered by [`add_warning_handler`](Self::add_warning_handler) are triggered.
+    fn read(&self, reader: &mut dyn Read) -> Result<FlatABAFramework<T>>;
+
+    /// Reads an argument from a string.
+    ///
+    /// The argument must belong to the provided framework.
+    /// If it is not the case, an error is returned.
+    fn read_arg_from_str<'a>(
+        &self,
+        af: &'a FlatABAFramework<T>,
+        arg: &str,
+    ) -> Result<&'a Argument<T>>;
 
     /// Adds a callback function to call when warnings are raised while parsing an AF.
     ///
