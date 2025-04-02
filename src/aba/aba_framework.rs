@@ -30,7 +30,7 @@ where
     atom_types: Vec<AtomType>,
     assumptions: Vec<usize>,
     contraries: Vec<usize>,
-    rules: Vec<(usize, Vec<usize>)>,
+    rules: Vec<Vec<Vec<usize>>>,
 }
 
 impl<T> FlatABAFramework<T>
@@ -45,7 +45,7 @@ where
             atom_types: vec![AtomType::Default; n_arguments],
             assumptions: vec![],
             contraries: vec![],
-            rules: Vec::new(),
+            rules: vec![vec![]; n_arguments],
         }
     }
 
@@ -134,7 +134,7 @@ where
                 self.arguments.get_argument_by_id(head_id).label()
             ));
         }
-        self.rules.push((head_id, tail_id_vec));
+        self.rules[head_id].push(tail_id_vec);
         Ok(())
     }
 
@@ -149,11 +149,21 @@ where
         &self.arguments
     }
 
-    /// Iterates over the assumptions.
+    /// Iterates over the assumption labels.
     pub fn iter_assumptions(&self) -> impl Iterator<Item = &Label<T>> + '_ {
         self.assumptions
             .iter()
             .map(|id| self.argument_set().get_argument_by_id(*id))
+    }
+
+    /// Returns a slice containing the ids of the assumption.
+    pub fn assumption_ids(&self) -> &[usize] {
+        &self.assumptions
+    }
+
+    /// Returns true if and only if the provided atom (given by its id) is an assumption.
+    pub fn is_assumption_id(&self, id: usize) -> bool {
+        matches!(self.atom_types[id], AtomType::Assumption(_))
     }
 
     /// Iterates over the contraries, yielding couples (contrary, base_assumption).
@@ -167,15 +177,62 @@ where
         })
     }
 
+    /// Iterates over the contraries, yielding couples (contrary id, base_assumption id).
+    pub fn iter_contraries_by_ids(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.contraries
+            .iter()
+            .map(|id| (*id, self.atom_types[*id].unwrap_contrary_assumption()))
+    }
+
+    /// Given an id, returns the contrary of it if it refers to an assumption which id is declared
+    pub fn contrary_of_id(&self, id: usize) -> Option<usize> {
+        if let AtomType::Assumption(Some(c)) = self.atom_types[id] {
+            Some(c)
+        } else {
+            None
+        }
+    }
+
+    /// Check if an atom given by its id is the contrary of an assumption.
+    /// The assumption is returned if it is the case.
+    pub fn is_contrary_of_id(&self, contrary: usize) -> Option<usize> {
+        if let AtomType::Contrary(a) = self.atom_types[contrary] {
+            Some(a)
+        } else {
+            None
+        }
+    }
+
     /// Iterates over the rules.
-    pub fn iter_rules(&self) -> impl Iterator<Item = (&Label<T>, Vec<&Label<T>>)> + '_ {
-        self.rules.iter().map(|(h, t)| {
+    ///
+    /// The item type is a couple composed of a head and the set of tails which have this head.
+    /// Arguments are given by labels.
+    pub fn iter_rules(&self) -> impl Iterator<Item = (&Label<T>, Vec<Vec<&Label<T>>>)> + '_ {
+        self.rules.iter().enumerate().map(|(head, tails)| {
             (
-                self.argument_set().get_argument_by_id(*h),
-                t.iter()
-                    .map(|id| self.argument_set().get_argument_by_id(*id))
+                self.argument_set().get_argument_by_id(head),
+                tails
+                    .iter()
+                    .map(|t| {
+                        t.iter()
+                            .map(|id| self.argument_set().get_argument_by_id(*id))
+                            .collect()
+                    })
                     .collect(),
             )
         })
+    }
+
+    /// Iterates over the rules.
+    ///
+    /// The item type is a couple composed of a head and the set of tails which have this head.
+    /// Arguments are given by ids.
+    pub fn iter_rules_by_ids(&self) -> impl Iterator<Item = (usize, &Vec<Vec<usize>>)> + '_ {
+        self.rules.iter().enumerate()
+    }
+
+    /// Returns tail of rules which has the given head id.
+    pub fn rule_tails_of_head_ids(&self, head_id: usize) -> &[Vec<usize>] {
+        &self.rules[head_id]
     }
 }

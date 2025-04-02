@@ -193,9 +193,24 @@ mod tests {
                 .collect::<Vec<_>>()
         );
         assert_eq!(
-            vec![(4, vec![5, 1]), (5, vec![]), (6, vec![2, 3])],
+            vec![
+                (1, vec![]),
+                (2, vec![]),
+                (3, vec![]),
+                (4, vec![vec![5, 1]]),
+                (5, vec![vec![]]),
+                (6, vec![vec![2, 3]]),
+                (7, vec![]),
+                (8, vec![]),
+            ],
             af.iter_rules()
-                .map(|(h, t)| (*h.label(), t.iter().map(|a| *a.label()).collect()))
+                .map(|(head, tails)| (
+                    *head.label(),
+                    tails
+                        .iter()
+                        .map(|t| t.iter().map(|a| *a.label()).collect())
+                        .collect()
+                ))
                 .collect::<Vec<_>>()
         );
     }
