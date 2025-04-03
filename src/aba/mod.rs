@@ -6,6 +6,9 @@ pub use aba_framework::FlatABAFramework;
 mod complete_constraints_encoder;
 pub use complete_constraints_encoder::FlatABACompleteConstraintsEncoder;
 
+mod complete_semantics_solver;
+pub use complete_semantics_solver::FlatABACompleteSemanticsSolver;
+
 use crate::{
     aa::Argument,
     sat::{Assignment, Literal, SatSolver},

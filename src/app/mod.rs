@@ -21,4 +21,7 @@ pub(crate) use problems_command::ProblemsCommand;
 mod solve_command;
 pub(crate) use solve_command::SolveCommand;
 
+mod solve_aba_command;
+pub(crate) use solve_aba_command::SolveABACommand;
+
 pub(crate) mod writable_string;

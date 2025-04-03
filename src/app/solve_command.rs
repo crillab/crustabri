@@ -15,7 +15,6 @@ use crustabri::{
         AspartixReader, AspartixWriter, Iccma23Reader, Iccma23Writer, InstanceReader,
         ResponseWriter,
     },
-    sat::{self, ExternalSatSolver, SatSolver, SatSolverFactoryFn, SolvingListener, SolvingResult},
     solvers::{
         CompleteSemanticsSolver, CredulousAcceptanceComputer, GroundedSemanticsSolver,
         IdealSemanticsSolver, PreferredSemanticsSolver, SemiStableSemanticsSolver,
@@ -27,9 +26,6 @@ use crustabri::{
 use log::{info, warn};
 
 const CMD_NAME: &str = "solve";
-
-const ARG_EXTERNAL_SAT_SOLVER: &str = "EXTERNAL_SAT_SOLVER";
-const ARG_EXTERNAL_SAT_SOLVER_OPTIONS: &str = "EXTERNAL_SAT_SOLVER_OPTIONS";
 
 const ARG_CERTIFICATE: &str = "CERTIFICATE";
 
@@ -53,7 +49,7 @@ impl<'a> Command<'a> for SolveCommand {
             .arg(common::input_args())
             .arg(common::reader_arg())
             .args(&common::problem_args())
-            .args(&external_sat_solver_args())
+            .args(&common::external_sat_solver_args())
             .arg(cli_manager::logging_level_cli_arg())
             .arg(
                 Arg::with_name(ARG_CERTIFICATE)
@@ -139,24 +135,6 @@ where
     }
 }
 
-fn external_sat_solver_args() -> Vec<Arg<'static, 'static>> {
-    vec![
-        Arg::with_name(ARG_EXTERNAL_SAT_SOLVER)
-            .long("external-sat-solver")
-            .empty_values(false)
-            .multiple(false)
-            .help("a path to an external SAT solver to replace the embedded one")
-            .required(false),
-        Arg::with_name(ARG_EXTERNAL_SAT_SOLVER_OPTIONS)
-            .long("external-sat-solver-opt")
-            .requires(ARG_EXTERNAL_SAT_SOLVER)
-            .empty_values(false)
-            .multiple(true)
-            .help("a option to give to the external SAT solver")
-            .required(false),
-    ]
-}
-
 fn check_args_definition<T>(query: Query, args: Option<T>) -> Result<()> {
     match query {
         Query::SE => {
@@ -199,32 +177,32 @@ where
         Semantics::PR => Box::new(
             PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
-            create_sat_solver_factory(arg_matches),
+            common::create_sat_solver_factory(arg_matches),
         )),
         Semantics::SST => Box::new(
             SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::STG => Box::new(
             StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ID => Box::new(
             IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
@@ -251,32 +229,32 @@ where
         Semantics::CO | Semantics::PR => Box::new(
             CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
-            create_sat_solver_factory(arg_matches),
+            common::create_sat_solver_factory(arg_matches),
         )),
         Semantics::SST => Box::new(
             SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::STG => Box::new(
             StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ID => Box::new(
             IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
@@ -313,32 +291,32 @@ where
         Semantics::PR => Box::new(
             PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
-            create_sat_solver_factory(arg_matches),
+            common::create_sat_solver_factory(arg_matches),
         )),
         Semantics::SST => Box::new(
             SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::STG => Box::new(
             StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ID => Box::new(
             IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches),
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
@@ -353,52 +331,6 @@ where
         let acceptance_status =
             solver.are_skeptically_accepted(&args.iter().map(|a| a.label()).collect::<Vec<&T>>());
         (writing_fn)(acceptance_status, None)
-    }
-}
-
-#[derive(Default)]
-struct SatSolvingLogger;
-
-impl SolvingListener for SatSolvingLogger {
-    fn solving_start(&self, n_vars: usize, n_clauses: usize) {
-        info!(
-            "launching SAT solver on an instance with {} variables and {} clauses",
-            n_vars, n_clauses
-        );
-    }
-
-    fn solving_end(&self, result: &SolvingResult) {
-        let r = match result {
-            SolvingResult::Satisfiable(_) => "SAT",
-            SolvingResult::Unsatisfiable => "UNSAT",
-            SolvingResult::Unknown => "UNKNOWN",
-        };
-        info!("SAT solver ended with result {}", r);
-    }
-}
-
-fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Box<SatSolverFactoryFn> {
-    let external_solver = arg_matches
-        .value_of(ARG_EXTERNAL_SAT_SOLVER)
-        .map(|s| s.to_string());
-    let external_solver_options = arg_matches
-        .values_of(ARG_EXTERNAL_SAT_SOLVER_OPTIONS)
-        .map(|v| v.map(|o| o.to_string()).collect::<Vec<String>>())
-        .unwrap_or_default();
-    if let Some(s) = external_solver {
-        info!("using {} for problems requiring a SAT solver", s);
-        Box::new(move || {
-            let mut s = ExternalSatSolver::new(s.to_string(), external_solver_options.clone());
-            s.add_listener(Box::<SatSolvingLogger>::default());
-            Box::new(s)
-        })
-    } else {
-        info!("using the default SAT solver for problems requiring a SAT solver");
-        Box::new(|| {
-            let mut s = sat::default_solver();
-            s.add_listener(Box::<SatSolvingLogger>::default());
-            s
-        })
     }
 }
 

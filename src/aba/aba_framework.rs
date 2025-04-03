@@ -31,6 +31,7 @@ where
     assumptions: Vec<usize>,
     contraries: Vec<usize>,
     rules: Vec<Vec<Vec<usize>>>,
+    n_rules: usize,
 }
 
 impl<T> FlatABAFramework<T>
@@ -46,7 +47,23 @@ where
             assumptions: vec![],
             contraries: vec![],
             rules: vec![vec![]; n_arguments],
+            n_rules: 0,
         }
+    }
+
+    /// Returns the number of assumptions in this framework.
+    pub fn n_assumptions(&self) -> usize {
+        self.assumptions.len()
+    }
+
+    /// Returns the number of contraries in this framework.
+    pub fn n_contraries(&self) -> usize {
+        self.contraries.len()
+    }
+
+    /// Returns the number of rules in this framework.
+    pub fn n_rules(&self) -> usize {
+        self.n_rules
     }
 
     /// Declares an existing argument as an assumption given its label.
@@ -135,6 +152,7 @@ where
             ));
         }
         self.rules[head_id].push(tail_id_vec);
+        self.n_rules += 1;
         Ok(())
     }
 

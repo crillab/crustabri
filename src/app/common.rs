@@ -1,10 +1,15 @@
 use super::{
     app_helper::AppHelper, command::Command, AuthorsCommand, CheckCommand, EncodeToSatCommand,
-    ProblemsCommand, SolveCommand,
+    ProblemsCommand, SolveABACommand, SolveCommand,
 };
 use anyhow::{Context, Result};
-use clap::Arg;
-use crustabri::{aa::AAFramework, io::InstanceReader, utils::LabelType};
+use clap::{Arg, ArgMatches};
+use crustabri::{
+    aa::AAFramework,
+    io::InstanceReader,
+    sat::{self, ExternalSatSolver, SatSolver, SatSolverFactoryFn, SolvingListener, SolvingResult},
+    utils::LabelType,
+};
 use log::{info, warn};
 use std::{
     fs::{self, File},
@@ -28,6 +33,7 @@ pub(crate) fn create_app_helper() -> AppHelper<'static> {
         Box::new(EncodeToSatCommand::new()),
         Box::new(ProblemsCommand::new()),
         Box::new(SolveCommand::new()),
+        Box::new(SolveABACommand::new()),
     ];
     for c in commands {
         app.add_command(c);
@@ -123,4 +129,71 @@ where
 pub(crate) fn canonicalize_file_path(file_path: &str) -> Result<PathBuf> {
     fs::canonicalize(PathBuf::from(file_path))
         .with_context(|| format!(r#"while opening file "{}""#, file_path))
+}
+
+pub(crate) const ARG_EXTERNAL_SAT_SOLVER: &str = "EXTERNAL_SAT_SOLVER";
+pub(crate) const ARG_EXTERNAL_SAT_SOLVER_OPTIONS: &str = "EXTERNAL_SAT_SOLVER_OPTIONS";
+
+pub(crate) fn external_sat_solver_args() -> Vec<Arg<'static, 'static>> {
+    vec![
+        Arg::with_name(ARG_EXTERNAL_SAT_SOLVER)
+            .long("external-sat-solver")
+            .empty_values(false)
+            .multiple(false)
+            .help("a path to an external SAT solver to replace the embedded one")
+            .required(false),
+        Arg::with_name(ARG_EXTERNAL_SAT_SOLVER_OPTIONS)
+            .long("external-sat-solver-opt")
+            .requires(ARG_EXTERNAL_SAT_SOLVER)
+            .empty_values(false)
+            .multiple(true)
+            .help("a option to give to the external SAT solver")
+            .required(false),
+    ]
+}
+
+pub(crate) fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Box<SatSolverFactoryFn> {
+    let external_solver = arg_matches
+        .value_of(ARG_EXTERNAL_SAT_SOLVER)
+        .map(|s| s.to_string());
+    let external_solver_options = arg_matches
+        .values_of(ARG_EXTERNAL_SAT_SOLVER_OPTIONS)
+        .map(|v| v.map(|o| o.to_string()).collect::<Vec<String>>())
+        .unwrap_or_default();
+    if let Some(s) = external_solver {
+        info!("using {} for problems requiring a SAT solver", s);
+        Box::new(move || {
+            let mut s = ExternalSatSolver::new(s.to_string(), external_solver_options.clone());
+            s.add_listener(Box::<SatSolvingLogger>::default());
+            Box::new(s)
+        })
+    } else {
+        info!("using the default SAT solver for problems requiring a SAT solver");
+        Box::new(|| {
+            let mut s = sat::default_solver();
+            s.add_listener(Box::<SatSolvingLogger>::default());
+            s
+        })
+    }
+}
+
+#[derive(Default)]
+struct SatSolvingLogger;
+
+impl SolvingListener for SatSolvingLogger {
+    fn solving_start(&self, n_vars: usize, n_clauses: usize) {
+        info!(
+            "launching SAT solver on an instance with {} variables and {} clauses",
+            n_vars, n_clauses
+        );
+    }
+
+    fn solving_end(&self, result: &SolvingResult) {
+        let r = match result {
+            SolvingResult::Satisfiable(_) => "SAT",
+            SolvingResult::Unsatisfiable => "UNSAT",
+            SolvingResult::Unknown => "UNKNOWN",
+        };
+        info!("SAT solver ended with result {}", r);
+    }
 }
