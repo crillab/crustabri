@@ -1,3 +1,4 @@
+use app::common::ARG_INPUT;
 use clap::App;
 use std::ffi::OsString;
 
@@ -27,17 +28,29 @@ fn translate_args_os_params() -> Vec<OsString> {
         let fake_app = App::new(option_env!("CARGO_PKG_NAME").unwrap_or("unknown app name"))
             .arg(app::common::input_args())
             .args(&app::common::problem_args());
-        fake_app.get_matches();
-        Box::new(
-            std::iter::once("solve".to_string().into())
-                .chain(real_args)
-                .chain(COMMON_ARGS.iter().map(|s| s.into()))
-                .chain(
-                    ["--with-certificate", "--reader", "iccma23"]
-                        .iter()
-                        .map(|s| s.into()),
-                ),
-        )
+        let fake_app_matches = fake_app.get_matches();
+        let is_aba = fake_app_matches
+            .value_of(ARG_INPUT)
+            .unwrap()
+            .ends_with(".aba");
+        if is_aba {
+            Box::new(
+                std::iter::once("solve-aba".to_string().into())
+                    .chain(real_args)
+                    .chain(COMMON_ARGS.iter().map(|s| s.into())),
+            )
+        } else {
+            Box::new(
+                std::iter::once("solve".to_string().into())
+                    .chain(real_args)
+                    .chain(COMMON_ARGS.iter().map(|s| s.into()))
+                    .chain(
+                        ["--with-certificate", "--reader", "iccma23"]
+                            .iter()
+                            .map(|s| s.into()),
+                    ),
+            )
+        }
     };
     std::iter::once(std::env::args_os().next().unwrap())
         .chain(new_args)
