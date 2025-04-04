@@ -187,9 +187,9 @@ mod tests {
                 .collect::<Vec<_>>()
         );
         assert_eq!(
-            vec![(6, 1), (7, 2), (8, 3)],
+            vec![(6, vec![1]), (7, vec![2]), (8, vec![3])],
             af.iter_contraries()
-                .map(|(c, a)| (*c.label(), *a.label()))
+                .map(|(c, a)| (*c.label(), a.map(|l| *l.label()).collect::<Vec<_>>()))
                 .collect::<Vec<_>>()
         );
         assert_eq!(

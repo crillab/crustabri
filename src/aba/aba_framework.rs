@@ -4,32 +4,16 @@ use crate::{
 };
 use anyhow::{anyhow, Context, Result};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum AtomType {
-    Assumption(Option<usize>),
-    Contrary(usize),
-    Default,
-}
-
-impl AtomType {
-    fn unwrap_contrary_assumption(&self) -> usize {
-        if let Self::Contrary(a) = self {
-            *a
-        } else {
-            panic!()
-        }
-    }
-}
-
 /// A Flat Assumption-Based Argumentation framework as defined by Bondarenko et al.
 pub struct FlatABAFramework<T>
 where
     T: LabelType,
 {
     arguments: ArgumentSet<T>,
-    atom_types: Vec<AtomType>,
-    assumptions: Vec<usize>,
-    contraries: Vec<usize>,
+    assumptions_map: Vec<Option<Option<usize>>>,
+    assumptions_vec: Vec<usize>,
+    contraries_map: Vec<Vec<usize>>,
+    contraries_vec: Vec<usize>,
     rules: Vec<Vec<Vec<usize>>>,
     n_rules: usize,
 }
@@ -43,9 +27,10 @@ where
         let n_arguments = arguments.len();
         Self {
             arguments,
-            atom_types: vec![AtomType::Default; n_arguments],
-            assumptions: vec![],
-            contraries: vec![],
+            assumptions_map: vec![None; n_arguments],
+            assumptions_vec: vec![],
+            contraries_map: vec![vec![]; n_arguments],
+            contraries_vec: vec![],
             rules: vec![vec![]; n_arguments],
             n_rules: 0,
         }
@@ -53,12 +38,12 @@ where
 
     /// Returns the number of assumptions in this framework.
     pub fn n_assumptions(&self) -> usize {
-        self.assumptions.len()
+        self.assumptions_vec.len()
     }
 
     /// Returns the number of contraries in this framework.
     pub fn n_contraries(&self) -> usize {
-        self.contraries.len()
+        self.contraries_vec.len()
     }
 
     /// Returns the number of rules in this framework.
@@ -82,8 +67,13 @@ where
     ///
     /// An error is returned if the argument does not exists or if it was already set as an assumption or a contrary.
     pub fn set_as_assumption_by_id(&mut self, id: usize) -> Result<()> {
-        self.assumptions.push(id);
-        self.set_as_by_id(id, AtomType::Assumption(None))
+        if self.assumptions_map[id].is_some() || !self.contraries_map[id].is_empty() {
+            Err(anyhow!("cannot set as assumption an atom ({}) which is already set as assumption or contrary", self.arguments.get_argument_by_id(id).label()))
+        } else {
+            self.assumptions_map[id] = Some(None);
+            self.assumptions_vec.push(id);
+            Ok(())
+        }
     }
 
     /// Declares an existing argument as a contrary given its label and the one of its related assumption.
@@ -105,24 +95,16 @@ where
     /// An error is returned if the argument does not exists or if it was already set as an assumption or a contrary.
     /// An error is also returned if a contrary has already been set for the assumption.
     pub fn set_as_contrary_by_ids(&mut self, contrary: usize, assumption: usize) -> Result<()> {
-        self.contraries.push(contrary);
-        if self.atom_types[assumption] != AtomType::Assumption(None) {
+        if self.assumptions_map[assumption] != Some(None) {
             return Err(anyhow!(
                 r#"assumption "{}" has already a contrary"#,
                 self.argument_set().get_argument_by_id(assumption).id()
             ));
         }
-        self.atom_types[assumption] = AtomType::Assumption(Some(contrary));
-        self.set_as_by_id(contrary, AtomType::Contrary(assumption))
-    }
-
-    fn set_as_by_id(&mut self, id: usize, atom_type: AtomType) -> Result<()> {
-        if self.atom_types[id] != AtomType::Default {
-            Err(anyhow!("cannot set as assumption or contrary an atom ({}) which is already set as assumption or contrary", self.arguments.get_argument_by_id(id).label()))
-        } else {
-            self.atom_types[id] = atom_type;
-            Ok(())
-        }
+        self.assumptions_map[assumption] = Some(Some(contrary));
+        self.contraries_map[contrary].push(assumption);
+        self.contraries_vec.push(contrary);
+        Ok(())
     }
 
     /// Adds a new rule given its head and its tail; the arguments are given by their labels.
@@ -145,7 +127,7 @@ where
     ///
     /// An error is returned if one of the arguments does not exists or the head is an assumption.
     pub fn add_rule_by_ids(&mut self, head_id: usize, tail_id_vec: Vec<usize>) -> Result<()> {
-        if matches!(self.atom_types[head_id], AtomType::Assumption(_)) {
+        if self.assumptions_map[head_id].is_some() {
             return Err(anyhow!(
                 "the head of a rule (here {}) cannot be an assumption",
                 self.arguments.get_argument_by_id(head_id).label()
@@ -169,59 +151,54 @@ where
 
     /// Iterates over the assumption labels.
     pub fn iter_assumptions(&self) -> impl Iterator<Item = &Label<T>> + '_ {
-        self.assumptions
+        self.assumptions_vec
             .iter()
             .map(|id| self.argument_set().get_argument_by_id(*id))
     }
 
     /// Returns a slice containing the ids of the assumption.
     pub fn assumption_ids(&self) -> &[usize] {
-        &self.assumptions
+        &self.assumptions_vec
     }
 
     /// Returns true if and only if the provided atom (given by its id) is an assumption.
     pub fn is_assumption_id(&self, id: usize) -> bool {
-        matches!(self.atom_types[id], AtomType::Assumption(_))
+        self.assumptions_map[id].is_some()
     }
 
-    /// Iterates over the contraries, yielding couples (contrary, base_assumption).
-    pub fn iter_contraries(&self) -> impl Iterator<Item = (&Label<T>, &Label<T>)> + '_ {
-        self.contraries.iter().map(|id| {
+    /// Iterates over the contraries, yielding couples (contrary, base_assumptions).
+    pub fn iter_contraries(
+        &self,
+    ) -> impl Iterator<Item = (&Label<T>, impl Iterator<Item = &Label<T>> + '_)> + '_ {
+        self.contraries_vec.iter().map(|id| {
             (
                 self.argument_set().get_argument_by_id(*id),
-                self.argument_set()
-                    .get_argument_by_id(self.atom_types[*id].unwrap_contrary_assumption()),
+                self.contraries_map[*id]
+                    .iter()
+                    .map(|i| self.argument_set().get_argument_by_id(*i)),
             )
         })
     }
 
-    /// Iterates over the contraries, yielding couples (contrary id, base_assumption id).
-    pub fn iter_contraries_by_ids(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
-        self.contraries
+    /// Iterates over the contraries, yielding couples (contrary id, base_assumption ids).
+    pub fn iter_contraries_by_ids(&self) -> impl Iterator<Item = (usize, &[usize])> + '_ {
+        self.contraries_vec
             .iter()
-            .map(|id| (*id, self.atom_types[*id].unwrap_contrary_assumption()))
+            .map(|id| (*id, self.contraries_map[*id].as_slice()))
     }
 
-    /// Given an id, returns the contrary of it if it refers to an assumption which id is declared
+    /// Given an id, returns the contrary of it if it refers to an assumption which contrary is declared
     pub fn contrary_of_id(&self, id: usize) -> Option<usize> {
-        if let AtomType::Assumption(Some(c)) = self.atom_types[id] {
-            Some(c)
-        } else {
-            None
-        }
+        self.assumptions_map[id].and_then(|c| c)
     }
 
-    /// Check if an atom given by its id is the contrary of an assumption.
-    /// The assumption is returned if it is the case.
-    pub fn is_contrary_of_id(&self, contrary: usize) -> Option<usize> {
-        if let AtomType::Contrary(a) = self.atom_types[contrary] {
-            Some(a)
-        } else {
-            None
-        }
+    /// Returns the assumptions of which the atom with the provided id is the contrary.
+    pub fn is_contrary_of_id(&self, contrary: usize) -> &[usize] {
+        self.contraries_map[contrary].as_slice()
     }
 
-    /// Iterates over the rules.
+    /// Iterates over the atoms, returning couples (head, tails).
+    /// If an atom does not belong to any rule head, then (atom, vec![]) is yielded.
     ///
     /// The item type is a couple composed of a head and the set of tails which have this head.
     /// Arguments are given by labels.
@@ -241,7 +218,8 @@ where
         })
     }
 
-    /// Iterates over the rules.
+    /// Iterates over the atoms, returning couples (head, tails).
+    /// If an atom does not belong to any rule head, then (atom, vec![]) is yielded.
     ///
     /// The item type is a couple composed of a head and the set of tails which have this head.
     /// Arguments are given by ids.
@@ -252,5 +230,141 @@ where
     /// Returns tail of rules which has the given head id.
     pub fn rule_tails_of_head_ids(&self, head_id: usize) -> &[Vec<usize>] {
         &self.rules[head_id]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metrics() {
+        let labels: Vec<usize> = (1..=5).collect();
+        let mut af = FlatABAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&labels));
+        assert_eq!(5, af.argument_set().len());
+        assert_eq!(0, af.n_assumptions());
+        assert_eq!(0, af.n_contraries());
+        assert_eq!(0, af.n_rules());
+        af.set_as_assumption(&1).unwrap();
+        af.set_as_assumption(&2).unwrap();
+        af.set_as_assumption(&3).unwrap();
+        af.set_as_contrary(&4, &1).unwrap();
+        af.set_as_contrary(&5, &2).unwrap();
+        af.add_rule(&4, vec![&2, &3]).unwrap();
+        assert_eq!(5, af.argument_set().len());
+        assert_eq!(3, af.n_assumptions());
+        assert_eq!(2, af.n_contraries());
+        assert_eq!(1, af.n_rules());
+        assert_eq!(
+            (1..=3)
+                .map(|i| af.argument_set().get_argument(&i).unwrap().id())
+                .collect::<Vec<_>>(),
+            af.assumption_ids()
+        );
+        for i in 1..=5 {
+            let id = af.argument_set().get_argument(&i).unwrap().id();
+            assert_eq!(af.assumption_ids().contains(&id), af.is_assumption_id(id),)
+        }
+    }
+
+    #[test]
+    fn test_add_as_assumption() {
+        let labels: Vec<usize> = (1..=5).collect();
+        let mut af = FlatABAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&labels));
+        assert_eq!(0, af.n_assumptions());
+        af.set_as_assumption(&1).unwrap();
+        assert_eq!(1, af.n_assumptions());
+        assert!(af.set_as_assumption(&1).is_err());
+        assert_eq!(1, af.n_assumptions());
+    }
+
+    #[test]
+    fn test_add_as_contrary() {
+        let labels: Vec<usize> = (1..=5).collect();
+        let mut af = FlatABAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&labels));
+        af.set_as_assumption(&1).unwrap();
+        let id1 = af.argument_set().get_argument(&1).unwrap().id();
+        let id4 = af.argument_set().get_argument(&4).unwrap().id();
+        assert!(af.is_contrary_of_id(id4).is_empty());
+        assert!(af.contrary_of_id(id1).is_none());
+        assert_eq!(0, af.n_contraries());
+        af.set_as_contrary(&4, &1).unwrap();
+        assert_eq!(&[id1], af.is_contrary_of_id(id4));
+        assert_eq!(Some(id4), af.contrary_of_id(id1));
+        assert_eq!(1, af.n_contraries());
+        assert_eq!(Some(id4), af.contrary_of_id(id1));
+        assert!(af.set_as_contrary(&4, &2).is_err());
+        assert!(af.set_as_contrary(&5, &1).is_err());
+        assert_eq!(1, af.n_contraries());
+        assert_eq!(
+            vec![(
+                af.argument_set().get_argument_by_id(id4),
+                vec![af.argument_set().get_argument_by_id(id1)],
+            )],
+            af.iter_contraries()
+                .map(|(c, a)| (c, a.collect::<Vec<_>>()))
+                .collect::<Vec<_>>(),
+        );
+        assert_eq!(
+            vec![(id4, &[id1] as &[usize])],
+            af.iter_contraries_by_ids().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_add_rules() {
+        let labels: Vec<usize> = (1..=3).collect();
+        let mut af = FlatABAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&labels));
+        af.set_as_assumption(&1).unwrap();
+        assert_eq!(0, af.n_rules());
+        assert!(af.add_rule(&1, vec![]).is_err());
+        assert_eq!(0, af.n_rules());
+        af.add_rule(&2, vec![]).unwrap();
+        af.add_rule(&2, vec![&1]).unwrap();
+        assert_eq!(2, af.n_rules());
+        assert_eq!(
+            vec![
+                (af.argument_set().get_argument(&1).unwrap(), vec![]),
+                (
+                    af.argument_set().get_argument(&2).unwrap(),
+                    vec![vec![], vec![af.argument_set().get_argument(&1).unwrap()]]
+                ),
+                (af.argument_set().get_argument(&3).unwrap(), vec![]),
+            ],
+            af.iter_rules().collect::<Vec<_>>(),
+        );
+        assert_eq!(
+            vec![
+                (af.argument_set().get_argument(&1).unwrap().id(), &vec![]),
+                (
+                    af.argument_set().get_argument(&2).unwrap().id(),
+                    &vec![
+                        vec![],
+                        vec![af.argument_set().get_argument(&1).unwrap().id()]
+                    ]
+                ),
+                (af.argument_set().get_argument(&3).unwrap().id(), &vec![]),
+            ],
+            af.iter_rules_by_ids().collect::<Vec<_>>(),
+        );
+    }
+
+    #[test]
+    fn test_assumption_as_contrary() {
+        let labels: Vec<usize> = (1..=3).collect();
+        let mut af = FlatABAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&labels));
+        af.set_as_assumption(&1).unwrap();
+        af.set_as_assumption(&2).unwrap();
+        af.set_as_contrary(&2, &1).unwrap();
+    }
+
+    #[test]
+    fn test_contrary_of_multiple_assumptions() {
+        let labels: Vec<usize> = (1..=3).collect();
+        let mut af = FlatABAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&labels));
+        af.set_as_assumption(&1).unwrap();
+        af.set_as_assumption(&2).unwrap();
+        af.set_as_contrary(&3, &1).unwrap();
+        af.set_as_contrary(&3, &2).unwrap();
     }
 }

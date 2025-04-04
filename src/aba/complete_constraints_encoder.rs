@@ -79,11 +79,13 @@ fn encode_contraries<T>(af: &FlatABAFramework<T>, solver: &mut dyn SatSolver)
 where
     T: LabelType,
 {
-    for (contrary, assumption) in af.iter_contraries_by_ids() {
-        solver.add_clause(vec![
-            Literal::from(arg_id_to_solver_var(contrary)).negate(),
-            Literal::from(arg_id_to_solver_var(assumption)).negate(),
-        ]);
+    for (contrary, assumptions) in af.iter_contraries_by_ids() {
+        for assumption in assumptions {
+            solver.add_clause(vec![
+                Literal::from(arg_id_to_solver_var(contrary)).negate(),
+                Literal::from(arg_id_to_solver_var(*assumption)).negate(),
+            ]);
+        }
     }
 }
 
