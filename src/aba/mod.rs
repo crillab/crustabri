@@ -8,8 +8,14 @@ mod aba_reduce;
 mod aba_remove_cycles;
 pub use aba_remove_cycles::FlatABACycleBreaker;
 
+mod complete_semantics_encoder;
+pub use complete_semantics_encoder::CompleteSemanticsEncoder;
+
 mod complete_semantics_solver;
 pub use complete_semantics_solver::FlatABACompleteConstraintsSolver;
+
+mod preferred_semantics_solver;
+pub use preferred_semantics_solver::FlatABAPreferredConstraintsSolver;
 
 use crate::{
     aa::Argument,

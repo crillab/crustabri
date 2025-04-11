@@ -8,8 +8,8 @@ use clap::{App, AppSettings, ArgMatches, SubCommand};
 use crustabri::{
     aa::{Argument, Query, Semantics},
     aba::{
-        FlatABACompleteConstraintsSolver, FlatABAConstraintsEncoder, FlatABACycleBreaker,
-        FlatABAFramework,
+        FlatABACompleteConstraintsSolver, FlatABACycleBreaker, FlatABAFramework,
+        FlatABAPreferredConstraintsSolver,
     },
     io::{FlatABAInstanceReader, FlatABAReader, Iccma23Writer, ResponseWriter},
     solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
@@ -84,10 +84,15 @@ fn execute_with_reader_and_writer(
         Ok(())
     };
     match query {
-        Query::SE => compute_one_extension(&af, semantics, &mut |opt_model| match opt_model {
-            Some(m) => writer.write_single_extension(&mut out, &m),
-            None => writer.write_no_extension(&mut out),
-        }),
+        Query::SE => compute_one_extension(
+            &af,
+            semantics,
+            &mut |opt_model| match opt_model {
+                Some(m) => writer.write_single_extension(&mut out, &m),
+                None => writer.write_no_extension(&mut out),
+            },
+            arg_matches,
+        ),
         Query::DC => check_credulous_acceptance(
             &af,
             semantics,
@@ -128,16 +133,21 @@ fn check_args_definition<T>(query: Query, args: Option<T>) -> Result<()> {
     }
 }
 
-fn compute_one_extension<F, T>(
-    af: &FlatABAFramework<T>,
+fn compute_one_extension<F>(
+    af: &FlatABAFramework<usize>,
     semantics: Semantics,
     writing_fn: &mut F,
+    arg_matches: &ArgMatches<'_>,
 ) -> Result<()>
 where
-    T: LabelType,
-    F: FnMut(Option<Vec<&Argument<T>>>) -> Result<()>,
+    F: FnMut(Option<Vec<&Argument<usize>>>) -> Result<()>,
 {
-    let mut solver: Box<dyn SingleExtensionComputer<T>> = match semantics {
+    let mut solver: Box<dyn SingleExtensionComputer<usize>> = match semantics {
+        Semantics::PR => Box::new(FlatABAPreferredConstraintsSolver::new(
+            af,
+            common::create_sat_solver_factory(arg_matches),
+            FlatABACycleBreaker::new_for_usize(),
+        )),
         _ => return Err(anyhow!("unsupported semantics")),
     };
     (writing_fn)(solver.compute_one_extension())
@@ -156,7 +166,7 @@ where
     let mut solver: Box<dyn CredulousAcceptanceComputer<usize>> = match semantics {
         Semantics::CO => Box::new(FlatABACompleteConstraintsSolver::new(
             af,
-            (common::create_sat_solver_factory(arg_matches))(),
+            common::create_sat_solver_factory(arg_matches),
             FlatABACycleBreaker::new_for_usize(),
         )),
         _ => return Err(anyhow!("unsupported semantics")),
