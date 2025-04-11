@@ -7,7 +7,10 @@ use anyhow::{anyhow, Context, Result};
 use clap::{App, AppSettings, ArgMatches, SubCommand};
 use crustabri::{
     aa::{Argument, Query, Semantics},
-    aba::{FlatABACompleteSemanticsSolver, FlatABAFramework},
+    aba::{
+        FlatABACompleteConstraintsSolver, FlatABAConstraintsEncoder, FlatABACycleBreaker,
+        FlatABAFramework,
+    },
     io::{FlatABAInstanceReader, FlatABAReader, Iccma23Writer, ResponseWriter},
     solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
     utils::LabelType,
@@ -48,14 +51,11 @@ impl<'a> Command<'a> for SolveABACommand {
     }
 }
 
-fn execute_with_reader_and_writer<T>(
+fn execute_with_reader_and_writer(
     arg_matches: &ArgMatches<'_>,
-    reader: &mut dyn FlatABAInstanceReader<T>,
-    writer: &mut dyn ResponseWriter<T>,
-) -> Result<()>
-where
-    T: LabelType,
-{
+    reader: &mut dyn FlatABAInstanceReader<usize>,
+    writer: &mut dyn ResponseWriter<usize>,
+) -> Result<()> {
     let file = arg_matches.value_of(common::ARG_INPUT).unwrap();
     reader.add_warning_handler(Box::new(|line, msg| warn!("at line {}: {}", line, msg)));
     let af = common::read_file_path_with(file, &|r| reader.read(r))?;
@@ -76,7 +76,7 @@ where
     let args = arg.map(|a| vec![a]);
     check_args_definition(query, args.as_ref())?;
     let mut out = std::io::stdout();
-    let mut acceptance_status_writer = |status, opt_certificate: Option<Vec<&Argument<T>>>| {
+    let mut acceptance_status_writer = |status, opt_certificate: Option<Vec<&Argument<usize>>>| {
         writer.write_acceptance_status(&mut out, status)?;
         if let Some(c) = opt_certificate {
             writer.write_single_extension(&mut out, c.as_slice())?
@@ -143,26 +143,26 @@ where
     (writing_fn)(solver.compute_one_extension())
 }
 
-fn check_credulous_acceptance<F, T>(
-    af: &FlatABAFramework<T>,
+fn check_credulous_acceptance<F>(
+    af: &FlatABAFramework<usize>,
     semantics: Semantics,
-    args: Vec<&Argument<T>>,
+    args: Vec<&Argument<usize>>,
     arg_matches: &ArgMatches<'_>,
     writing_fn: &mut F,
 ) -> Result<()>
 where
-    T: LabelType,
-    F: FnMut(bool, Option<Vec<&Argument<T>>>) -> Result<()>,
+    F: FnMut(bool, Option<Vec<&Argument<usize>>>) -> Result<()>,
 {
-    let mut solver: Box<dyn CredulousAcceptanceComputer<T>> = match semantics {
-        Semantics::CO => Box::new(FlatABACompleteSemanticsSolver::new_with_sat_solver_factory(
+    let mut solver: Box<dyn CredulousAcceptanceComputer<usize>> = match semantics {
+        Semantics::CO => Box::new(FlatABACompleteConstraintsSolver::new(
             af,
-            common::create_sat_solver_factory(arg_matches),
+            (common::create_sat_solver_factory(arg_matches))(),
+            FlatABACycleBreaker::new_for_usize(),
         )),
         _ => return Err(anyhow!("unsupported semantics")),
     };
     let acceptance_status =
-        solver.are_credulously_accepted(&args.iter().map(|a| a.label()).collect::<Vec<&T>>());
+        solver.are_credulously_accepted(&args.iter().map(|a| a.label()).collect::<Vec<&usize>>());
     (writing_fn)(acceptance_status, None)
 }
 

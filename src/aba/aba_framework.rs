@@ -95,16 +95,25 @@ where
     /// An error is returned if the argument does not exists or if it was already set as an assumption or a contrary.
     /// An error is also returned if a contrary has already been set for the assumption.
     pub fn set_as_contrary_by_ids(&mut self, contrary: usize, assumption: usize) -> Result<()> {
-        if self.assumptions_map[assumption] != Some(None) {
-            return Err(anyhow!(
+        match self.assumptions_map[assumption] {
+            None => Err(anyhow!(
+                r#"atom "{}" is not an assumption"#,
+                self.argument_set().get_argument_by_id(assumption).id()
+            )),
+            Some(Some(_)) => Err(anyhow!(
                 r#"assumption "{}" has already a contrary"#,
                 self.argument_set().get_argument_by_id(assumption).id()
-            ));
+            )),
+            Some(None) => {
+                self.assumptions_map[assumption] = Some(Some(contrary));
+                let contrary_map_vec = &mut self.contraries_map[contrary];
+                if contrary_map_vec.is_empty() {
+                    self.contraries_vec.push(contrary);
+                }
+                contrary_map_vec.push(assumption);
+                Ok(())
+            }
         }
-        self.assumptions_map[assumption] = Some(Some(contrary));
-        self.contraries_map[contrary].push(assumption);
-        self.contraries_vec.push(contrary);
-        Ok(())
     }
 
     /// Adds a new rule given its head and its tail; the arguments are given by their labels.
@@ -136,6 +145,16 @@ where
         self.rules[head_id].push(tail_id_vec);
         self.n_rules += 1;
         Ok(())
+    }
+
+    pub(crate) fn swap_remove_rule_by_id_and_index(&mut self, head_id: usize, tail_index: usize) {
+        self.rules[head_id].swap_remove(tail_index);
+        self.n_rules -= 1;
+    }
+
+    pub(crate) fn remove_rules_with_head_id(&mut self, head_id: usize) {
+        self.n_rules -= self.rules[head_id].len();
+        self.rules[head_id].clear();
     }
 
     fn label_to_argument(&self, label: &T) -> Result<&Argument<T>> {
@@ -366,5 +385,8 @@ mod tests {
         af.set_as_assumption(&2).unwrap();
         af.set_as_contrary(&3, &1).unwrap();
         af.set_as_contrary(&3, &2).unwrap();
+        let contrary_ids = af.iter_contraries_by_ids().collect::<Vec<_>>();
+        assert_eq!(1, contrary_ids.len());
+        assert_eq!(2, contrary_ids[0].1.len());
     }
 }

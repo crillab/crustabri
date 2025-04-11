@@ -3,15 +3,17 @@
 mod aba_framework;
 pub use aba_framework::FlatABAFramework;
 
-mod complete_constraints_encoder;
-pub use complete_constraints_encoder::FlatABACompleteConstraintsEncoder;
+mod aba_reduce;
+
+mod aba_remove_cycles;
+pub use aba_remove_cycles::FlatABACycleBreaker;
 
 mod complete_semantics_solver;
-pub use complete_semantics_solver::FlatABACompleteSemanticsSolver;
+pub use complete_semantics_solver::FlatABACompleteConstraintsSolver;
 
 use crate::{
     aa::Argument,
-    sat::{Assignment, Literal, SatSolver},
+    sat::{Assignment, SatSolver},
     utils::LabelType,
 };
 
@@ -21,15 +23,12 @@ where
     T: LabelType,
 {
     /// Encodes the constraints for the underlying semantics into the SAT solver.
-    fn encode_constraints(&self, af: &FlatABAFramework<T>, solver: &mut dyn SatSolver);
+    fn new(
+        af: &FlatABAFramework<T>,
+        solver: Box<dyn SatSolver>,
+        cycle_breaker: FlatABACycleBreaker<T>,
+    ) -> Self;
 
     /// Translates back a SAT assignment into the corresponding set of arguments.
-    fn assignment_to_extension<'a>(
-        &self,
-        assignment: &Assignment,
-        af: &'a FlatABAFramework<T>,
-    ) -> Vec<&'a Argument<T>>;
-
-    /// Translates an argument into the literal that represent it.
-    fn arg_to_lit(&self, arg: &Argument<T>) -> Literal;
+    fn assignment_to_extension(&self, assignment: &Assignment) -> Vec<&Argument<T>>;
 }
