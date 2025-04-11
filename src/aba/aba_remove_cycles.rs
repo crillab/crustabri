@@ -38,6 +38,20 @@ where
     /// Translates an input framework into a new one without cycles.
     pub fn remove_cycles(&self, init_af: &FlatABAFramework<T>) -> FlatABAFramework<T> {
         let translation_table = IdTranslationTable::new(init_af);
+        let labels = self.create_new_labels(init_af, &translation_table);
+        let mut new_af =
+            FlatABAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&labels));
+        Self::create_new_assumptions(init_af, &mut new_af);
+        Self::create_new_contraries(init_af, &mut new_af);
+        Self::create_new_rules(init_af, &mut new_af, &translation_table);
+        new_af
+    }
+
+    fn create_new_labels(
+        &self,
+        init_af: &FlatABAFramework<T>,
+        translation_table: &IdTranslationTable,
+    ) -> Vec<T> {
         let init_arg_set = init_af.argument_set();
         let mut labels = Vec::with_capacity(translation_table.n_total_atoms());
         for init_arg in init_arg_set.iter() {
@@ -53,11 +67,16 @@ where
                 }
             }
         }
-        let mut new_af =
-            FlatABAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&labels));
+        labels
+    }
+
+    fn create_new_assumptions(init_af: &FlatABAFramework<T>, new_af: &mut FlatABAFramework<T>) {
         for assumption in init_af.assumption_ids() {
             new_af.set_as_assumption_by_id(*assumption).unwrap();
         }
+    }
+
+    fn create_new_contraries(init_af: &FlatABAFramework<T>, new_af: &mut FlatABAFramework<T>) {
         for (contrary, assumptions) in init_af.iter_contraries_by_ids() {
             for assumption in assumptions {
                 new_af
@@ -65,29 +84,40 @@ where
                     .unwrap();
             }
         }
-        for (head, tails) in init_af.iter_rules_by_ids() {
-            for tail in tails {
-                if tail.iter().all(|id| init_af.is_assumption_id(*id)) {
-                    for depth in 0..translation_table.depth() {
-                        new_af
-                            .add_rule_by_ids(translation_table.atom_id(head, depth), tail.clone())
-                            .unwrap();
-                    }
-                } else {
-                    for depth in 0..(translation_table.depth() - 1) {
-                        new_af
-                            .add_rule_by_ids(
-                                translation_table.atom_id(head, depth),
-                                tail.iter()
-                                    .map(|i| translation_table.atom_id(*i, depth + 1))
-                                    .collect(),
-                            )
-                            .unwrap();
+    }
+
+    fn create_new_rules(
+        init_af: &FlatABAFramework<T>,
+        new_af: &mut FlatABAFramework<T>,
+        translation_table: &IdTranslationTable,
+    ) {
+        let mut generate_for_head = vec![false; new_af.argument_set().len()];
+        for (head, _) in init_af.iter_rules_by_ids() {
+            generate_for_head[head] = true;
+        }
+
+        for depth in 0..translation_table.depth() {
+            for (head, tails) in init_af.iter_rules_by_ids() {
+                let new_rule_head = translation_table.atom_id(head, depth);
+                if !generate_for_head[new_rule_head] {
+                    continue;
+                }
+                for tail in tails {
+                    if tail.iter().all(|id| init_af.is_assumption_id(*id)) {
+                        new_af.add_rule_by_ids(new_rule_head, tail.clone()).unwrap();
+                    } else if depth < translation_table.depth() - 1 {
+                        let new_tail = tail
+                            .iter()
+                            .map(|i| translation_table.atom_id(*i, depth + 1))
+                            .collect::<Vec<_>>();
+                        for t in &new_tail {
+                            generate_for_head[*t] = true;
+                        }
+                        new_af.add_rule_by_ids(new_rule_head, new_tail).unwrap();
                     }
                 }
             }
         }
-        new_af
     }
 }
 
