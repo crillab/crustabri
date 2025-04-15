@@ -1,6 +1,11 @@
+use anyhow::{anyhow, Context, Result};
 use app::common::ARG_INPUT;
-use clap::App;
-use std::ffi::OsString;
+use clap::{App, ArgMatches};
+use std::{
+    ffi::OsString,
+    fs::File,
+    io::{BufRead, BufReader},
+};
 
 mod app;
 
@@ -29,11 +34,7 @@ fn translate_args_os_params() -> Vec<OsString> {
             .arg(app::common::input_args())
             .args(&app::common::problem_args());
         let fake_app_matches = fake_app.get_matches();
-        let is_aba = fake_app_matches
-            .value_of(ARG_INPUT)
-            .unwrap()
-            .ends_with(".aba");
-        if is_aba {
+        if is_aba(&fake_app_matches).is_ok_and(|b| b) {
             Box::new(
                 std::iter::once("solve-aba".to_string().into())
                     .chain(real_args)
@@ -55,4 +56,23 @@ fn translate_args_os_params() -> Vec<OsString> {
     std::iter::once(std::env::args_os().next().unwrap())
         .chain(new_args)
         .collect()
+}
+
+fn is_aba(arg_matches: &ArgMatches) -> Result<bool> {
+    let path = arg_matches.value_of(ARG_INPUT).unwrap();
+    let mut reader = BufReader::new(File::open(path).context("while opening input file")?);
+    let mut buffer = String::new();
+    reader
+        .read_line(&mut buffer)
+        .context("while reading first line of input file")?;
+    let mut words = buffer.split_whitespace();
+    if words.next() != Some("p") {
+        return Err(anyhow!(r#"first word of input file must be "p""#));
+    }
+    let is_aba = match words.next() {
+        Some("af") => false,
+        Some("aba") => true,
+        Some(_) | None => return Err(anyhow!(r#"first word of input file must be "p""#)),
+    };
+    Ok(is_aba)
 }
