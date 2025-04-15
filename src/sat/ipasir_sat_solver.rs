@@ -28,7 +28,7 @@ impl SatSolver for IpasirSatSolver {
         for l in cl {
             let i32_lit = isize::from(l) as i32;
             self.solver.ipasir_add(i32_lit).unwrap();
-            self.n_vars = i32::max(self.n_vars, i32_lit);
+            self.n_vars = i32::max(self.n_vars, i32_lit.abs());
         }
         self.solver.ipasir_add(0).unwrap();
         self.n_clauses += 1;
@@ -45,7 +45,7 @@ impl SatSolver for IpasirSatSolver {
         for l in assumptions {
             let i32_lit = isize::from(*l) as i32;
             self.solver.ipasir_assume(i32_lit).unwrap();
-            self.n_vars = i32::max(self.n_vars, i32_lit);
+            self.n_vars = i32::max(self.n_vars, i32_lit.abs());
         }
         let solving_result = match self.solver.ipasir_solve().unwrap() {
             Some(true) => {
@@ -99,5 +99,21 @@ impl IpasirSatSolverFactory {
 impl SatSolverFactory for IpasirSatSolverFactory {
     fn new_solver(&self) -> Box<dyn SatSolver> {
         Box::new(IpasirSatSolver::new(self.loader.new_solver().unwrap()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_n_vars() {
+        if let Ok(path) = std::env::var("IPASIR_LIBRARY") {
+            let factory = IpasirSatSolverFactory::new(path);
+            let mut solver = factory.new_solver();
+            assert_eq!(0, solver.n_vars());
+            solver.add_clause(vec![Literal::from(-1)]);
+            assert_eq!(1, solver.n_vars());
+        }
     }
 }
