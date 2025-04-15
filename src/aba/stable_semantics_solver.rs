@@ -2,7 +2,7 @@ use super::{FlatABAFramework, StableSemanticsEncoder};
 use crate::{
     aa::Argument,
     aba::aba_remove_cycles::FlatABACycleBreaker,
-    sat::SatSolverFactoryFn,
+    sat::SatSolverFactory,
     solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
     utils::LabelType,
 };
@@ -13,7 +13,7 @@ where
     T: LabelType,
 {
     af: &'a FlatABAFramework<T>,
-    solver_factory: Box<SatSolverFactoryFn>,
+    solver_factory: Box<dyn SatSolverFactory>,
     constraints_encoder: StableSemanticsEncoder<T>,
 }
 
@@ -24,7 +24,7 @@ where
     /// Creates a new solver for complete semantics problems applied on flat ABA frameworks.
     pub fn new(
         af: &'a FlatABAFramework<T>,
-        solver_factory: Box<SatSolverFactoryFn>,
+        solver_factory: Box<dyn SatSolverFactory>,
         cycle_breaker: FlatABACycleBreaker<T>,
     ) -> Self {
         Self {
@@ -39,7 +39,7 @@ where
             .iter()
             .map(|a| self.af.argument_set().get_argument(a).unwrap())
             .collect::<Vec<_>>();
-        let solver = (self.solver_factory)();
+        let solver = self.solver_factory.new_solver();
         let mut encoding_data = self.constraints_encoder.encode_constraints(self.af, solver);
         let mut lits = args
             .iter()
@@ -61,7 +61,7 @@ where
     T: LabelType,
 {
     fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
-        let solver = (self.solver_factory)();
+        let solver = self.solver_factory.new_solver();
         let mut encoding_data = self.constraints_encoder.encode_constraints(self.af, solver);
         encoding_data.solver().solve().unwrap_model().map(|m| {
             self.constraints_encoder
@@ -107,7 +107,7 @@ mod test {
     use super::*;
     use crate::{
         io::{FlatABAInstanceReader, FlatABAReader},
-        sat,
+        sat::DefaultSatSolverFactory,
     };
 
     fn assert_se(str_af: &str, expected: Vec<Vec<usize>>) {
@@ -115,7 +115,7 @@ mod test {
         let af = reader.read(&mut str_af.as_bytes()).unwrap();
         let mut solver = FlatABAStableConstraintsSolver::new(
             &af,
-            Box::new(|| sat::default_solver()),
+            Box::new(DefaultSatSolverFactory),
             FlatABACycleBreaker::new_for_usize(),
         );
         let actual = solver
@@ -132,7 +132,7 @@ mod test {
         let af = reader.read(&mut str_af.as_bytes()).unwrap();
         let mut solver = FlatABAStableConstraintsSolver::new(
             &af,
-            Box::new(|| sat::default_solver()),
+            Box::new(DefaultSatSolverFactory),
             FlatABACycleBreaker::new_for_usize(),
         );
         let mut actual = Vec::new();
@@ -149,7 +149,7 @@ mod test {
         let af = reader.read(&mut str_af.as_bytes()).unwrap();
         let mut solver = FlatABAStableConstraintsSolver::new(
             &af,
-            Box::new(|| sat::default_solver()),
+            Box::new(DefaultSatSolverFactory),
             FlatABACycleBreaker::new_for_usize(),
         );
         let mut actual = Vec::new();

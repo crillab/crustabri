@@ -1,6 +1,6 @@
 use super::{CompleteSemanticsEncoder, FlatABAFramework};
 use crate::{
-    aa::Argument, aba::aba_remove_cycles::FlatABACycleBreaker, sat::SatSolverFactoryFn,
+    aa::Argument, aba::aba_remove_cycles::FlatABACycleBreaker, sat::SatSolverFactory,
     solvers::CredulousAcceptanceComputer, utils::LabelType,
 };
 
@@ -10,7 +10,7 @@ where
     T: LabelType,
 {
     af: &'a FlatABAFramework<T>,
-    solver_factory: Box<SatSolverFactoryFn>,
+    solver_factory: Box<dyn SatSolverFactory>,
     constraints_encoder: CompleteSemanticsEncoder<T>,
 }
 
@@ -21,7 +21,7 @@ where
     /// Creates a new solver for complete semantics problems applied on flat ABA frameworks.
     pub fn new(
         af: &'a FlatABAFramework<T>,
-        solver_factory: Box<SatSolverFactoryFn>,
+        solver_factory: Box<dyn SatSolverFactory>,
         cycle_breaker: FlatABACycleBreaker<T>,
     ) -> Self {
         Self {
@@ -41,7 +41,7 @@ where
             .iter()
             .map(|a| self.af.argument_set().get_argument(a).unwrap())
             .collect::<Vec<_>>();
-        let solver = (self.solver_factory)();
+        let solver = self.solver_factory.new_solver();
         let mut encoding_data = self.constraints_encoder.encode_constraints(self.af, solver);
         let lits = args
             .iter()
@@ -67,7 +67,7 @@ mod test {
     use super::*;
     use crate::{
         io::{FlatABAInstanceReader, FlatABAReader},
-        sat,
+        sat::DefaultSatSolverFactory,
     };
 
     fn assert_dc(str_af: &str, expected: Vec<usize>) {
@@ -75,7 +75,7 @@ mod test {
         let af = reader.read(&mut str_af.as_bytes()).unwrap();
         let mut solver = FlatABACompleteConstraintsSolver::new(
             &af,
-            Box::new(|| sat::default_solver()),
+            Box::new(DefaultSatSolverFactory),
             FlatABACycleBreaker::new_for_usize(),
         );
         let mut actual = Vec::new();

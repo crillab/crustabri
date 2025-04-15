@@ -2,7 +2,7 @@ use super::buffered_dynamic_constraints_encoder_attacks::BufferedDynamicConstrai
 use crate::{
     aa::{AAFramework, Argument, ArgumentSet, Semantics},
     dynamics::DynamicSolver,
-    sat::{self, SatSolver, SatSolverFactoryFn},
+    sat::{DefaultSatSolverFactory, SatSolver, SatSolverFactory},
     solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
     utils::LabelType,
 };
@@ -36,7 +36,7 @@ where
     where
         T: LabelType,
     {
-        Self::new_with_sat_solver_factory_and_arg_factor(Box::new(|| sat::default_solver()), 2.)
+        Self::new_with_sat_solver_factory_and_arg_factor(Box::new(DefaultSatSolverFactory), 2.)
     }
 
     /// Builds a new SAT based dynamic solver for the complete semantics.
@@ -50,7 +50,7 @@ where
         T: LabelType,
     {
         Self::new_with_sat_solver_factory_and_arg_factor(
-            Box::new(|| sat::default_solver()),
+            Box::new(DefaultSatSolverFactory),
             arg_factor,
         )
     }
@@ -59,13 +59,13 @@ where
     ///
     /// The SAT solver to use in given through the solver factory.
     pub fn new_with_sat_solver_factory_and_arg_factor(
-        solver_factory: Box<SatSolverFactoryFn>,
+        solver_factory: Box<dyn SatSolverFactory>,
         arg_factor: f64,
     ) -> Self
     where
         T: LabelType,
     {
-        let solver = Rc::new(RefCell::new((solver_factory)()));
+        let solver = Rc::new(RefCell::new(solver_factory.new_solver()));
         Self {
             af: AAFramework::new_with_argument_set(ArgumentSet::new_with_labels(&[])),
             buffered_encoder: BufferedDynamicConstraintsEncoder::new_with_arg_factor(

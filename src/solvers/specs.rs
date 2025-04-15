@@ -5,7 +5,7 @@ use crate::{aa::Argument, sat::SatSolver, utils::LabelType};
 /// Implementors are able to encode the constraints imposed by the semantics into a SAT solver.
 pub trait SatEncoder {
     /// Encodes the constraints into a SAT solver and returns it.
-    fn encode(&mut self) -> Box<dyn SatSolver>;
+    fn encode(&mut self) -> Box<dyn SatSolver + '_>;
 }
 
 /// A trait for solvers able to compute an extension.

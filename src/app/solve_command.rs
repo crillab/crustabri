@@ -177,32 +177,37 @@ where
         Semantics::PR => Box::new(
             PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
-            common::create_sat_solver_factory(arg_matches),
+            common::create_sat_solver_factory(arg_matches)
+                .context("while creating the SAT solver factory")?,
         )),
         Semantics::SST => Box::new(
             SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::STG => Box::new(
             StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ID => Box::new(
             IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
@@ -229,32 +234,37 @@ where
         Semantics::CO | Semantics::PR => Box::new(
             CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
-            common::create_sat_solver_factory(arg_matches),
+            common::create_sat_solver_factory(arg_matches)
+                .context("while creating the SAT solver factory")?,
         )),
         Semantics::SST => Box::new(
             SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::STG => Box::new(
             StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ID => Box::new(
             IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
@@ -291,32 +301,37 @@ where
         Semantics::PR => Box::new(
             PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ST => Box::new(StableSemanticsSolver::new_with_sat_solver_factory(
             af,
-            common::create_sat_solver_factory(arg_matches),
+            common::create_sat_solver_factory(arg_matches)
+                .context("while creating the SAT solver factory")?,
         )),
         Semantics::SST => Box::new(
             SemiStableSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::STG => Box::new(
             StageSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),
         Semantics::ID => Box::new(
             IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
                 af,
-                common::create_sat_solver_factory(arg_matches),
+                common::create_sat_solver_factory(arg_matches)
+                    .context("while creating the SAT solver factory")?,
                 create_encoder(arg_matches, semantics).unwrap(),
             ),
         ),

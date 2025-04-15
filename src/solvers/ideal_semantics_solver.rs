@@ -6,8 +6,7 @@ use super::{
 use crate::{
     aa::{AAFramework, Argument},
     encodings::{aux_var_constraints_encoder, ConstraintsEncoder},
-    sat,
-    sat::{Literal, SatSolver, SatSolverFactoryFn},
+    sat::{DefaultSatSolverFactory, Literal, SatSolver, SatSolverFactory},
     utils::{self, ConnectedComponentsComputer, Label, LabelType},
 };
 use std::{cell::RefCell, rc::Rc};
@@ -24,7 +23,7 @@ where
     T: LabelType,
 {
     af: &'a AAFramework<T>,
-    solver_factory: Box<SatSolverFactoryFn>,
+    solver_factory: Box<dyn SatSolverFactory>,
     constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
 }
 
@@ -50,7 +49,7 @@ where
     /// # search_one_extension::<usize>(&AAFramework::default());
     /// ```
     pub fn new(af: &'a AAFramework<T>) -> Self {
-        Self::new_with_sat_solver_factory(af, Box::new(|| sat::default_solver()))
+        Self::new_with_sat_solver_factory(af, Box::new(DefaultSatSolverFactory))
     }
 
     /// Builds a new SAT based solver for the ideal semantics.
@@ -62,12 +61,12 @@ where
     /// ```
     /// # use crustabri::aa::{AAFramework};
     /// # use crustabri::utils::LabelType;
-    /// # use crustabri::sat::CadicalSolver;
+    /// # use crustabri::sat::DefaultSatSolverFactory;
     /// # use crustabri::solvers::{SingleExtensionComputer, IdealSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory(
     ///         af,
-    ///         Box::new(|| Box::new(CadicalSolver::default())),
+    ///         Box::new(DefaultSatSolverFactory),
     ///     );
     ///     let ext = solver.compute_one_extension().unwrap();
     ///     println!("found the ideal extension: {:?}", ext);
@@ -76,7 +75,7 @@ where
     /// ```
     pub fn new_with_sat_solver_factory(
         af: &'a AAFramework<T>,
-        solver_factory: Box<SatSolverFactoryFn>,
+        solver_factory: Box<dyn SatSolverFactory>,
     ) -> Self {
         Self {
             af,
@@ -94,13 +93,13 @@ where
     /// ```
     /// # use crustabri::aa::{AAFramework};
     /// # use crustabri::utils::LabelType;
-    /// # use crustabri::sat;
+    /// # use crustabri::sat::DefaultSatSolverFactory;
     /// # use crustabri::encodings;
     /// # use crustabri::solvers::{SingleExtensionComputer, IdealSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
     ///         af,
-    ///         Box::new(|| sat::default_solver()),
+    ///         Box::new(DefaultSatSolverFactory),
     ///         encodings::new_default_complete_constraints_encoder(),
     ///     );
     ///     let ext = solver.compute_one_extension().unwrap();
@@ -110,7 +109,7 @@ where
     /// ```
     pub fn new_with_sat_solver_factory_and_constraints_encoder(
         af: &'a AAFramework<T>,
-        solver_factory: Box<SatSolverFactoryFn>,
+        solver_factory: Box<dyn SatSolverFactory>,
         constraints_encoder: Box<dyn ConstraintsEncoder<T>>,
     ) -> Self
     where
@@ -125,7 +124,7 @@ where
 
     fn compute_one_extension_for_cc<'b>(&self, cc_af: &'b AAFramework<T>) -> Vec<&'b Argument<T>> {
         let grounded = utils::grounded_extension(cc_af);
-        let solver = Rc::new(RefCell::new((self.solver_factory)()));
+        let solver = Rc::new(RefCell::new(self.solver_factory.new_solver()));
         let (in_all, n_in_all, n_preferred) =
             self.compute_in_all_extensions_for_cc(cc_af, &grounded, Rc::clone(&solver));
         if n_in_all == grounded.len() {
@@ -174,7 +173,7 @@ where
         cc_args: &[&'b Argument<T>],
     ) -> (bool, Option<Vec<&'b Argument<T>>>) {
         let grounded = utils::grounded_extension(cc_af);
-        let solver = Rc::new(RefCell::new((self.solver_factory)()));
+        let solver = Rc::new(RefCell::new(self.solver_factory.new_solver()));
         let (in_all, n_in_all, n_preferred) =
             self.compute_in_all_extensions_for_cc(cc_af, &grounded, Rc::clone(&solver));
         if cc_args.iter().all(|a| !in_all[a.id()]) {
@@ -254,7 +253,7 @@ where
     fn compute_one_extension(&mut self) -> Option<Vec<&Argument<T>>> {
         let mut merged = Vec::new();
         for cc_af in ConnectedComponentsComputer::iter_connected_components(self.af) {
-            let mut solver = (self.solver_factory)();
+            let mut solver = self.solver_factory.new_solver();
             self.constraints_encoder
                 .encode_constraints(&cc_af, solver.as_mut());
             let local_ext = self.compute_one_extension_for_cc(&cc_af);
@@ -365,7 +364,7 @@ mod tests {
         "#;
                 let reader = AspartixReader::default();
                 let af = reader.read(&mut instance.as_bytes()).unwrap();
-                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(DefaultSatSolverFactory), Box::new($encoder));
                 assert!(solver.compute_one_extension().unwrap().is_empty())
             }
 
@@ -380,7 +379,7 @@ mod tests {
         "#;
                 let reader = AspartixReader::default();
                 let af = reader.read(&mut instance.as_bytes()).unwrap();
-                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(DefaultSatSolverFactory), Box::new($encoder));
                 assert_eq!(
                     vec!["a0"],
                     solver
@@ -408,7 +407,7 @@ mod tests {
         "#;
                 let reader = AspartixReader::default();
                 let af = reader.read(&mut instance.as_bytes()).unwrap();
-                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(DefaultSatSolverFactory), Box::new($encoder));
                 assert_eq!(
                     vec!["a3"],
                     solver
@@ -436,7 +435,7 @@ mod tests {
         "#;
                 let reader = AspartixReader::default();
                 let af = reader.read(&mut instance.as_bytes()).unwrap();
-                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(DefaultSatSolverFactory), Box::new($encoder));
                 assert!(!solver.is_credulously_accepted(&"a0".to_string()));
                 assert!(!solver.is_credulously_accepted(&"a1".to_string()));
                 assert!(!solver.is_credulously_accepted(&"a2".to_string()));
@@ -462,7 +461,7 @@ mod tests {
         "#;
                 let reader = AspartixReader::default();
                 let af = reader.read(&mut instance.as_bytes()).unwrap();
-                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(DefaultSatSolverFactory), Box::new($encoder));
                 assert!(!solver.is_credulously_accepted(&"a0".to_string()));
                 assert!(!solver.is_credulously_accepted(&"a1".to_string()));
                 assert!(!solver.is_credulously_accepted(&"a2".to_string()));
@@ -486,7 +485,7 @@ mod tests {
         "#;
                 let reader = AspartixReader::default();
                 let af = reader.read(&mut instance.as_bytes()).unwrap();
-                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(DefaultSatSolverFactory), Box::new($encoder));
                 assert!(solver.is_credulously_accepted(&"a0".to_string()));
                 assert!(!solver.is_credulously_accepted(&"a1".to_string()));
                 assert!(!solver.is_credulously_accepted(&"a2".to_string()));
@@ -506,7 +505,7 @@ mod tests {
         "#;
                 let reader = AspartixReader::default();
                 let af = reader.read(&mut instance.as_bytes()).unwrap();
-                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(DefaultSatSolverFactory), Box::new($encoder));
                 assert!(solver.is_credulously_accepted(&"a0".to_string()));
                 assert!(!solver.is_credulously_accepted(&"a1".to_string()));
                 assert!(solver.is_skeptically_accepted(&"a0".to_string()));
@@ -532,7 +531,7 @@ mod tests {
                 let af = reader.read(&mut instance.as_bytes()).unwrap();
                 let a3 = af.argument_set().get_argument(&"a3".to_string()).unwrap();
                 let a4 = af.argument_set().get_argument(&"a4".to_string()).unwrap();
-                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                let mut solver = IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(DefaultSatSolverFactory), Box::new($encoder));
                 assert_eq!(
                     (false, None),
                     solver.is_credulously_accepted_with_certificate(&"a0".to_string())
@@ -584,7 +583,7 @@ mod tests {
                 let reader = AspartixReader::default();
                 let af = reader.read(&mut instance.as_bytes()).unwrap();
                 let mut solver =
-                    IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                    IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(DefaultSatSolverFactory), Box::new($encoder));
                 let extension = solver.compute_one_extension().unwrap();
                 let mut actual = extension.iter().map(|l| l.label().clone()).collect::<Vec<String>>();
                 actual.sort_unstable();
@@ -613,7 +612,7 @@ mod tests {
                 let reader = AspartixReader::default();
                 let af = reader.read(&mut instance.as_bytes()).unwrap();
                 let mut solver =
-                    IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                    IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(DefaultSatSolverFactory), Box::new($encoder));
                 assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a1".to_string()]));
                 assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a2".to_string()]));
                 assert!(solver.are_credulously_accepted(&[&"a0".to_string(), &"a3".to_string()]));
@@ -645,7 +644,7 @@ mod tests {
                 let reader = AspartixReader::default();
                 let af = reader.read(&mut instance.as_bytes()).unwrap();
                 let mut solver =
-                    IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(|| sat::default_solver()), Box::new($encoder));
+                    IdealSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(&af, Box::new(DefaultSatSolverFactory), Box::new($encoder));
                 assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a1".to_string()]));
                 assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a2".to_string()]));
                 assert!(solver.are_skeptically_accepted(&[&"a0".to_string(), &"a3".to_string()]));

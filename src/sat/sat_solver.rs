@@ -340,10 +340,22 @@ pub fn default_solver() -> Box<dyn SatSolver> {
     Box::<CadicalSolver>::default()
 }
 
-/// The type of solver factories.
+/// A trait for objects that create [`SatSolver`] instances.
+pub trait SatSolverFactory {
+    /// Returns a new SAT solver.
+    fn new_solver(&self) -> Box<dyn SatSolver>;
+}
+
+/// A SAT solver factory returning the default SAT solver.
 ///
-/// SAT solver factories are functions without parameters that return a SAT solver.
-pub type SatSolverFactoryFn = dyn Fn() -> Box<dyn SatSolver>;
+/// See [`default_solver`] for more information.
+pub struct DefaultSatSolverFactory;
+
+impl SatSolverFactory for DefaultSatSolverFactory {
+    fn new_solver(&self) -> Box<dyn SatSolver> {
+        default_solver()
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -23,6 +23,15 @@ path = "src/main.rs"
 [[bin]]
 name = "crustabri_iccma23"
 path = "src/main_iccma23.rs"
+required-features = ["iccma"]
+
+[[bin]]
+name = "crustabri_iccma25"
+path = "src/main_iccma25.rs"
+required-features = ["iccma"]
+
+[features]
+iccma = []
 
 [dependencies]
 anyhow = "1.0.65"
@@ -30,6 +39,7 @@ cadical = "0.1.14"
 chrono = "0.4.19"
 clap = "2.33.3"
 fern = { version = "0.6.0", features = ["colored"] }
+ipasir-loading = "0.1"
 lazy_static = "1.4.0"
 log = "0.4.20"
 permutator = "0.4.3"

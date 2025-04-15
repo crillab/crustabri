@@ -7,7 +7,10 @@ use clap::{Arg, ArgMatches};
 use crustabri::{
     aa::AAFramework,
     io::InstanceReader,
-    sat::{self, ExternalSatSolver, SatSolver, SatSolverFactoryFn, SolvingListener, SolvingResult},
+    sat::{
+        DefaultSatSolverFactory, ExternalSatSolverFactory, IpasirSatSolverFactory,
+        SatSolverFactory, SolvingListener, SolvingResult,
+    },
     utils::LabelType,
 };
 use log::{info, warn};
@@ -131,8 +134,9 @@ pub(crate) fn canonicalize_file_path(file_path: &str) -> Result<PathBuf> {
         .with_context(|| format!(r#"while opening file "{}""#, file_path))
 }
 
-pub(crate) const ARG_EXTERNAL_SAT_SOLVER: &str = "EXTERNAL_SAT_SOLVER";
-pub(crate) const ARG_EXTERNAL_SAT_SOLVER_OPTIONS: &str = "EXTERNAL_SAT_SOLVER_OPTIONS";
+const ARG_EXTERNAL_SAT_SOLVER: &str = "EXTERNAL_SAT_SOLVER";
+const ARG_EXTERNAL_SAT_SOLVER_OPTIONS: &str = "EXTERNAL_SAT_SOLVER_OPTIONS";
+const ARG_IPASIR_LIBRARY: &str = "ARG_IPASIR_LIBRARY";
 
 pub(crate) fn external_sat_solver_args() -> Vec<Arg<'static, 'static>> {
     vec![
@@ -149,10 +153,19 @@ pub(crate) fn external_sat_solver_args() -> Vec<Arg<'static, 'static>> {
             .multiple(true)
             .help("a option to give to the external SAT solver")
             .required(false),
+        Arg::with_name(ARG_IPASIR_LIBRARY)
+            .long("ipasir-library")
+            .empty_values(false)
+            .multiple(false)
+            .help("a path to a shared library containing an IPASIR compatible SAT solver")
+            .required(false)
+            .conflicts_with(ARG_EXTERNAL_SAT_SOLVER),
     ]
 }
 
-pub(crate) fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Box<SatSolverFactoryFn> {
+pub(crate) fn create_sat_solver_factory(
+    arg_matches: &ArgMatches<'_>,
+) -> Result<Box<dyn SatSolverFactory>> {
     let external_solver = arg_matches
         .value_of(ARG_EXTERNAL_SAT_SOLVER)
         .map(|s| s.to_string());
@@ -160,20 +173,30 @@ pub(crate) fn create_sat_solver_factory(arg_matches: &ArgMatches<'_>) -> Box<Sat
         .values_of(ARG_EXTERNAL_SAT_SOLVER_OPTIONS)
         .map(|v| v.map(|o| o.to_string()).collect::<Vec<String>>())
         .unwrap_or_default();
+    let ipasir_library = arg_matches
+        .value_of(ARG_IPASIR_LIBRARY)
+        .map(|s| s.to_string());
     if let Some(s) = external_solver {
-        info!("using {} for problems requiring a SAT solver", s);
-        Box::new(move || {
-            let mut s = ExternalSatSolver::new(s.to_string(), external_solver_options.clone());
-            s.add_listener(Box::<SatSolvingLogger>::default());
-            Box::new(s)
-        })
+        let path = canonicalize_file_path(&s)?;
+        info!("using {path:?} for problems requiring a SAT solver");
+        let mut factory = ExternalSatSolverFactory::new(
+            path.to_str().unwrap().to_string(),
+            external_solver_options,
+        );
+        factory.add_solver_listener(Box::new(|| {
+            Box::<SatSolvingLogger>::default() as Box<dyn SolvingListener>
+        }));
+        Ok(Box::new(factory))
+    } else if let Some(s) = ipasir_library {
+        let path = canonicalize_file_path(&s)?;
+        info!("using {path:?} IPASIR library for problems requiring a SAT solver");
+        let factory = IpasirSatSolverFactory::new(path.to_str().unwrap());
+        info!("IPASIR signature is {}", factory.ipasir_signature());
+        let result = Box::new(factory);
+        Ok(result)
     } else {
         info!("using the default SAT solver for problems requiring a SAT solver");
-        Box::new(|| {
-            let mut s = sat::default_solver();
-            s.add_listener(Box::<SatSolvingLogger>::default());
-            s
-        })
+        Ok(Box::new(DefaultSatSolverFactory))
     }
 }
 
@@ -196,4 +219,78 @@ impl SolvingListener for SatSolvingLogger {
         };
         info!("SAT solver ended with result {}", r);
     }
+}
+
+#[cfg(feature = "iccma")]
+#[allow(dead_code)]
+pub(crate) fn translate_args_for_iccma() -> Vec<std::ffi::OsString> {
+    use crate::app::cli_manager::{self, APP_HELPER_LOGGING_LEVEL_ARG};
+
+    const COMMON_ARGS: [&str; 2] = ["--logging-level", "off"];
+
+    let mut real_args = std::env::args_os()
+        .skip(1)
+        .collect::<Vec<std::ffi::OsString>>();
+    let new_args: Vec<std::ffi::OsString> = if real_args.is_empty() {
+        std::iter::once("authors".to_string().into())
+            .chain(COMMON_ARGS.iter().map(|s| s.into()))
+            .collect()
+    } else if real_args == ["--problems"] {
+        std::iter::once("problems".to_string().into())
+            .chain(COMMON_ARGS.iter().map(|s| s.into()))
+            .collect()
+    } else {
+        let fake_app = clap::App::new(option_env!("CARGO_PKG_NAME").unwrap_or("unknown app name"))
+            .arg(input_args())
+            .args(&problem_args())
+            .arg(cli_manager::logging_level_cli_arg_with_default_value("off"));
+        let fake_app_matches = fake_app.get_matches();
+        let mut new_args: Vec<std::ffi::OsString> = if is_aba(&fake_app_matches).is_ok_and(|b| b) {
+            vec!["solve-aba".to_string().into()]
+        } else {
+            ["solve", "--with-certificate", "--reader", "iccma23"]
+                .iter()
+                .map(|s| s.into())
+                .collect()
+        };
+        if !std::env::args_os().any(|arg| arg.to_str().unwrap().starts_with("--logging-level=")) {
+            new_args.push("--logging-level".to_string().into());
+            new_args.push(
+                fake_app_matches
+                    .value_of(APP_HELPER_LOGGING_LEVEL_ARG)
+                    .unwrap()
+                    .to_string()
+                    .into(),
+            );
+        }
+        new_args.append(&mut real_args);
+        new_args
+    };
+    std::iter::once(std::env::args_os().next().unwrap())
+        .chain(new_args)
+        .collect()
+}
+
+#[cfg(feature = "iccma")]
+#[allow(dead_code)]
+fn is_aba(arg_matches: &ArgMatches) -> Result<bool> {
+    use anyhow::anyhow;
+    use std::io::BufRead;
+
+    let path = arg_matches.value_of(ARG_INPUT).unwrap();
+    let mut reader = BufReader::new(File::open(path).context("while opening input file")?);
+    let mut buffer = String::new();
+    reader
+        .read_line(&mut buffer)
+        .context("while reading first line of input file")?;
+    let mut words = buffer.split_whitespace();
+    if words.next() != Some("p") {
+        return Err(anyhow!(r#"first word of input file must be "p""#));
+    }
+    let is_aba = match words.next() {
+        Some("af") => false,
+        Some("aba") => true,
+        Some(_) | None => return Err(anyhow!(r#"first word of input file must be "p""#)),
+    };
+    Ok(is_aba)
 }
