@@ -184,10 +184,21 @@ where
                     d.solver().add_clause(vec![solver_assumption.negate()]);
                 }
             };
-            let discard_current =
+            let discard_maximal =
                 |a: &mut Vec<Literal>, e: &[&Argument<T>], d: &mut EncodingData| {
                     let (_, mut not_in_extension) = self.split_in_extension(e, d);
                     let new_solver_assumption = Literal::from(1 + d.solver().n_vars() as isize);
+                    not_in_extension.push(new_solver_assumption.negate());
+                    d.solver().add_clause(not_in_extension);
+                    a.push(new_solver_assumption);
+                };
+            let discard_partial =
+                |a: &mut Vec<Literal>, e: &[&Argument<T>], d: &mut EncodingData| {
+                    let (mut in_extension, mut not_in_extension) = self.split_in_extension(e, d);
+                    in_extension.iter_mut().for_each(|l| *l = l.negate());
+                    let new_solver_assumption = Literal::from(1 + d.solver().n_vars() as isize);
+                    in_extension.push(new_solver_assumption.negate());
+                    d.solver().add_clause(in_extension);
                     not_in_extension.push(new_solver_assumption.negate());
                     d.solver().add_clause(not_in_extension);
                     a.push(new_solver_assumption);
@@ -206,14 +217,14 @@ where
                                 .var(),
                         ) == Some(true)
                     }) {
-                        discard_current(&mut solver_assumptions, &extension, &mut encoding_data);
+                        discard_maximal(&mut solver_assumptions, &extension, &mut encoding_data);
                     } else {
                         forgot_assumed_clauses(&solver_assumptions, &mut encoding_data);
                         return false;
                     }
                 }
                 MaximalComputationResult::Partial { extension, .. } => {
-                    discard_current(&mut solver_assumptions, &extension, &mut encoding_data);
+                    discard_partial(&mut solver_assumptions, &extension, &mut encoding_data);
                 }
                 MaximalComputationResult::Unsat => {
                     forgot_assumed_clauses(&solver_assumptions, &mut encoding_data);
