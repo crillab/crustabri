@@ -9,7 +9,7 @@ use crustabri::{
     aa::{Argument, Query, Semantics},
     aba::{
         FlatABACompleteConstraintsSolver, FlatABACycleBreaker, FlatABAFramework,
-        FlatABAPreferredConstraintsSolver,
+        FlatABAPreferredConstraintsSolver, FlatABAStableConstraintsSolver,
     },
     io::{FlatABAInstanceReader, FlatABAReader, Iccma23Writer, ResponseWriter},
     solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
@@ -143,6 +143,11 @@ where
     F: FnMut(Option<Vec<&Argument<usize>>>) -> Result<()>,
 {
     let mut solver: Box<dyn SingleExtensionComputer<usize>> = match semantics {
+        Semantics::ST => Box::new(FlatABAStableConstraintsSolver::new(
+            af,
+            common::create_sat_solver_factory(arg_matches),
+            FlatABACycleBreaker::new_for_usize(),
+        )),
         Semantics::PR => Box::new(FlatABAPreferredConstraintsSolver::new(
             af,
             common::create_sat_solver_factory(arg_matches),
@@ -169,6 +174,11 @@ where
             common::create_sat_solver_factory(arg_matches),
             FlatABACycleBreaker::new_for_usize(),
         )),
+        Semantics::ST => Box::new(FlatABAStableConstraintsSolver::new(
+            af,
+            common::create_sat_solver_factory(arg_matches),
+            FlatABACycleBreaker::new_for_usize(),
+        )),
         _ => return Err(anyhow!("unsupported semantics")),
     };
     let acceptance_status =
@@ -187,6 +197,11 @@ where
     F: FnMut(bool, Option<Vec<&Argument<usize>>>) -> Result<()>,
 {
     let mut solver: Box<dyn SkepticalAcceptanceComputer<usize>> = match semantics {
+        Semantics::ST => Box::new(FlatABAStableConstraintsSolver::new(
+            af,
+            common::create_sat_solver_factory(arg_matches),
+            FlatABACycleBreaker::new_for_usize(),
+        )),
         Semantics::PR => Box::new(FlatABAPreferredConstraintsSolver::new(
             af,
             common::create_sat_solver_factory(arg_matches),

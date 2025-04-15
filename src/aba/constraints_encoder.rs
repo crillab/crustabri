@@ -6,23 +6,23 @@ use crate::{
 
 use super::{FlatABACycleBreaker, FlatABAFramework};
 
+pub struct EncodingData {
+    solver: Box<dyn SatSolver>,
+    varmap: VarMap,
+}
+
+impl EncodingData {
+    pub fn solver(&mut self) -> &mut dyn SatSolver {
+        self.solver.as_mut()
+    }
+}
+
 /// An encoder dedicated to complete semantics for flat ABA frameworks.
 pub struct CompleteSemanticsEncoder<T>
 where
     T: LabelType,
 {
     cycle_breaker: FlatABACycleBreaker<T>,
-}
-
-pub struct CompleteSemanticsEncoderEncodingData {
-    solver: Box<dyn SatSolver>,
-    varmap: VarMap,
-}
-
-impl CompleteSemanticsEncoderEncodingData {
-    pub fn solver(&mut self) -> &mut dyn SatSolver {
-        self.solver.as_mut()
-    }
 }
 
 impl<T> CompleteSemanticsEncoder<T>
@@ -39,7 +39,7 @@ where
         &self,
         af: &FlatABAFramework<T>,
         mut solver: Box<dyn SatSolver>,
-    ) -> CompleteSemanticsEncoderEncodingData
+    ) -> EncodingData
     where
         T: LabelType,
     {
@@ -50,22 +50,12 @@ where
         encode_rule_is_defeated(&af, solver.as_mut(), &mut varmap);
         encode_contraries(&af, solver.as_mut(), &mut varmap);
         encode_defense(&af, solver.as_mut(), &mut varmap);
-        CompleteSemanticsEncoderEncodingData { solver, varmap }
+        EncodingData { solver, varmap }
     }
 
     /// Translates an argument into the literal that represent it.
-    pub fn arg_to_lit(
-        &self,
-        arg: &Argument<T>,
-        encoding_data: &mut CompleteSemanticsEncoderEncodingData,
-    ) -> Literal {
-        if let Some(v) = encoding_data.varmap.assumption_var(arg.id()) {
-            v
-        } else {
-            encoding_data
-                .varmap
-                .atom_is_applied_var(arg.id(), encoding_data.solver.as_mut())
-        }
+    pub fn arg_to_lit(&self, arg: &Argument<T>, encoding_data: &mut EncodingData) -> Literal {
+        arg_to_lit(arg, encoding_data)
     }
 
     /// Translates an assignment into the corresponding extension.
@@ -73,23 +63,99 @@ where
         &self,
         assignment: &Assignment,
         af: &'a FlatABAFramework<T>,
-        encoding_data: &CompleteSemanticsEncoderEncodingData,
+        encoding_data: &EncodingData,
     ) -> Vec<&'a Argument<T>> {
-        let mut extension = Vec::new();
-        for assumption in af.assumption_ids() {
-            if assignment.value_of(
-                encoding_data
-                    .varmap
-                    .assumption_var(*assumption)
-                    .unwrap()
-                    .var(),
-            ) == Some(true)
-            {
-                extension.push(af.argument_set().get_argument_by_id(*assumption));
-            }
-        }
-        extension
+        assignment_to_extension(assignment, af, encoding_data)
     }
+}
+
+/// An encoder dedicated to complete semantics for flat ABA frameworks.
+pub struct StableSemanticsEncoder<T>
+where
+    T: LabelType,
+{
+    cycle_breaker: FlatABACycleBreaker<T>,
+}
+
+impl<T> StableSemanticsEncoder<T>
+where
+    T: LabelType,
+{
+    /// Creates an encoder dedicated to stable semantics for flat ABA frameworks.
+    pub fn new(cycle_breaker: FlatABACycleBreaker<T>) -> Self {
+        Self { cycle_breaker }
+    }
+
+    /// Encodes the constraints for the provided framework into the provided solver.
+    pub fn encode_constraints(
+        &self,
+        af: &FlatABAFramework<T>,
+        mut solver: Box<dyn SatSolver>,
+    ) -> EncodingData
+    where
+        T: LabelType,
+    {
+        let mut af = self.cycle_breaker.remove_cycles(af);
+        af.reduce_not_derivable();
+        let mut varmap = VarMap::new(&af, solver.as_mut());
+        encode_rule_is_applied(&af, solver.as_mut(), &mut varmap);
+        encode_rule_is_defeated(&af, solver.as_mut(), &mut varmap);
+        encode_contraries(&af, solver.as_mut(), &mut varmap);
+        encode_stable(&af, solver.as_mut(), &mut varmap);
+        EncodingData { solver, varmap }
+    }
+
+    /// Translates an argument into the literal that represent it.
+    pub fn arg_to_lit(&self, arg: &Argument<T>, encoding_data: &mut EncodingData) -> Literal {
+        arg_to_lit(arg, encoding_data)
+    }
+
+    /// Translates an assignment into the corresponding extension.
+    pub fn assignment_to_extension<'a>(
+        &self,
+        assignment: &Assignment,
+        af: &'a FlatABAFramework<T>,
+        encoding_data: &EncodingData,
+    ) -> Vec<&'a Argument<T>> {
+        assignment_to_extension(assignment, af, encoding_data)
+    }
+}
+
+fn arg_to_lit<T>(arg: &Argument<T>, encoding_data: &mut EncodingData) -> Literal
+where
+    T: LabelType,
+{
+    if let Some(v) = encoding_data.varmap.assumption_var(arg.id()) {
+        v
+    } else {
+        encoding_data
+            .varmap
+            .atom_is_applied_var(arg.id(), encoding_data.solver.as_mut())
+    }
+}
+
+fn assignment_to_extension<'a, T>(
+    assignment: &Assignment,
+    af: &'a FlatABAFramework<T>,
+    encoding_data: &EncodingData,
+) -> Vec<&'a Argument<T>>
+where
+    T: LabelType,
+{
+    let mut extension = Vec::new();
+    for assumption in af.assumption_ids() {
+        if assignment.value_of(
+            encoding_data
+                .varmap
+                .assumption_var(*assumption)
+                .unwrap()
+                .var(),
+        ) == Some(true)
+        {
+            extension.push(af.argument_set().get_argument_by_id(*assumption));
+        }
+    }
+    extension
 }
 
 fn encode_rule_is_applied<T>(
@@ -206,6 +272,27 @@ where
                 let contrary_is_defeated_lit = varmap.atom_is_defeated_var(c, solver);
                 solver.add_clause(vec![assumption_lit.negate(), contrary_is_defeated_lit]);
                 solver.add_clause(vec![assumption_lit, contrary_is_defeated_lit.negate()]);
+            }
+            None => {
+                solver.add_clause(vec![assumption_lit]);
+            }
+        }
+    }
+}
+
+fn encode_stable<T>(af: &FlatABAFramework<T>, solver: &mut dyn SatSolver, varmap: &mut VarMap)
+where
+    T: LabelType,
+{
+    for assumption in af.assumption_ids() {
+        let assumption_lit = varmap.assumption_var(*assumption).unwrap();
+        match af.contrary_of_id(*assumption) {
+            Some(c) if af.is_assumption_id(c) => {
+                solver.add_clause(vec![assumption_lit, varmap.assumption_var(c).unwrap()]);
+            }
+            Some(c) => {
+                let contrary_is_applied_lit = varmap.atom_is_applied_var(c, solver);
+                solver.add_clause(vec![assumption_lit, contrary_is_applied_lit]);
             }
             None => {
                 solver.add_clause(vec![assumption_lit]);

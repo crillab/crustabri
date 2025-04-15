@@ -1,6 +1,6 @@
 use super::{
-    complete_semantics_encoder::CompleteSemanticsEncoderEncodingData, CompleteSemanticsEncoder,
-    FlatABACycleBreaker, FlatABAFramework,
+    constraints_encoder::EncodingData, CompleteSemanticsEncoder, FlatABACycleBreaker,
+    FlatABAFramework,
 };
 use crate::{
     aa::Argument,
@@ -78,7 +78,7 @@ where
 
     fn compute_maximal_under_assumptions_until(
         &self,
-        encoding_data: &mut CompleteSemanticsEncoderEncodingData,
+        encoding_data: &mut EncodingData,
         init_solver_assumptions: &[Literal],
         return_on: &[&Argument<T>],
     ) -> MaximalComputationResult<T> {
@@ -129,7 +129,7 @@ where
     fn split_in_extension(
         &self,
         extension: &[&Argument<T>],
-        encoding_data: &mut CompleteSemanticsEncoderEncodingData,
+        encoding_data: &mut EncodingData,
     ) -> (Vec<Literal>, Vec<Literal>) {
         let arg_set = self.af.argument_set();
         let mut in_ext_bool = vec![false; arg_set.len()];
@@ -179,16 +179,13 @@ where
             .collect::<Vec<_>>();
         let mut solver_assumptions = Vec::new();
         loop {
-            let forgot_assumed_clauses =
-                |a: &[Literal], d: &mut CompleteSemanticsEncoderEncodingData| {
-                    for solver_assumption in a {
-                        d.solver().add_clause(vec![solver_assumption.negate()]);
-                    }
-                };
+            let forgot_assumed_clauses = |a: &[Literal], d: &mut EncodingData| {
+                for solver_assumption in a {
+                    d.solver().add_clause(vec![solver_assumption.negate()]);
+                }
+            };
             let discard_current =
-                |a: &mut Vec<Literal>,
-                 e: &[&Argument<T>],
-                 d: &mut CompleteSemanticsEncoderEncodingData| {
+                |a: &mut Vec<Literal>, e: &[&Argument<T>], d: &mut EncodingData| {
                     let (_, mut not_in_extension) = self.split_in_extension(e, d);
                     let new_solver_assumption = Literal::from(1 + d.solver().n_vars() as isize);
                     not_in_extension.push(new_solver_assumption.negate());
