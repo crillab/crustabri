@@ -68,7 +68,7 @@ where
         }
     }
 
-    /// Translates an assignment into the correponding extension.
+    /// Translates an assignment into the corresponding extension.
     pub fn assignment_to_extension<'a>(
         &self,
         assignment: &Assignment,
@@ -234,13 +234,20 @@ impl VarMap {
         }
         let applied_rule_solver_vars = Self::generate_one_var_per_rule(af, solver);
         let defeated_rule_solver_vars = Self::generate_one_var_per_rule(af, solver);
-        Self {
+        let mut result = Self {
             assumption_vars,
             applied_rule_solver_vars,
             atom_is_applied_solver_vars: vec![None; af.argument_set().len()],
             defeated_rule_solver_vars,
             atom_is_defeated_solver_vars: vec![None; af.argument_set().len()],
+        };
+        for arg in af.argument_set().iter() {
+            let arg_id = arg.id();
+            if !af.is_assumption_id(arg_id) {
+                result.atom_is_applied_var(arg_id, solver);
+            }
         }
+        result
     }
 
     fn generate_one_var_per_rule<T>(

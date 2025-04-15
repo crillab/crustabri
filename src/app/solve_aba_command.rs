@@ -13,7 +13,6 @@ use crustabri::{
     },
     io::{FlatABAInstanceReader, FlatABAReader, Iccma23Writer, ResponseWriter},
     solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
-    utils::LabelType,
 };
 use log::{info, warn};
 
@@ -104,6 +103,7 @@ fn execute_with_reader_and_writer(
             &af,
             semantics,
             vec![arg.unwrap()],
+            arg_matches,
             &mut acceptance_status_writer,
         ),
     }
@@ -176,20 +176,25 @@ where
     (writing_fn)(acceptance_status, None)
 }
 
-fn check_skeptical_acceptance<F, T>(
-    af: &FlatABAFramework<T>,
+fn check_skeptical_acceptance<F>(
+    af: &FlatABAFramework<usize>,
     semantics: Semantics,
-    args: Vec<&Argument<T>>,
+    args: Vec<&Argument<usize>>,
+    arg_matches: &ArgMatches<'_>,
     writing_fn: &mut F,
 ) -> Result<()>
 where
-    T: LabelType,
-    F: FnMut(bool, Option<Vec<&Argument<T>>>) -> Result<()>,
+    F: FnMut(bool, Option<Vec<&Argument<usize>>>) -> Result<()>,
 {
-    let mut solver: Box<dyn SkepticalAcceptanceComputer<T>> = match semantics {
+    let mut solver: Box<dyn SkepticalAcceptanceComputer<usize>> = match semantics {
+        Semantics::PR => Box::new(FlatABAPreferredConstraintsSolver::new(
+            af,
+            common::create_sat_solver_factory(arg_matches),
+            FlatABACycleBreaker::new_for_usize(),
+        )),
         _ => return Err(anyhow!("unsupported semantics")),
     };
     let acceptance_status =
-        solver.are_skeptically_accepted(&args.iter().map(|a| a.label()).collect::<Vec<&T>>());
+        solver.are_skeptically_accepted(&args.iter().map(|a| a.label()).collect::<Vec<&usize>>());
     (writing_fn)(acceptance_status, None)
 }
