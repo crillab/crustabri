@@ -9,7 +9,10 @@ use crate::{
     sat::{DefaultSatSolverFactory, Literal, SatSolver, SatSolverFactory},
     utils::{self, ConnectedComponentsComputer, Label, LabelType},
 };
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 /// A SAT-based solver for the ideal semantics.
 ///
@@ -125,12 +128,12 @@ where
     fn compute_one_extension_for_cc<'b>(&self, cc_af: &'b AAFramework<T>) -> Vec<&'b Argument<T>> {
         let grounded = utils::grounded_extension(cc_af);
         let solver = Rc::new(RefCell::new(self.solver_factory.new_solver()));
-        let (in_all, n_in_all, n_preferred) =
+        let (in_all, n_in_all, has_single_preferred) =
             self.compute_in_all_extensions_for_cc(cc_af, &grounded, Rc::clone(&solver));
         if n_in_all == grounded.len() {
             return grounded;
         }
-        if n_preferred == 1 {
+        if has_single_preferred {
             return single_preferred(cc_af, in_all);
         }
         compute_maximal_with_allowed(cc_af, solver, in_all, self.constraints_encoder.as_ref())
@@ -142,29 +145,52 @@ where
         cc_af: &'b AAFramework<T>,
         grounded: &[&'b Label<T>],
         solver: Rc<RefCell<Box<dyn SatSolver>>>,
-    ) -> (Vec<bool>, usize, usize) {
-        let mut in_all = vec![true; cc_af.n_arguments()];
-        let mut n_in_all = 0;
-        let mut n_preferred = 0;
+    ) -> (Vec<bool>, usize, bool) {
+        let in_all = RefCell::new(vec![true; cc_af.n_arguments()]);
+        let n_in_all = Cell::new(0);
+        let single_preferred = Cell::new(None);
+        let compute_new_in_all = |ext: &[&Label<T>], in_all: &[bool]| {
+            let mut new_in_all = vec![false; cc_af.n_arguments()];
+            let mut n_in_all = 0;
+            ext.iter().for_each(|a| {
+                if in_all[a.id()] {
+                    new_in_all[a.id()] = true;
+                    n_in_all += 1;
+                }
+            });
+            (new_in_all, n_in_all)
+        };
         PreferredSemanticsSolver::enumerate_extensions(
             cc_af,
             Rc::clone(&solver),
             self.constraints_encoder.as_ref(),
             &mut |ext| {
-                n_preferred += 1;
-                let mut new_in_all = vec![false; cc_af.n_arguments()];
-                n_in_all = 0;
-                ext.iter().for_each(|a| {
-                    if in_all[a.id()] {
-                        new_in_all[a.id()] = true;
-                        n_in_all += 1;
-                    }
+                if single_preferred.get().is_none() {
+                    return true;
+                }
+                let (_, new_n_in_all) = compute_new_in_all(ext, &in_all.borrow());
+                if n_in_all.get() == new_n_in_all {
+                    single_preferred.set(Some(false));
+                }
+                n_in_all.get() != new_n_in_all
+            },
+            &mut |ext| {
+                single_preferred.set(if single_preferred.get().is_none() {
+                    Some(true)
+                } else {
+                    Some(false)
                 });
-                in_all = new_in_all;
-                n_in_all != grounded.len()
+                let (new_in_all, new_n_in_all) = compute_new_in_all(ext, &in_all.borrow());
+                *in_all.borrow_mut() = new_in_all;
+                n_in_all.set(new_n_in_all);
+                n_in_all.get() != grounded.len()
             },
         );
-        (in_all, n_in_all, n_preferred)
+        (
+            in_all.into_inner(),
+            n_in_all.get(),
+            single_preferred.get().unwrap(),
+        )
     }
 
     fn check_credulous_acceptance_for_cc<'b>(
@@ -174,7 +200,7 @@ where
     ) -> (bool, Option<Vec<&'b Argument<T>>>) {
         let grounded = utils::grounded_extension(cc_af);
         let solver = Rc::new(RefCell::new(self.solver_factory.new_solver()));
-        let (in_all, n_in_all, n_preferred) =
+        let (in_all, n_in_all, has_single_preferred) =
             self.compute_in_all_extensions_for_cc(cc_af, &grounded, Rc::clone(&solver));
         if cc_args.iter().all(|a| !in_all[a.id()]) {
             return (false, None);
@@ -189,7 +215,7 @@ where
         if n_in_all == grounded.len() {
             return result(grounded);
         }
-        if n_preferred == 1 {
+        if has_single_preferred {
             let ext = single_preferred(cc_af, in_all);
             return result(ext);
         }
