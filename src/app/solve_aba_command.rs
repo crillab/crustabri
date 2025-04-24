@@ -57,7 +57,8 @@ fn execute_with_reader_and_writer(
 ) -> Result<()> {
     let file = arg_matches.value_of(common::ARG_INPUT).unwrap();
     reader.add_warning_handler(Box::new(|line, msg| warn!("at line {}: {}", line, msg)));
-    let af = common::read_file_path_with(file, &|r| reader.read(r))?;
+    let mut af = common::read_file_path_with(file, &|r| reader.read(r))?;
+    af.reduce_not_derivable();
     info!(
         "the argumentation framework has {} arguments, {} assumptions, {} contraries and {} rules",
         af.argument_set().len(),

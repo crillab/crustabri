@@ -6,7 +6,7 @@ where
     T: LabelType,
 {
     /// Removes the rules that cannot be derived.
-    pub(crate) fn reduce_not_derivable(&mut self) {
+    pub fn reduce_not_derivable(&mut self) {
         let n_arguments = self.argument_set().len();
         let mut tail_atom_to_rule = vec![vec![]; n_arguments];
         let mut atom_queue = vec![];
@@ -41,18 +41,7 @@ where
                 }
             }
         }
-        let mut rules_to_clear = Vec::new();
-        for (atom, _) in atom_is_derivable.iter().enumerate().filter(|(_, b)| !*b) {
-            rules_to_clear.append(&mut tail_atom_to_rule[atom]);
-        }
-        rules_to_clear.sort_unstable();
-        rules_to_clear.dedup();
-        for (head, tail_index) in rules_to_clear.iter().rev() {
-            self.swap_remove_rule_by_id_and_index(*head, *tail_index);
-        }
-        for (atom, _) in atom_is_derivable.iter().enumerate().filter(|(_, b)| !*b) {
-            self.remove_rules_with_head_id(atom);
-        }
+        self.remove_rules_with_underivable_atom(&atom_is_derivable);
     }
 }
 

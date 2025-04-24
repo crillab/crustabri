@@ -147,14 +147,17 @@ where
         Ok(())
     }
 
-    pub(crate) fn swap_remove_rule_by_id_and_index(&mut self, head_id: usize, tail_index: usize) {
-        self.rules[head_id].swap_remove(tail_index);
-        self.n_rules -= 1;
-    }
-
-    pub(crate) fn remove_rules_with_head_id(&mut self, head_id: usize) {
-        self.n_rules -= self.rules[head_id].len();
-        self.rules[head_id].clear();
+    pub(crate) fn remove_rules_with_underivable_atom(&mut self, derivable: &[bool]) {
+        for (index, tails) in self.rules.iter_mut().enumerate() {
+            if !derivable[index] {
+                self.n_rules -= tails.len();
+                tails.clear();
+                continue;
+            }
+            let len_before = tails.len();
+            tails.retain(|tail| tail.iter().all(|a| derivable[*a]));
+            self.n_rules = self.n_rules - len_before + tails.len();
+        }
     }
 
     fn label_to_argument(&self, label: &T) -> Result<&Argument<T>> {
