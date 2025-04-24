@@ -178,7 +178,8 @@ where
         af: &AAFramework<T>,
         solver: Rc<RefCell<Box<dyn SatSolver>>>,
         constraints_encoder: &dyn ConstraintsEncoder<T>,
-        callback: &mut dyn FnMut(&[&Argument<T>]) -> bool,
+        partial_callback: &mut dyn FnMut(&[&Argument<T>]) -> bool,
+        maximal_callback: &mut dyn FnMut(&[&Argument<T>]) -> bool,
     ) {
         constraints_encoder.encode_constraints(af, solver.borrow_mut().as_mut());
         let mut computer = maximal_extension_computer::new_for_preferred_semantics(
@@ -190,8 +191,13 @@ where
             computer.compute_next();
             match computer.state() {
                 MaximalExtensionComputerState::Maximal => {
-                    if !callback(computer.current()) {
+                    if !maximal_callback(computer.current()) {
                         break;
+                    }
+                }
+                MaximalExtensionComputerState::Intermediate => {
+                    if !partial_callback(computer.current()) {
+                        computer.discard_current_search();
                     }
                 }
                 MaximalExtensionComputerState::None => break,
@@ -519,6 +525,7 @@ mod tests {
             &af,
             solver,
             &constraints_encoder,
+            &mut |_| {true},
             &mut |ext| {
                 n_exts += 1;
                 let args = ext.iter().map(|a| a.label()).collect::<Vec<&String>>();
@@ -626,6 +633,7 @@ mod tests {
             &af,
             solver,
             &constraints_encoder,
+            &mut |_| {true},
             &mut |ext| {
                 n_exts += 1;
                 let args = ext.iter().map(|a| a.label()).collect::<Vec<&String>>();
