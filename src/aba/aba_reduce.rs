@@ -7,12 +7,20 @@ where
 {
     /// Removes the rules that cannot be derived.
     pub fn reduce_not_derivable(&mut self) {
+        let atom_is_derivable = self.find_derivables_from_assumption_set_fn(&|_| true);
+        self.remove_rules_with_underivable_atom(&atom_is_derivable);
+    }
+
+    pub(crate) fn find_derivables_from_assumption_set_fn<F>(&self, in_set_fn: &F) -> Vec<bool>
+    where
+        F: Fn(usize) -> bool,
+    {
         let n_arguments = self.argument_set().len();
         let mut tail_atom_to_rule = vec![vec![]; n_arguments];
         let mut atom_queue = vec![];
         let mut atom_is_derivable = vec![false; n_arguments];
         for (head, tails) in self.iter_rules_by_ids() {
-            if self.is_assumption_id(head) {
+            if self.is_assumption_id(head) && in_set_fn(head) {
                 atom_queue.push(head);
                 atom_is_derivable[head] = true;
                 continue;
@@ -41,7 +49,7 @@ where
                 }
             }
         }
-        self.remove_rules_with_underivable_atom(&atom_is_derivable);
+        atom_is_derivable
     }
 }
 

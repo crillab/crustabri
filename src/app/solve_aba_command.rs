@@ -8,8 +8,8 @@ use clap::{App, AppSettings, ArgMatches, SubCommand};
 use crustabri::{
     aa::{Argument, Query, Semantics},
     aba::{
-        FlatABACompleteConstraintsSolver, FlatABACycleBreaker, FlatABAFramework,
-        FlatABAPreferredConstraintsSolver, FlatABAStableConstraintsSolver,
+        FlatABACompleteConstraintsSolver, FlatABAFramework, FlatABAPreferredConstraintsSolver,
+        FlatABAStableConstraintsSolver,
     },
     io::{FlatABAInstanceReader, FlatABAReader, Iccma23Writer, ResponseWriter},
     solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
@@ -148,13 +148,11 @@ where
             af,
             common::create_sat_solver_factory(arg_matches)
                 .context("while creating the SAT solver factory")?,
-            FlatABACycleBreaker::new_for_usize(),
         )),
         Semantics::PR => Box::new(FlatABAPreferredConstraintsSolver::new(
             af,
             common::create_sat_solver_factory(arg_matches)
                 .context("while creating the SAT solver factory")?,
-            FlatABACycleBreaker::new_for_usize(),
         )),
         _ => return Err(anyhow!("unsupported semantics")),
     };
@@ -176,13 +174,11 @@ where
             af,
             common::create_sat_solver_factory(arg_matches)
                 .context("while creating the SAT solver factory")?,
-            FlatABACycleBreaker::new_for_usize(),
         )),
         Semantics::ST => Box::new(FlatABAStableConstraintsSolver::new(
             af,
             common::create_sat_solver_factory(arg_matches)
                 .context("while creating the SAT solver factory")?,
-            FlatABACycleBreaker::new_for_usize(),
         )),
         _ => return Err(anyhow!("unsupported semantics")),
     };
@@ -206,13 +202,11 @@ where
             af,
             common::create_sat_solver_factory(arg_matches)
                 .context("while creating the SAT solver factory")?,
-            FlatABACycleBreaker::new_for_usize(),
         )),
         Semantics::PR => Box::new(FlatABAPreferredConstraintsSolver::new(
             af,
             common::create_sat_solver_factory(arg_matches)
                 .context("while creating the SAT solver factory")?,
-            FlatABACycleBreaker::new_for_usize(),
         )),
         _ => return Err(anyhow!("unsupported semantics")),
     };

@@ -1,7 +1,4 @@
-use super::{
-    constraints_encoder::EncodingData, CompleteSemanticsEncoder, FlatABACycleBreaker,
-    FlatABAFramework,
-};
+use super::{constraints_encoder::EncodingData, CompleteSemanticsEncoder, FlatABAFramework};
 use crate::{
     aa::Argument,
     sat::{Assignment, Literal, SatSolverFactory},
@@ -64,15 +61,11 @@ where
     T: LabelType,
 {
     /// Creates a new solver for complete semantics problems applied on flat ABA frameworks.
-    pub fn new(
-        af: &'a FlatABAFramework<T>,
-        solver_factory: Box<dyn SatSolverFactory>,
-        cycle_breaker: FlatABACycleBreaker<T>,
-    ) -> Self {
+    pub fn new(af: &'a FlatABAFramework<T>, solver_factory: Box<dyn SatSolverFactory>) -> Self {
         Self {
             af,
             solver_factory,
-            constraints_encoder: CompleteSemanticsEncoder::new(cycle_breaker),
+            constraints_encoder: CompleteSemanticsEncoder::new(),
         }
     }
 
@@ -82,10 +75,9 @@ where
         init_solver_assumptions: &[Literal],
         return_on: &[&Argument<T>],
     ) -> MaximalComputationResult<T> {
-        let mut model = if let Some(m) = encoding_data
-            .solver()
-            .solve_under_assumptions(init_solver_assumptions)
-            .unwrap_model()
+        let mut model = if let Some(m) = self
+            .constraints_encoder
+            .extension_under_literal_assumptions(init_solver_assumptions, self.af, encoding_data)
         {
             m
         } else {
@@ -102,10 +94,9 @@ where
             not_in_extension.push(new_solver_assumption.negate());
             encoding_data.solver().add_clause(not_in_extension);
             in_extension.push(new_solver_assumption);
-            let opt_model = encoding_data
-                .solver()
-                .solve_under_assumptions(&in_extension)
-                .unwrap_model();
+            let opt_model = self
+                .constraints_encoder
+                .extension_under_literal_assumptions(&in_extension, self.af, encoding_data);
             encoding_data
                 .solver()
                 .add_clause(vec![new_solver_assumption.negate()]);
@@ -178,31 +169,29 @@ where
             .map(|l| self.af.argument_set().get_argument(l).unwrap())
             .collect::<Vec<_>>();
         let mut solver_assumptions = Vec::new();
+        let forgot_assumed_clauses = |a: &[Literal], d: &mut EncodingData| {
+            for solver_assumption in a {
+                d.solver().add_clause(vec![solver_assumption.negate()]);
+            }
+        };
+        let discard_maximal = |a: &mut Vec<Literal>, e: &[&Argument<T>], d: &mut EncodingData| {
+            let (_, mut not_in_extension) = self.split_in_extension(e, d);
+            let new_solver_assumption = Literal::from(1 + d.solver().n_vars() as isize);
+            not_in_extension.push(new_solver_assumption.negate());
+            d.solver().add_clause(not_in_extension);
+            a.push(new_solver_assumption);
+        };
+        let discard_partial = |a: &mut Vec<Literal>, e: &[&Argument<T>], d: &mut EncodingData| {
+            let (mut in_extension, mut not_in_extension) = self.split_in_extension(e, d);
+            in_extension.iter_mut().for_each(|l| *l = l.negate());
+            let new_solver_assumption = Literal::from(1 + d.solver().n_vars() as isize);
+            in_extension.push(new_solver_assumption.negate());
+            d.solver().add_clause(in_extension);
+            not_in_extension.push(new_solver_assumption.negate());
+            d.solver().add_clause(not_in_extension);
+            a.push(new_solver_assumption);
+        };
         loop {
-            let forgot_assumed_clauses = |a: &[Literal], d: &mut EncodingData| {
-                for solver_assumption in a {
-                    d.solver().add_clause(vec![solver_assumption.negate()]);
-                }
-            };
-            let discard_maximal =
-                |a: &mut Vec<Literal>, e: &[&Argument<T>], d: &mut EncodingData| {
-                    let (_, mut not_in_extension) = self.split_in_extension(e, d);
-                    let new_solver_assumption = Literal::from(1 + d.solver().n_vars() as isize);
-                    not_in_extension.push(new_solver_assumption.negate());
-                    d.solver().add_clause(not_in_extension);
-                    a.push(new_solver_assumption);
-                };
-            let discard_partial =
-                |a: &mut Vec<Literal>, e: &[&Argument<T>], d: &mut EncodingData| {
-                    let (mut in_extension, mut not_in_extension) = self.split_in_extension(e, d);
-                    in_extension.iter_mut().for_each(|l| *l = l.negate());
-                    let new_solver_assumption = Literal::from(1 + d.solver().n_vars() as isize);
-                    in_extension.push(new_solver_assumption.negate());
-                    d.solver().add_clause(in_extension);
-                    not_in_extension.push(new_solver_assumption.negate());
-                    d.solver().add_clause(not_in_extension);
-                    a.push(new_solver_assumption);
-                };
             let result = self.compute_maximal_under_assumptions_until(
                 &mut encoding_data,
                 &solver_assumptions,
@@ -253,11 +242,8 @@ mod tests {
     fn assert_se(str_af: &str, expected: Vec<Vec<usize>>) {
         let reader = FlatABAReader::default();
         let af = reader.read(&mut str_af.as_bytes()).unwrap();
-        let mut solver = FlatABAPreferredConstraintsSolver::new(
-            &af,
-            Box::new(DefaultSatSolverFactory),
-            FlatABACycleBreaker::new_for_usize(),
-        );
+        let mut solver =
+            FlatABAPreferredConstraintsSolver::new(&af, Box::new(DefaultSatSolverFactory));
         let actual = solver
             .compute_one_extension()
             .unwrap()
@@ -270,11 +256,8 @@ mod tests {
     fn assert_ds(str_af: &str, expected: Vec<usize>) {
         let reader = FlatABAReader::default();
         let af = reader.read(&mut str_af.as_bytes()).unwrap();
-        let mut solver = FlatABAPreferredConstraintsSolver::new(
-            &af,
-            Box::new(DefaultSatSolverFactory),
-            FlatABACycleBreaker::new_for_usize(),
-        );
+        let mut solver =
+            FlatABAPreferredConstraintsSolver::new(&af, Box::new(DefaultSatSolverFactory));
         let mut actual = Vec::new();
         for argument in af.argument_set().iter() {
             if solver.is_skeptically_accepted(argument.label()) {
