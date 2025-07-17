@@ -1,8 +1,8 @@
 [package]
 name = "scalop"
-authors = ["Jean-Marie Lagniez <lagniez@cril.fr>", "Emmanuel Lonca <lonca@cril.fr>", "Jean-Guy Mailly <jean-guy.mailly@u-paris.fr>"]
+authors = ["Jean-Marie Lagniez <lagniez@cril.fr>", "Emmanuel Lonca <lonca@cril.fr>", "Jean-Guy Mailly <jean-guy.mailly@irit.fr>"]
 license = "GPL-3.0-or-later"
-version = "1.1.1"
+version = "2.0.0"
 description = "Scalop, an argumentation solver."
 categories = ["command-line-utilities", "science"]
 keywords = ["argumentation", "frameworks", "AF", "solver"]
