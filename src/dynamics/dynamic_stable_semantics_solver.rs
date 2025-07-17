@@ -235,7 +235,7 @@ where
     }
 
     fn are_skeptically_accepted(&mut self, args: &[&T]) -> bool {
-        return self.are_skeptically_accepted_with_certificate(args).0;
+        self.are_skeptically_accepted_with_certificate(args).0
     }
 }
 

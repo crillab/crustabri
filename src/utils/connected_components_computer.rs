@@ -150,7 +150,7 @@ where
     computer: ConnectedComponentsComputer<'a, T>,
 }
 
-impl<'a, T> Iterator for ConnectedComponentsIterator<'a, T>
+impl<T> Iterator for ConnectedComponentsIterator<'_, T>
 where
     T: LabelType,
 {

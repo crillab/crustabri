@@ -1,7 +1,5 @@
 //! Specs and solvers dedicated to dynamic argumentation frameworks.
 
-pub mod assumptions_on_attacks;
-
 mod dynamic_complete_semantics_solver;
 pub use dynamic_complete_semantics_solver::DynamicCompleteSemanticsSolver;
 
