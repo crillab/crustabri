@@ -32,8 +32,8 @@ where
 /// # Example
 ///
 /// ```
-/// # use crustabri::aa::AAFramework;
-/// # use crustabri::utils::LabelType;
+/// # use scalop::aa::AAFramework;
+/// # use scalop::utils::LabelType;
 /// fn print_af_attacks<T>(af: &AAFramework<T>) where T: LabelType {
 ///     af
 ///         .iter_attacks()
@@ -53,8 +53,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{Attack};
-    /// # use crustabri::utils::LabelType;
+    /// # use scalop::aa::{Attack};
+    /// # use scalop::utils::LabelType;
     /// fn describe_attack<T: LabelType>(attack: &Attack<T>) {
     ///     println!("{} attacks {}", attack.attacker(), attack.attacked());
     /// }
@@ -68,8 +68,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{Attack};
-    /// # use crustabri::utils::LabelType;
+    /// # use scalop::aa::{Attack};
+    /// # use scalop::utils::LabelType;
     /// fn describe_attack<T: LabelType>(attack: &Attack<T>) {
     ///     println!("{} attacks {}", attack.attacker(), attack.attacked());
     /// }
@@ -90,7 +90,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let arguments = ArgumentSet::new_with_labels(&["a", "b", "c"]);
     /// let framework = AAFramework::new_with_argument_set(arguments);
     /// assert_eq!(3, framework.argument_set().len());
@@ -115,7 +115,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
     /// let args = ArgumentSet::new_with_labels(&arg_labels);
     /// let mut af = AAFramework::new_with_argument_set(args);
@@ -143,7 +143,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let arg_labels = vec!["a".to_string(), "b".to_string(), "c".to_string()];
     /// let args = ArgumentSet::new_with_labels(&arg_labels);
     /// let mut af = AAFramework::new_with_argument_set(args);
@@ -190,7 +190,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new_with_argument_set(arguments);
@@ -224,7 +224,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new_with_argument_set(arguments);
@@ -294,7 +294,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let framework = AAFramework::new_with_argument_set(arguments);
@@ -309,7 +309,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new_with_argument_set(arguments);
@@ -334,7 +334,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut af = AAFramework::new_with_argument_set(arguments);
@@ -366,7 +366,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut af = AAFramework::new_with_argument_set(arguments);
@@ -393,7 +393,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new_with_argument_set(arguments);
@@ -417,7 +417,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// let mut framework = AAFramework::new_with_argument_set(arguments);
@@ -439,7 +439,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{ArgumentSet, AAFramework};
+    /// # use scalop::aa::{ArgumentSet, AAFramework};
     /// let arg_labels = vec!["a", "b", "c", "d", "e", "f"];
     /// let args = ArgumentSet::new_with_labels(&arg_labels);
     /// let mut af = AAFramework::new_with_argument_set(args);

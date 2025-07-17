@@ -29,8 +29,8 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::io::{AspartixReader, InstanceReader};
-    /// # use crustabri::aa::AAFramework;
+    /// # use scalop::io::{AspartixReader, InstanceReader};
+    /// # use scalop::aa::AAFramework;
     /// fn read_af_from_str(s: &str) -> AAFramework<String> {
     ///     let reader = AspartixReader::default();
     ///     reader.read(&mut s.as_bytes()).expect("invalid Aspartix AF")
@@ -47,9 +47,9 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework};
-    /// # use crustabri::utils::LabelType;
-    /// # use crustabri::io::{AspartixReader, InstanceReader};
+    /// # use scalop::aa::{AAFramework};
+    /// # use scalop::utils::LabelType;
+    /// # use scalop::io::{AspartixReader, InstanceReader};
     /// fn print_arg_status<T>(reader: &dyn InstanceReader<T>, af: &AAFramework<T>, arg: &str)
     /// where
     ///     T: LabelType,

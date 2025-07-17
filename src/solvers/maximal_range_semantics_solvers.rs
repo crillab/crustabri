@@ -39,9 +39,9 @@ macro_rules! maximal_range_solver {
             /// # Example
             ///
             /// ```
-            /// # use crustabri::aa::{AAFramework};
-            /// # use crustabri::utils::LabelType;
-            #[doc = concat!(" # use crustabri::solvers::{SingleExtensionComputer, ", stringify!($solver_ident), "};")]
+            /// # use scalop::aa::{AAFramework};
+            /// # use scalop::utils::LabelType;
+            #[doc = concat!(" # use scalop::solvers::{SingleExtensionComputer, ", stringify!($solver_ident), "};")]
             /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
             #[doc = concat!("     let mut solver = ", stringify!($solver_ident), "::new(af);")]
             ///     let ext = solver.compute_one_extension().unwrap();
@@ -62,10 +62,10 @@ macro_rules! maximal_range_solver {
             /// # Example
             ///
             /// ```
-            /// # use crustabri::aa::{AAFramework};
-            /// # use crustabri::utils::LabelType;
-            /// # use crustabri::sat::DefaultSatSolverFactory;
-            #[doc = concat!(" # use crustabri::solvers::{SingleExtensionComputer, ", stringify!($solver_ident), "};")]
+            /// # use scalop::aa::{AAFramework};
+            /// # use scalop::utils::LabelType;
+            /// # use scalop::sat::DefaultSatSolverFactory;
+            #[doc = concat!(" # use scalop::solvers::{SingleExtensionComputer, ", stringify!($solver_ident), "};")]
             /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
             #[doc = concat!("     let mut solver = ", stringify!($solver_ident), "::new_with_sat_solver_factory(")]
             ///         af,
@@ -98,11 +98,11 @@ macro_rules! maximal_range_solver {
             /// # Example
             ///
             /// ```
-            /// # use crustabri::aa::{AAFramework};
-            /// # use crustabri::utils::LabelType;
-            /// # use crustabri::sat::DefaultSatSolverFactory;
-            /// # use crustabri::encodings;
-            #[doc = concat!(" # use crustabri::solvers::{SingleExtensionComputer, ", stringify!($solver_ident), "};")]
+            /// # use scalop::aa::{AAFramework};
+            /// # use scalop::utils::LabelType;
+            /// # use scalop::sat::DefaultSatSolverFactory;
+            /// # use scalop::encodings;
+            #[doc = concat!(" # use scalop::solvers::{SingleExtensionComputer, ", stringify!($solver_ident), "};")]
             /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
             #[doc = concat!("     let mut solver = ", stringify!($solver_ident), "::new_with_sat_solver_factory_and_constraints_encoder(")]
             ///         af,

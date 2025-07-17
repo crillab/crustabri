@@ -85,8 +85,8 @@ where
 /// # Example
 ///
 /// ```
-/// # use crustabri::aa::AAFramework;
-/// # use crustabri::io::{AspartixReader, InstanceReader};
+/// # use scalop::aa::AAFramework;
+/// # use scalop::io::{AspartixReader, InstanceReader};
 /// fn read_af_from_str(s: &str) -> AAFramework<String> {
 ///     let reader = AspartixReader::default();
 ///     reader.read(&mut s.as_bytes()).expect("invalid Aspartix AF")

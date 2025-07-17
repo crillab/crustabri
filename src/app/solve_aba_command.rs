@@ -5,7 +5,8 @@ use super::{
 };
 use anyhow::{anyhow, Context, Result};
 use clap::{App, AppSettings, ArgMatches, SubCommand};
-use crustabri::{
+use log::{info, warn};
+use scalop::{
     aa::{Argument, Query, Semantics},
     aba::{
         FlatABACompleteConstraintsSolver, FlatABAFramework, FlatABAPreferredConstraintsSolver,
@@ -14,7 +15,6 @@ use crustabri::{
     io::{FlatABAInstanceReader, FlatABAReader, Iccma23Writer, ResponseWriter},
     solvers::{CredulousAcceptanceComputer, SingleExtensionComputer, SkepticalAcceptanceComputer},
 };
-use log::{info, warn};
 
 const CMD_NAME: &str = "solve-aba";
 

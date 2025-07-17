@@ -2,7 +2,7 @@ use std::{cell::RefCell, fs, io::Read, rc::Rc};
 
 use anyhow::Result;
 use clap::{AppSettings, Arg, ArgMatches, SubCommand};
-use crustabri::{
+use scalop::{
     aa::Semantics,
     encodings::{
         aux_var_constraints_encoder, exp_constraints_encoder, ConstraintsEncoder,

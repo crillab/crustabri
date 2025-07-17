@@ -27,7 +27,7 @@ impl ExternalSatSolver {
     /// # Example
     ///
     /// ```no_run
-    /// # use crustabri::sat::{ExternalSatSolver, Literal, SatSolver, self};
+    /// # use scalop::sat::{ExternalSatSolver, Literal, SatSolver, self};
     /// let mut solver = ExternalSatSolver::new(
     ///     "/home/me/my_solver".to_string(),
     ///     vec!["-i".to_string(), "/dev/stdin".to_string()],

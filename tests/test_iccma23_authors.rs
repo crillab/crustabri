@@ -16,5 +16,5 @@ fn test_authors(cargo_bin: &str) {
 
 #[test]
 fn test_iccma23() {
-    test_authors("crustabri_iccma23")
+    test_authors("scalop_iccma23")
 }

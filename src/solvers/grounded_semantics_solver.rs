@@ -29,9 +29,9 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework};
-    /// # use crustabri::utils::LabelType;
-    /// # use crustabri::solvers::{SingleExtensionComputer, GroundedSemanticsSolver};
+    /// # use scalop::aa::{AAFramework};
+    /// # use scalop::utils::LabelType;
+    /// # use scalop::solvers::{SingleExtensionComputer, GroundedSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = GroundedSemanticsSolver::new(af);
     ///     let ext = solver.compute_one_extension().unwrap();

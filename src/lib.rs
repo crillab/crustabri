@@ -1,4 +1,5 @@
-//! Crustabri is a RUST ABstract argumentation Reasoner Implementation.
+//! Scalop is a solver designed for reasoning with argumentation frameworks, including abstract argumentation and assumption-based argumentation tasks.
+//! It was formerly named Crustabri.
 //!
 //! This library provides datastructures and functions used to handle argumentation frameworks and to execute queries on them.
 //! Take a look at the example below to get an overview, and browse this documentation to see its capabilities.
@@ -6,8 +7,8 @@
 //! # Example
 //!
 //! ```
-//! # use crustabri::aa::{ArgumentSet, AAFramework};
-//! # use crustabri::solvers::{SingleExtensionComputer, StableSemanticsSolver};
+//! # use scalop::aa::{ArgumentSet, AAFramework};
+//! # use scalop::solvers::{SingleExtensionComputer, StableSemanticsSolver};
 //! let labels = vec!["a", "b", "c"];
 //! let arguments = ArgumentSet::new_with_labels(&labels);
 //! let mut framework = AAFramework::new_with_argument_set(arguments);

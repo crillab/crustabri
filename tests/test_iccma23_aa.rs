@@ -30,7 +30,7 @@ fn test_answer_for_track_and_instance(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let file = NamedTempFile::new("test_instance.aa")?;
     file.write_str(instance)?;
-    let mut cmd = Command::cargo_bin("crustabri_iccma23")?;
+    let mut cmd = Command::cargo_bin("scalop_iccma23")?;
     cmd.arg("-f").arg(file.path()).arg("-p").arg(track);
     if let Some(a) = additional_arg {
         cmd.arg("-a").arg(a);

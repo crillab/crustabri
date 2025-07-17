@@ -4,7 +4,8 @@ use super::{
 };
 use anyhow::{Context, Result};
 use clap::{Arg, ArgMatches};
-use crustabri::{
+use log::{info, warn};
+use scalop::{
     aa::AAFramework,
     io::InstanceReader,
     sat::{
@@ -13,7 +14,6 @@ use crustabri::{
     },
     utils::LabelType,
 };
-use log::{info, warn};
 use std::{
     fs::{self, File},
     io::{BufReader, Read},
@@ -28,7 +28,7 @@ pub(crate) fn create_app_helper() -> AppHelper<'static> {
         app_name,
         app_version,
         authors,
-        "Crustabri, an abstract argumentation solver.",
+        "Scalop, an argumentation solver.",
     );
     let commands: Vec<Box<dyn Command>> = vec![
         Box::new(AuthorsCommand::new(app_name, app_version, authors)),

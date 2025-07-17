@@ -36,9 +36,9 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework, Argument, ArgumentSet};
-    /// # use crustabri::utils::LabelType;
-    /// # use crustabri::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
+    /// # use scalop::aa::{AAFramework, Argument, ArgumentSet};
+    /// # use scalop::utils::LabelType;
+    /// # use scalop::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
     /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &T) where T: LabelType {
     ///     let mut solver = CompleteSemanticsSolver::new(af);
     ///     if solver.is_credulously_accepted(arg) {
@@ -64,10 +64,10 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework, Argument, ArgumentSet};
-    /// # use crustabri::utils::LabelType;
-    /// # use crustabri::sat::DefaultSatSolverFactory;
-    /// # use crustabri::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
+    /// # use scalop::aa::{AAFramework, Argument, ArgumentSet};
+    /// # use scalop::utils::LabelType;
+    /// # use scalop::sat::DefaultSatSolverFactory;
+    /// # use scalop::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
     /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &T) where T: LabelType {
     ///     let mut solver = CompleteSemanticsSolver::new_with_sat_solver_factory(
     ///         af,
@@ -103,11 +103,11 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework, Argument, ArgumentSet};
-    /// # use crustabri::utils::LabelType;
-    /// # use crustabri::sat::DefaultSatSolverFactory;
-    /// # use crustabri::encodings;
-    /// # use crustabri::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
+    /// # use scalop::aa::{AAFramework, Argument, ArgumentSet};
+    /// # use scalop::utils::LabelType;
+    /// # use scalop::sat::DefaultSatSolverFactory;
+    /// # use scalop::encodings;
+    /// # use scalop::solvers::{CredulousAcceptanceComputer, CompleteSemanticsSolver};
     /// fn check_credulous_acceptance<T>(af: &AAFramework<T>, arg: &T) where T: LabelType {
     ///     let mut solver = CompleteSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
     ///         af,
