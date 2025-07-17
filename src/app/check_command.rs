@@ -1,7 +1,7 @@
 use super::{cli_manager, command::Command, common};
 use anyhow::Result;
 use clap::{App, AppSettings, ArgMatches, SubCommand};
-use crustabri::io::{AspartixReader, Iccma23Reader};
+use scalop::io::{AspartixReader, Iccma23Reader};
 
 const CMD_NAME: &str = "check";
 

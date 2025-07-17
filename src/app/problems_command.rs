@@ -1,7 +1,7 @@
 use super::{cli_manager, command::Command};
 use anyhow::Result;
 use clap::{App, AppSettings, ArgMatches, SubCommand};
-use crustabri::aa::Query;
+use scalop::aa::Query;
 
 const CMD_NAME: &str = "problems";
 

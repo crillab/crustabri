@@ -1,6 +1,6 @@
 use assert_cmd::Command;
-use crustabri::aa::Query;
 use predicates::{reflection::PredicateReflection, Predicate};
+use scalop::aa::Query;
 use std::fmt::Display;
 
 fn test_problems(cargo_bin: &str) {
@@ -50,5 +50,5 @@ impl Predicate<[u8]> for CheckProblemsPredicate {
 
 #[test]
 fn test_iccma23() {
-    test_problems("crustabri_iccma23")
+    test_problems("scalop_iccma23")
 }

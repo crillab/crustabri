@@ -5,7 +5,8 @@ use super::{
 };
 use anyhow::{anyhow, Context, Result};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
-use crustabri::{
+use log::{info, warn};
+use scalop::{
     aa::{AAFramework, Argument, Query, Semantics},
     encodings::{
         aux_var_constraints_encoder, exp_constraints_encoder, ConstraintsEncoder,
@@ -23,7 +24,6 @@ use crustabri::{
     },
     utils::LabelType,
 };
-use log::{info, warn};
 
 const CMD_NAME: &str = "solve";
 

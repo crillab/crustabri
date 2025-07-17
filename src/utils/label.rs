@@ -83,7 +83,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::utils::LabelSet;
+    /// # use scalop::utils::LabelSet;
     /// let labels = vec!["a", "b"];
     /// let labels = LabelSet::new_with_labels(&labels);
     /// assert_eq!(2, labels.len());
@@ -108,7 +108,7 @@ where
     /// In the label is already present in the set, nothing is added.
     ///
     /// ```
-    /// # use crustabri::utils::LabelSet;
+    /// # use scalop::utils::LabelSet;
     /// let labels = vec!["a", "b"];
     /// let mut label_set = LabelSet::new_with_labels(&labels);
     /// assert_eq!(2, label_set.len());
@@ -133,7 +133,7 @@ where
     /// An error is returned if the label is not present in the set.
     ///
     /// ```
-    /// # use crustabri::utils::LabelSet;
+    /// # use scalop::utils::LabelSet;
     /// let labels = vec!["a", "b"];
     /// let mut label_set = LabelSet::new_with_labels(&labels);
     /// assert_eq!(2, label_set.len());
@@ -162,7 +162,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::utils::LabelSet;
+    /// # use scalop::utils::LabelSet;
     /// let labels = vec!["a", "b"];
     /// let mut label_set = LabelSet::new_with_labels(&labels);
     /// assert_eq!(2, label_set.len());
@@ -180,7 +180,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::utils::LabelSet;
+    /// # use scalop::utils::LabelSet;
     /// let labels = vec!["a", "b"];
     /// let mut label_set = LabelSet::new_with_labels(&labels);
     /// assert_eq!(1, label_set.max_id().unwrap());
@@ -200,7 +200,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::utils::LabelSet;
+    /// # use scalop::utils::LabelSet;
     /// let labels = vec!["a", "b"];
     /// let mut label_set = LabelSet::new_with_labels(&labels);
     /// assert!(!label_set.is_empty());
@@ -219,7 +219,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::utils::LabelSet;
+    /// # use scalop::utils::LabelSet;
     /// let labels = vec!["a", "b", "c"];
     /// let labels = LabelSet::new_with_labels(&labels);
     /// assert!(labels.get_label(&"a").is_ok());
@@ -244,7 +244,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::utils::LabelSet;
+    /// # use scalop::utils::LabelSet;
     /// let labels = vec!["a", "b", "c"];
     /// let label_set = LabelSet::new_with_labels(&labels);
     /// assert_eq!(&labels[0], label_set.get_label_by_id(0).label());
@@ -262,7 +262,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::utils::LabelSet;
+    /// # use scalop::utils::LabelSet;
     /// let labels = vec!["a", "b", "c"];
     /// let mut labels = LabelSet::new_with_labels(&labels);
     /// labels.remove_label(&"b");
@@ -279,7 +279,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::utils::LabelSet;
+    /// # use scalop::utils::LabelSet;
     /// let labels = vec!["a", "b", "c"];
     /// let labels = LabelSet::new_with_labels(&labels);
     /// assert_eq!(3, labels.iter().count());

@@ -16,8 +16,8 @@ use anyhow::Result;
 /// # Example
 ///
 /// ```
-/// # use crustabri::aa::{Argument};
-/// # use crustabri::utils::LabelType;
+/// # use scalop::aa::{Argument};
+/// # use scalop::utils::LabelType;
 /// fn describe_argument<T: LabelType>(a: &Argument<T>) {
 ///     println!("argument with id {} has the label {}", a.id(), a.label())    ;
 /// }
@@ -52,7 +52,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::ArgumentSet;
+    /// # use scalop::aa::ArgumentSet;
     /// let labels = vec!["a", "b"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(2, arguments.len());
@@ -69,7 +69,7 @@ where
     /// In an argument with the same label is already defined, no argument is added.
     ///
     /// ```
-    /// # use crustabri::aa::ArgumentSet;
+    /// # use scalop::aa::ArgumentSet;
     /// let arg_labels = vec!["a", "b"];
     /// let mut arguments = ArgumentSet::new_with_labels(&arg_labels);
     /// assert_eq!(2, arguments.len());
@@ -90,7 +90,7 @@ where
     /// An error is returned if no argument with the provided label exists.
     ///
     /// ```
-    /// # use crustabri::aa::ArgumentSet;
+    /// # use scalop::aa::ArgumentSet;
     /// let arg_labels = vec!["a", "b"];
     /// let mut arguments = ArgumentSet::new_with_labels(&arg_labels);
     /// assert_eq!(2, arguments.len());
@@ -113,7 +113,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::ArgumentSet;
+    /// # use scalop::aa::ArgumentSet;
     /// let arg_labels = vec!["a", "b"];
     /// let mut arguments = ArgumentSet::new_with_labels(&arg_labels);
     /// assert_eq!(2, arguments.len());
@@ -131,7 +131,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::ArgumentSet;
+    /// # use scalop::aa::ArgumentSet;
     /// let arg_labels = vec!["a", "b"];
     /// let mut arguments = ArgumentSet::new_with_labels(&arg_labels);
     /// assert_eq!(1, arguments.max_id().unwrap());
@@ -147,7 +147,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::ArgumentSet;
+    /// # use scalop::aa::ArgumentSet;
     /// let arg_labels = vec!["a", "b"];
     /// let mut arguments = ArgumentSet::new_with_labels(&arg_labels);
     /// assert!(!arguments.is_empty());
@@ -166,7 +166,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::ArgumentSet;
+    /// # use scalop::aa::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert!(arguments.get_argument(&"a").is_ok());
@@ -188,7 +188,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::ArgumentSet;
+    /// # use scalop::aa::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(&labels[0], arguments.get_argument_by_id(0).label());
@@ -206,7 +206,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::ArgumentSet;
+    /// # use scalop::aa::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
     /// let mut arguments = ArgumentSet::new_with_labels(&labels);
     /// arguments.remove_argument(&"b");
@@ -223,7 +223,7 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::ArgumentSet;
+    /// # use scalop::aa::ArgumentSet;
     /// let labels = vec!["a", "b", "c"];
     /// let arguments = ArgumentSet::new_with_labels(&labels);
     /// assert_eq!(3, arguments.iter().count());

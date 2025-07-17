@@ -1,32 +1,32 @@
 [package]
-name = "crustabri"
-authors = ["Jean-Marie Lagniez <lagniez@cril.fr>", "Emmanuel Lonca <lonca@cril.fr>", "Jean-Guy Mailly <jean-guy.mailly@u-paris.fr>"]
+name = "scalop"
+authors = ["Jean-Marie Lagniez <lagniez@cril.fr>", "Emmanuel Lonca <lonca@cril.fr>", "Jean-Guy Mailly <jean-guy.mailly@irit.fr>"]
 license = "GPL-3.0-or-later"
-version = "1.1.1"
-description = "An argumentation framework library & solver."
+version = "2.0.0"
+description = "Scalop, an argumentation solver."
 categories = ["command-line-utilities", "science"]
 keywords = ["argumentation", "frameworks", "AF", "solver"]
 repository = "https://github.com/crillab/crustabri"
 edition = "2021"
-default-run = "crustabri"
+default-run = "scalop"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "crustabri"
+name = "scalop"
 path = "src/lib.rs"
 
 [[bin]]
-name = "crustabri"
+name = "scalop"
 path = "src/main.rs"
 
 [[bin]]
-name = "crustabri_iccma23"
+name = "scalop_iccma23"
 path = "src/main_iccma23.rs"
 required-features = ["iccma"]
 
 [[bin]]
-name = "crustabri_iccma25"
+name = "scalop_iccma25"
 path = "src/main_iccma25.rs"
 required-features = ["iccma"]
 

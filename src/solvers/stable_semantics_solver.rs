@@ -39,9 +39,9 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework};
-    /// # use crustabri::utils::LabelType;
-    /// # use crustabri::solvers::{SingleExtensionComputer, StableSemanticsSolver};
+    /// # use scalop::aa::{AAFramework};
+    /// # use scalop::utils::LabelType;
+    /// # use scalop::solvers::{SingleExtensionComputer, StableSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = StableSemanticsSolver::new(af);
     ///     let opt_ext = solver.compute_one_extension();
@@ -64,10 +64,10 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework};
-    /// # use crustabri::utils::LabelType;
-    /// # use crustabri::sat::DefaultSatSolverFactory;
-    /// # use crustabri::solvers::{SingleExtensionComputer, StableSemanticsSolver};
+    /// # use scalop::aa::{AAFramework};
+    /// # use scalop::utils::LabelType;
+    /// # use scalop::sat::DefaultSatSolverFactory;
+    /// # use scalop::solvers::{SingleExtensionComputer, StableSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = StableSemanticsSolver::new_with_sat_solver_factory(
     ///         af,

@@ -67,7 +67,7 @@ impl Literal {
     /// # Example
     ///
     /// ```
-    /// # use crustabri::sat::Literal;
+    /// # use scalop::sat::Literal;
     /// fn always_ok(l: Literal) {
     ///     assert_ne!(l, l.negate());
     ///     assert_eq!(l, l.negate().negate());
@@ -83,7 +83,7 @@ impl Literal {
     /// # Example
     ///
     /// ```
-    /// # use crustabri::sat::Literal;
+    /// # use scalop::sat::Literal;
     /// fn are_opposite_literals(l0: Literal, l1: Literal) -> bool {
     ///     l0 != l1 && l0.var() == l1.var()
     /// }
@@ -161,7 +161,7 @@ impl Assignment {
     /// # Example
     ///
     /// ```
-    /// # use crustabri::sat::{Assignment, self};
+    /// # use scalop::sat::{Assignment, self};
     /// # fn get_assignment() -> Assignment {let mut s = sat::default_solver(); s.solve().unwrap_model().unwrap()}
     /// let assignment = get_assignment(); // user defined function
     /// # fn get_n_vars() -> usize {0}
@@ -189,7 +189,7 @@ impl Assignment {
     /// # Example
     ///
     /// ```
-    /// # use crustabri::sat::{Assignment, self};
+    /// # use scalop::sat::{Assignment, self};
     /// # fn get_assignment() -> Assignment {let mut s = sat::default_solver(); s.solve().unwrap_model().unwrap()}
     /// let assignment = get_assignment(); // user defined function
     /// assignment.iter().for_each(|opt_lit| {
@@ -252,7 +252,7 @@ pub trait SatSolver {
     /// # Example
     ///
     /// ```
-    /// # use crustabri::sat::{self, Literal, SatSolver, SolvingResult};
+    /// # use scalop::sat::{self, Literal, SatSolver, SolvingResult};
     /// fn try_to_solve(s: &mut dyn SatSolver) {
     ///     match s.solve() {
     ///         SolvingResult::Satisfiable(assignment) => {
@@ -280,7 +280,7 @@ pub trait SatSolver {
     /// # Example
     ///
     /// ```
-    /// # use crustabri::sat::{self, Literal, SatSolver, SolvingResult};
+    /// # use scalop::sat::{self, Literal, SatSolver, SolvingResult};
     /// fn try_to_solve_under_assumptions(s: &mut dyn SatSolver, assumptions: &[Literal]) {
     ///     match s.solve_under_assumptions(assumptions) {
     ///         SolvingResult::Satisfiable(assignment) => {
@@ -309,7 +309,7 @@ pub trait SatSolver {
     /// # Example
     ///
     /// ```
-    /// # use crustabri::sat::{self, Literal};
+    /// # use scalop::sat::{self, Literal};
     /// let mut solver = sat::default_solver();
     /// assert_eq!(0, solver.n_vars());
     /// solver.add_clause(vec![Literal::from(1), Literal::from(-2)]);

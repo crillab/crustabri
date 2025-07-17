@@ -33,10 +33,10 @@ use std::io::Write;
 /// The following example retrieves an AF and writes it to the standard output using the Aspartix format.
 ///
 /// ```
-/// # use crustabri::aa::AAFramework;
-/// # use crustabri::aa::ArgumentSet;
-/// # use crustabri::io::AspartixWriter;
-/// # use crustabri::utils::LabelType;
+/// # use scalop::aa::AAFramework;
+/// # use scalop::aa::ArgumentSet;
+/// # use scalop::io::AspartixWriter;
+/// # use scalop::utils::LabelType;
 /// # use anyhow::Result;
 /// fn write_af_to_stdout<T: LabelType>(af: &AAFramework<T>) -> Result<()> {
 ///     let writer = AspartixWriter;
@@ -55,10 +55,10 @@ impl AspartixWriter {
     /// The following example retrieves an AF and writes it to the standard output using the Aspartix format.
     ///
     /// ```
-    /// # use crustabri::aa::AAFramework;
-    /// # use crustabri::aa::ArgumentSet;
-    /// # use crustabri::io::AspartixWriter;
-    /// # use crustabri::utils::LabelType;
+    /// # use scalop::aa::AAFramework;
+    /// # use scalop::aa::ArgumentSet;
+    /// # use scalop::io::AspartixWriter;
+    /// # use scalop::utils::LabelType;
     /// # use anyhow::Result;
     /// fn write_af_to_stdout<T: LabelType>(af: &AAFramework<T>) -> Result<()> {
     ///     let writer = AspartixWriter;

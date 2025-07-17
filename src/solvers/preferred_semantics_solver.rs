@@ -38,9 +38,9 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework};
-    /// # use crustabri::utils::LabelType;
-    /// # use crustabri::solvers::{SingleExtensionComputer, PreferredSemanticsSolver};
+    /// # use scalop::aa::{AAFramework};
+    /// # use scalop::utils::LabelType;
+    /// # use scalop::solvers::{SingleExtensionComputer, PreferredSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = PreferredSemanticsSolver::new(af);
     ///     let ext = solver.compute_one_extension().unwrap();
@@ -59,10 +59,10 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework};
-    /// # use crustabri::utils::LabelType;
-    /// # use crustabri::sat::DefaultSatSolverFactory;
-    /// # use crustabri::solvers::{SingleExtensionComputer, PreferredSemanticsSolver};
+    /// # use scalop::aa::{AAFramework};
+    /// # use scalop::utils::LabelType;
+    /// # use scalop::sat::DefaultSatSolverFactory;
+    /// # use scalop::solvers::{SingleExtensionComputer, PreferredSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory(
     ///         af,
@@ -91,11 +91,11 @@ where
     /// # Example
     ///
     /// ```
-    /// # use crustabri::aa::{AAFramework};
-    /// # use crustabri::utils::LabelType;
-    /// # use crustabri::sat::DefaultSatSolverFactory;
-    /// # use crustabri::encodings;
-    /// # use crustabri::solvers::{SingleExtensionComputer, PreferredSemanticsSolver};
+    /// # use scalop::aa::{AAFramework};
+    /// # use scalop::utils::LabelType;
+    /// # use scalop::sat::DefaultSatSolverFactory;
+    /// # use scalop::encodings;
+    /// # use scalop::solvers::{SingleExtensionComputer, PreferredSemanticsSolver};
     /// fn search_one_extension<T>(af: &AAFramework<T>) where T: LabelType {
     ///     let mut solver = PreferredSemanticsSolver::new_with_sat_solver_factory_and_constraints_encoder(
     ///         af,
